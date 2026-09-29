@@ -772,6 +772,10 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
         }
         return;
     }
+    // Offline joint-input requests must never reach either network player.
+    // The manager hook rejects them, but keymap hooks can run before that hook.
+    if (scene == SokuLib::SCENE_BATTLESV || scene == SokuLib::SCENE_BATTLECL)
+        return;
     const auto player = playerIndexFor(self);
     if (player < 0)
         return;
