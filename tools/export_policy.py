@@ -77,8 +77,8 @@ def main(cfg):
     manifest = {"format": "sokurl-recurrent-onnx-v1", "model": "actor.onnx",
         "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
         "source_sha256": loaded.fingerprint, "training_config": "training.yaml",
-        "observation_shape": shape, "state_shape": state_shape,
-        "num_actions": interface.action_space.n,
+        "observation_shape": [int(size) for size in shape], "state_shape": [int(size) for size in state_shape],
+        "num_actions": int(interface.action_space.n),
         "verification": {"steps": config["verification_steps"], "round_resets": config["verification_steps"]//128,
                          "maximum_absolute_errors": errors.tolist()},
         "versions": {"torch": torch.__version__, "onnx": onnx.__version__, "onnxruntime": ort.__version__}}
