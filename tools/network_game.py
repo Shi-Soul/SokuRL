@@ -198,7 +198,7 @@ class NetworkGame:
             if pid.value == self.process.pid:
                 kind = ctypes.create_unicode_buffer(128)
                 user32.GetClassNameW(hwnd, kind, len(kind))
-                if kind.value != "#32770":
+                if kind.value == "th123_110a":
                     changed.append(bool(user32.SetWindowTextW(hwnd, caption)))
             return True
 
