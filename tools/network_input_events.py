@@ -6,7 +6,7 @@ from network_input import RESULTS
 
 
 EVENT = struct.Struct("<6I3Q")
-KINDS = RESULTS | {8: "injected", 9: "expired", 10: "cancelled"}
+KINDS = RESULTS | {8: "injected", 9: "expired", 10: "cancelled", 11: "superseded"}
 
 
 def decode_input_event(data):

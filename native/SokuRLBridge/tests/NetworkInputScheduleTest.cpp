@@ -1,5 +1,6 @@
 #include "../NetworkInputSchedule.hpp"
-#include <stdexcept>
+#include <cstdio>
+#include <cstdlib>
 #include <tuple>
 #include <vector>
 
@@ -10,7 +11,7 @@ void record(const ScheduledNetworkInput &request, unsigned kind, std::uint64_t a
     events.emplace_back(request.sequence, kind, at);
 }
 void require(bool condition, const char *message) {
-    if (!condition) throw std::runtime_error(message);
+    if (!condition) { std::fprintf(stderr, "%s\n", message); std::exit(1); }
 }
 ScheduledNetworkInput request(unsigned sequence, std::uint64_t observed, int horizontal) {
     return {sequence, 1, 1, 0, 3, observed, observed+5, {horizontal, 0, 0, 0, 0, 0, 0, 0}};

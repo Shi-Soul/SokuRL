@@ -41,6 +41,11 @@ def test_ordered_acceptance_injection_expiry_and_round_cancellation():
 def test_invalid_event_is_rejected():
     with pytest.raises(ValueError, match="length"):
         decode_input_event(b"")
-    for request, kind in ((0, 1), (1, 0), (1, 11)):
+    for request, kind in ((0, 1), (1, 0), (1, 12)):
         with pytest.raises(ValueError, match="identity"):
             decode_input_event(EVENT.pack(request, kind, 1, 1, 0, 3, 1, 6, 1))
+
+
+def test_superseded_intent_is_distinct_from_injection():
+    event = decode_input_event(EVENT.pack(1, 11, 1, 1, 0, 3, 208, 213, 216))
+    assert event["result"] == "superseded" and event["at"] == 216
