@@ -59,7 +59,7 @@ def main(cfg: DictConfig):
                     parameters["ppo"]["gamma"])
         if discount != 1.:
             raise ValueError("the finite-horizon health potential requires gamma=1")
-    if config["track"] == "human" and episode.observation_mode == "diagnostic_state":
+    if config["track"] == "human" and episode.observation_mode in {"diagnostic_state", "privileged_state"}:
         raise ValueError("the human track cannot expose privileged diagnostic state")
     if config["track"] not in {"human", "superhuman"}:
         raise ValueError("unsupported training track")

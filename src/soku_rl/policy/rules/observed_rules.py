@@ -39,7 +39,10 @@ class RulePolicy(RulePolicyBase):
     implementation: str
 
     def __post_init__(self):
-        if self.episode.observation_mode not in {"state", "diagnostic_state"}:
+        if self.name == "god":
+            self.god_policy()
+            return
+        if self.episode.observation_mode not in {"state", "diagnostic_state", "privileged_state"}:
             raise ValueError("rule policies require a numeric observation")
         if self.episode.observation_mode == "diagnostic_state" and self.episode.decision_frames != 1:
             raise ValueError("legacy diagnostic rules require one decision per frame")
@@ -47,10 +50,14 @@ class RulePolicy(RulePolicyBase):
 
     @property
     def fingerprint(self):
+        if self.name == "god":
+            return self.god_policy().fingerprint
         data = [self.name, self.rules, asdict(self.episode), self.implementation]
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
     def spawn(self, seed):
+        if self.name == "god":
+            return self.god_policy().spawn(seed)
         if type(seed) is not int or not 0 <= seed < 2**32:
             raise ValueError("policy seed must be a uint32")
         strategy = strategy_from_config(self.name, self.rules, self.implementation)
@@ -61,6 +68,13 @@ class RulePolicy(RulePolicyBase):
             actor = ScreenRules(strategy, self.rules["screen"], self.episode.decision_frames)
         return RuleEpisode(actor, self.episode)
 
+    def god_policy(self):
+        from soku_rl.policy.god.runtime import GodPolicy
+        from soku_rl.policy.god.package import ScriptPackage
+        config = self.rules["god"]
+        return GodPolicy(self.name, ScriptPackage(config["package"], config["api_source"]),
+                         config["script"], self.episode)
+
 
 @dataclass
 class RuleEpisode:
@@ -69,6 +83,16 @@ class RuleEpisode:
 
     def act(self, observation):
         values = np.asarray(observation)
+        if self.episode.observation_mode == "privileged_state":
+            from soku_rl.env.observation.privileged import decode_privileged
+            from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
+            current = decode_privileged(values[-PRIVILEGED_FEATURES:])
+            fighters = [Fighter(p["x"], p["y"], int(p["hp"]), p["rei"] / 1000.,
+                int(p["act"]), bool(int(p["fflags"]) & 4), int(p["hitstop"]), int(p["char"]), int(p["dir"]))
+                for p in current.players]
+            objects = tuple(Projectile(p["x"], p["y"], p["xspeed"], p["yspeed"])
+                            for p in current.players[1]["objects"] if p["attackarea_n"])
+            return encode_action(self.actor.act(Observation(int(current.world["frame"]), *fighters, objects)).inputs)
         width = STATE_FEATURES if self.episode.observation_mode == "state" else FRAME_FEATURES
         if values.shape != (width * self.episode.history_frames,) or not np.isfinite(values).all():
             raise ValueError("rule observation does not match the episode configuration")

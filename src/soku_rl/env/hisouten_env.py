@@ -11,6 +11,8 @@ from soku_rl.env.encoding import AGENTS, NUM_ACTIONS, decode_action, encode_obse
 from soku_rl.env.control import ControlConfig, DelayedControls
 from soku_rl.env.observation_history import ObservationHistory
 from soku_rl.env.match import LEGACY_MATCH, MatchConfig
+from soku_rl.env.observation.privileged import encode_privileged
+from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
 
 
 @dataclass(frozen=True)
@@ -36,7 +38,7 @@ class EpisodeConfig:
             object.__setattr__(self, "visibility", VisibilityConfig(**self.visibility))
         if not isinstance(self.visibility, VisibilityConfig):
             raise TypeError("visibility must be a VisibilityConfig or its configuration dictionary")
-        if self.observation_mode not in {"image", "state", "diagnostic_state"}:
+        if self.observation_mode not in {"image", "state", "diagnostic_state", "privileged_state"}:
             raise ValueError("unsupported observation mode")
 
     def backend_observation(self):
@@ -49,6 +51,8 @@ class EpisodeConfig:
         return cls(**({"match": LEGACY_MATCH} | values))
 
     def space(self):
+        if self.observation_mode == "privileged_state":
+            return spaces.Box(-np.inf, np.inf, (PRIVILEGED_FEATURES * self.history_frames,), np.float32)
         if self.observation_mode == "image":
             return spaces.Box(0, 255, (3 * self.history_frames + 1, 240, 320), np.uint8)
         if self.observation_mode == "state":
@@ -56,6 +60,8 @@ class EpisodeConfig:
         return observation_space(self.history_frames)
 
     def encode(self, observation):
+        if self.observation_mode == "privileged_state":
+            return encode_privileged(observation)
         if self.observation_mode == "image":
             if not isinstance(observation, RGBFrame) or (observation.width, observation.height) != (320, 240):
                 raise ValueError("expected a native 320x240 RGB frame")

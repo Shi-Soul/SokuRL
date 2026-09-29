@@ -12,7 +12,7 @@ import sokurl
 
 
 RESET_METHODS = {"image": "process_restart", "state": "native_scene_reload",
-                 "diagnostic_state": "native_scene_reload"}
+                 "diagnostic_state": "native_scene_reload", "privileged_state": "native_scene_reload"}
 
 
 def _time_step(raw, dropped_frames, observations, pid):
@@ -49,6 +49,7 @@ class SokuGameBatch:
         self.frames = {}
         self.active = set()
         self.image_clients = {}
+        self.privileged_readers = {}
         self.observation_mode = "diagnostic_state"
 
     def configure_observation(self, configuration):
@@ -60,7 +61,9 @@ class SokuGameBatch:
         self.match = MatchConfig(**configuration["match"])
 
     def _observe(self, slot, raw, dropped):
-        if self.observation_mode == "image":
+        if self.observation_mode == "privileged_state":
+            observations = self.privileged_readers[slot].observe(raw, self.clients[slot])
+        elif self.observation_mode == "image":
             scene = self.image_clients[slot].read(int(raw.frameId), 10.0)
             observations = (scene.image, scene.image)
         elif self.observation_mode == "state":
@@ -127,6 +130,9 @@ class SokuGameBatch:
                 raw = wait_for_frame_zero(client, process.pid, self.launch_timeout)
                 self.buffers[slot] = (ctypes.c_ubyte * (FRAME_RING_CAPACITY * FRAME_SIZE))()
                 self.frames[slot] = 0
+                if self.observation_mode == "privileged_state":
+                    from privileged_reader import PrivilegedReader, ProcessMemory
+                    self.privileged_readers[slot] = PrivilegedReader(ProcessMemory(process.pid))
                 if self.observation_mode in {"image", "state"}:
                     from image_shared import ImageClient
                     self.image_clients[slot] = ImageClient(process.pid)
@@ -169,6 +175,8 @@ class SokuGameBatch:
     def _close_slots(self, slots):
         errors = []
         for slot in slots:
+            if slot in self.privileged_readers:
+                self.privileged_readers.pop(slot).close()
             if slot in self.image_clients:
                 self.image_clients.pop(slot).close()
             try:

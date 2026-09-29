@@ -9,6 +9,11 @@ RELATIVE_FEATURES = 37
 
 
 def health_potential(observation, mode):
+    if mode == "privileged_state":
+        from soku_rl.env.observation.privileged import decode_privileged
+        from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
+        players = decode_privileged(observation[-PRIVILEGED_FEATURES:]).players
+        return (players[0]["hp"] - players[1]["hp"]) / 10000.
     if mode == "state":
         last = observation[-STATE_FEATURES:]
         return float(last[5] - last[13])
