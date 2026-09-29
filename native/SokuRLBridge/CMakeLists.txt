@@ -21,6 +21,8 @@ add_library(SokuRLBridge MODULE
     SceneReset.cpp
     NetworkStart.hpp
     NetworkStart.cpp
+    NetworkState.hpp
+    NetworkState.cpp
     AudioMute.hpp
     AudioMute.cpp
     ControlBlock.hpp

@@ -1,0 +1,82 @@
+#include "NetworkState.hpp"
+#include <Windows.h>
+#include <cwchar>
+
+namespace {
+HANDLE g_handle = nullptr;
+SokuRLBridge::NetworkState *g_state = nullptr;
+bool battle(unsigned scene) { return scene == 13 || scene == 14; }
+void beginWrite() { InterlockedIncrement(&g_state->sequence); MemoryBarrier(); }
+void endWrite() { MemoryBarrier(); InterlockedIncrement(&g_state->sequence); }
+}
+
+namespace SokuRLBridge {
+bool initializeNetworkState()
+{
+    wchar_t name[64]{};
+    swprintf_s(name, L"Local\\SokuRLNetwork_%lu", GetCurrentProcessId());
+    g_handle = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+        0, sizeof(NetworkState), name);
+    if (!g_handle)
+        return false;
+    g_state = static_cast<NetworkState *>(MapViewOfFile(g_handle,
+        FILE_MAP_ALL_ACCESS, 0, 0, sizeof(NetworkState)));
+    if (!g_state) {
+        CloseHandle(g_handle);
+        g_handle = nullptr;
+        return false;
+    }
+    *g_state = {};
+    g_state->magic = 0x54454E53;
+    g_state->version = 1;
+    g_state->size = sizeof(NetworkState);
+    g_state->connected = 1;
+    g_state->localSeat = UINT32_MAX;
+    return true;
+}
+
+void closeNetworkState()
+{
+    if (g_state) {
+        beginWrite();
+        g_state->connected = 0;
+        endWrite();
+        UnmapViewOfFile(g_state);
+        g_state = nullptr;
+    }
+    if (g_handle) {
+        CloseHandle(g_handle);
+        g_handle = nullptr;
+    }
+}
+
+void observeNetworkScene(std::uint32_t scene)
+{
+    if (!g_state || g_state->scene == scene)
+        return;
+    beginWrite();
+    if (battle(scene) && !battle(g_state->scene)) {
+        ++g_state->match;
+        g_state->updates = 0;
+        g_state->scores[0] = g_state->scores[1] = 0;
+    }
+    g_state->scene = scene;
+    g_state->localSeat = (scene == 8 || scene == 10 || scene == 13) ? 0 :
+        (scene == 9 || scene == 11 || scene == 14) ? 1 : UINT32_MAX;
+    endWrite();
+}
+
+std::uint64_t nextNetworkUpdate() { return g_state->updates + 1; }
+std::uint32_t networkMatch() { return g_state->match; }
+
+void publishNetworkState(const RawFrameState &raw, unsigned leftScore, unsigned rightScore)
+{
+    beginWrite();
+    g_state->updates = raw.frameId;
+    g_state->scores[0] = leftScore;
+    g_state->scores[1] = rightScore;
+    g_state->raw = raw;
+    captureRenderState(g_state->render);
+    endWrite();
+}
+}

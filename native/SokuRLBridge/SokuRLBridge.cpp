@@ -3,6 +3,7 @@
 #include "AudioMute.hpp"
 #include "SceneReset.hpp"
 #include "NetworkStart.hpp"
+#include "NetworkState.hpp"
 
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
@@ -734,6 +735,7 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
     if (!g_control)
         return;
     const auto scene = *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID);
+    SokuRLBridge::observeNetworkScene(scene);
     const bool networkSelection = scene == SokuLib::SCENE_SELECTSV ||
         scene == SokuLib::SCENE_SELECTCL;
     // Network startup selects the local keyboard. Inject before the original
@@ -933,6 +935,23 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
 {
     if (!g_control)
         return (manager->*g_originalBattleManagerProcess)();
+    const auto scene = static_cast<unsigned>(SokuLib::sceneId);
+    SokuRLBridge::observeNetworkScene(scene);
+    if (scene == SokuLib::SCENE_BATTLESV || scene == SokuLib::SCENE_BATTLECL) {
+        // Offline pause, reset and joint-input commands cannot control netplay.
+        store32(&g_control->inGameplay, 0);
+        consumeCommand(false);
+        const auto result = (manager->*g_originalBattleManagerProcess)();
+        auto state = captureState(manager, SokuRLBridge::nextNetworkUpdate());
+        state.segmentId = SokuRLBridge::networkMatch();
+        state.p1.input = toLogicalInput(manager->leftCharacterManager.keyMap);
+        state.p2.input = toLogicalInput(manager->rightCharacterManager.keyMap);
+        state.stateHash = stateHash(state);
+        SokuRLBridge::publishNetworkState(state,
+            static_cast<unsigned char>(manager->leftCharacterManager.score),
+            static_cast<unsigned char>(manager->rightCharacterManager.score));
+        return result;
+    }
     const bool gameplay = isSupportedGameplay();
     store32(&g_control->inGameplay, gameplay ? 1U : 0U);
     consumeCommand(gameplay);
@@ -1149,6 +1168,7 @@ bool createMapping()
 
 void closeMapping()
 {
+    SokuRLBridge::closeNetworkState();
     SokuRLBridge::closeImageCapture();
     if (g_control)
         store32(&g_control->connected, 0);
@@ -1212,6 +1232,10 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE, HMODULE)
     g_history.reserve(SokuRLBridge::INPUT_HISTORY_CAPACITY);
     if (!createMapping())
         return false;
+    if (!SokuRLBridge::initializeNetworkState()) {
+        closeMapping();
+        return false;
+    }
     g_headlessRender = environmentValue(L"SOKURL_HEADLESS_RENDER", 0) == 1;
     if (environmentValue(L"SOKURL_MUTE_AUDIO", g_headlessRender ? 1U : 0U) == 1 &&
         !SokuRLBridge::installAudioMute()) {
