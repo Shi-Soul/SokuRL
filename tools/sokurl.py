@@ -377,7 +377,15 @@ def _launch_vs_group_from_title(
             if not pending:
                 return processes
             time.sleep(0.01)
-        raise RuntimeError(f"Title bootstrap timeout for PIDs {[p.pid for p in pending]}")
+        stalled = []
+        for process in pending:
+            try:
+                live = _read_process_values(process.pid)
+                stalled.append({"pid": process.pid, "scene": live[0], "mode": live[1],
+                                "characters": live[2:4]})
+            except OSError as error:
+                stalled.append({"pid": process.pid, "read_error": repr(error)})
+        raise RuntimeError(f"Title bootstrap timeout: {stalled}")
     except Exception:
         for process in processes:
             if process.is_running():
