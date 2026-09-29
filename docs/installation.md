@@ -56,7 +56,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_sokumods.ps1
 
 提交、源码树、补丁、修改后文件及历史构建 DLL 的 SHA-256 统一记录在[依赖锁定文件](../config/dependencies.lock.json)。SokuLib 使用固定 SokuMods 提交所引用的子模块，不可单独切换到新版本。
 
-补丁让只有一个命令行参数的游戏启动交给 ReplayDnD，避免 SkipIntro 抢先进入练习模式而阻止回放加载。另一个文件的修改只补齐末尾换行。获取脚本重复运行时会核对已应用的补丁。
+补丁让只有一个命令行参数的游戏启动交给 ReplayDnD，避免 SkipIntro 抢先进入练习模式而阻止回放加载。初始化函数明确返回加载器要求的布尔值；直接返回空值会使部分构建在回放启动时报初始化失败。另一个文件的修改只补齐末尾换行。源码哈希按 UTF-8、LF 换行且无 BOM 计算，获取脚本重复运行时会核对已应用的补丁。
 
 ## 编译两组 DLL
 
@@ -77,7 +77,7 @@ cmake --build native/SokuRLBridge/build --config Release --target SokuRLBridge
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_sokumods.ps1 -BuildDirectory third_party\SokuMods\build\Release
 ```
 
-该验证同时检查位数和锁定的 DLL 哈希。不同编译环境可能产生不同哈希；不匹配时需要查明并记录原因，不能当作已有构建的复现结果。
+该验证核对源码和补丁，检查 DLL 位数，并输出本次二进制文件的 SHA-256。应将输出与编译器版本、源码提交及补丁哈希一起保存。锁文件中的 `verified_build` 保留上游旧补丁与 MSVC 19.51 的历史结果；当前补丁已经改变，应为新构建保存独立指纹。
 
 仓库另有 `native/RuntimeModules` 精简构建入口。若用 NMake，先在 x86 开发者命令行中指定 `-G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release`，且不传 `-A Win32`；输出没有 `Release/` 子目录。两种生成器不得共用构建目录，精简构建的产物也不能直接沿用另一种构建的哈希结论。
 

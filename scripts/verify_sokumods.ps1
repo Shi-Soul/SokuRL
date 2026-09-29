@@ -85,13 +85,10 @@ foreach ($file in $Lock.skipintro.patched_files) {
 }
 
 if ($BuildDirectory) {
-    Assert-Equal "Reference build source patch SHA-256" `
-        $Lock.verified_build.source_patch_sha256 $Lock.skipintro.patch_sha256
     $resolvedBuildDirectory = (Resolve-Path -LiteralPath $BuildDirectory).Path
     foreach ($output in $Lock.verified_build.outputs) {
         $outputFile = Join-Path $resolvedBuildDirectory $output.path
-        Assert-Equal "Build output $($output.path) SHA-256" `
-            (Get-Sha256 $outputFile) $output.sha256
+        $sha256 = Get-Sha256 $outputFile
 
         $bytes = [System.IO.File]::ReadAllBytes($outputFile)
         $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
@@ -99,10 +96,11 @@ if ($BuildDirectory) {
         if ($machine -ne 0x014c) {
             throw "Build output $($output.path) is not x86 (machine=0x$($machine.ToString('X4')))."
         }
+        Write-Output "$($output.path) SHA-256: $sha256"
     }
 }
 
 Write-Output "SokuMods dependency lock verified."
 if ($BuildDirectory) {
-    Write-Output "Verified build outputs and x86 PE architecture: $resolvedBuildDirectory"
+    Write-Output "Recorded build hashes and verified x86 PE architecture: $resolvedBuildDirectory"
 }
