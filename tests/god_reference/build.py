@@ -42,7 +42,7 @@ def generate(upstream, output):
             source = before + signature + after.replace(b"return false;", b"return 0;")
         parts.append(source)
     main = (upstream / "main.cpp").read_bytes()
-    for signature in (b"short GetCardId(", b"int GetCardCost(", b"int GetCardCost2(",
+    for signature in (b"int GetPlayerAddr(", b"int is_CardUse(", b"short GetCardId(", b"int GetCardCost(", b"int GetCardCost2(",
                       b"char GetSkillLv(", b"int GetSpecialData(", b"int get_correction(",
                       b"void is_bullethit("):
         parts.append(function(main, signature))

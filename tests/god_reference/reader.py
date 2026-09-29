@@ -12,6 +12,7 @@ class Reference:
             "init": ([MEMORY_READ], None),
             "reload": ([C.c_uint32, C.c_int, C.c_int], None),
             "global": ([C.c_char_p], C.c_double),
+            "card_use": ([C.c_int], C.c_int),
             "entity": ([C.c_int, C.c_int, C.POINTER(C.c_double)], None),
             "box": ([C.c_int] * 4 + [C.POINTER(C.c_int)], None),
             "field": ([C.c_int] * 3, C.c_int),

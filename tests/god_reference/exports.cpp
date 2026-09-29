@@ -14,6 +14,14 @@ EXPORT void reference_reload(unsigned int root, int mode, int active_weather) {
     is_bullethit();
 }
 EXPORT double reference_global(const char *name) { return storage.values.at(name); }
+EXPORT int reference_card_use(int seat) {
+    const auto address = my_data.base_addr;
+    const int gauge = my_data.gauge;
+    if (seat == 1) { my_data.base_addr = enemy_data.base_addr; my_data.gauge = enemy_data.gauge; }
+    const int result = is_CardUse();
+    my_data.base_addr = address; my_data.gauge = gauge;
+    return result;
+}
 EXPORT void reference_entity(int player, int object, double *out) {
     const Character &c = player == 0 ? my_data : enemy_data;
     const ObjBase &p = object == -1 ? static_cast<const ObjBase &>(c) : c.GetObject(object);

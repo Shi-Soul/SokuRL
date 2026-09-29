@@ -17,6 +17,7 @@ namespace org { namespace click3 { namespace Utility { using SHARED_HANDLE = int
 enum {ACT_UP,ACT_DOWN,ACT_LEFT,ACT_RIGHT,ACT_A,ACT_B,ACT_C,ACT_D,ACT_AB,ACT_BC,
       ACT_DLEFT,ACT_DRIGHT,ACT_ULEFT,ACT_URIGHT};
 enum {MY, ENEMY};
+enum {FALSE, TRUE};
 using MemoryRead = int (*)(unsigned int, void *, unsigned int);
 MemoryRead memory_read;
 int weather = 0, ph = 0, obj_dis = 0, obj_dis2 = 0;

@@ -4,6 +4,7 @@ from soku_rl.env.observation.memory_schema import OBJECT_NAMES, FIGHTER_FIELDS
 
 def players_equal(reference, players):
     for seat, player in enumerate(players):
+        assert player["is_card_use"] == reference.dll.reference_card_use(seat), (seat, "is_card_use")
         prefix = "my_" if seat == 0 else "enemy_"
         for name in (*FIGHTER_FIELDS, "char", "spell", "card", "obj_n"):
             assert player[name] == reference.value(prefix + name), (seat, name, player[name], reference.value(prefix+name))

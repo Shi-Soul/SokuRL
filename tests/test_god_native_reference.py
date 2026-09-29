@@ -129,12 +129,26 @@ def test_removed_hand_card_retains_the_original_persistent_slot(reference):
     reference.initialize(memory)
     reader = PrivilegedReader(memory)
     for pointer in (0, 0x102310, 0, 0x102300):
-        memory.write(0x102210, "I", pointer)
+        memory.write(0x102200, "I", pointer)
         reference.dll.reference_reload(0x100000, 1, 0)
         players = tuple(reader.fighter(0x101000 + seat * 0x10000, seat, 0) for seat in (0, 1))
         reader.previous = players
         players_equal(reference, players)
     assert reference.null_card_reads == 2
+
+
+def test_card_use_reads_the_selected_pointer_without_wrapping(reference):
+    memory = game_memory(1)
+    memory.write(0x101000 + 0x5F0, "I", 2)
+    memory.write(0x102310, "2h", 104, 3)
+    reference.initialize(memory)
+    reader = PrivilegedReader(memory)
+    for weather, expected in ((0, 0), (2, 1), (11, 0)):
+        reference.dll.reference_reload(0x100000, 1, weather)
+        players = tuple(reader.fighter(0x101000 + seat * 0x10000, seat, weather) for seat in (0, 1))
+        reader.previous = players
+        players_equal(reference, players)
+        assert players[0]["is_card_use"] == expected
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="the original Windows CRT is required")

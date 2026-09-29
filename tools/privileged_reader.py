@@ -160,8 +160,14 @@ class PrivilegedReader:
         entity["objects"] = self.objects(seat)
         entity["obj_n"] = len(entity["objects"])
         entity["deck"] = self.deck(seat)
-        cost = cards[1] - int(weather == 2 and cards[1] > 1)
-        entity["is_card_use"] = int(weather != 11 and count > 0 and 1 <= cost <= entity["spell"] // 500)
+        entity["is_card_use"] = 0
+        if weather != 11 and count > 0:
+            # is_CardUse reads the selected table entry directly; unlike the
+            # five-card snapshot, it does not wrap the index modulo maximum.
+            selected = self.value(table + point * 4, "I")
+            cost = self.value(selected + 2, "h")
+            cost -= int(weather == 2 and cost > 1)
+            entity["is_card_use"] = int(1 <= cost <= entity["spell"] // 500)
         return entity
 
     def observe(self, raw, client):
