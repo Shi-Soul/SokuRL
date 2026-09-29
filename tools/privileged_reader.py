@@ -22,7 +22,7 @@ class ProcessMemory:
 
     def read(self, address, size):
         if type(address) is not int or not 0 < address < 2**32 or not 0 < size <= 65536:
-            raise ValueError("invalid 32-bit game memory read")
+            raise ValueError(f"invalid 32-bit game memory read: address={address!r}, size={size}")
         buffer = ctypes.create_string_buffer(size)
         count = ctypes.c_size_t()
         if (not self.kernel.ReadProcessMemory(self.handle, address, buffer, size, ctypes.byref(count))

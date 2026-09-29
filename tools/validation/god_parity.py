@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 import time
+import traceback
 
 import hydra
 from omegaconf import OmegaConf
@@ -71,6 +72,7 @@ def episode(package, script, seat, config, reference, output):
                       final=dict(current.diagnostics))
     except Exception as error:
         result["error"] = repr(error)
+        result["traceback"] = traceback.format_exc()
         if "actors" in locals():
             result["script_failures"] = [[x.decode("utf-8", errors="replace") if isinstance(x, bytes)
                                            else repr(x) for x in a.failures] for a in actors]
