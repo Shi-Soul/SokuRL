@@ -14,7 +14,8 @@ RESULTS = {1: "accepted", 2: "released", 3: "invalid", 4: "wrong_round",
 
 
 def input_payload(snapshot, keys, duration):
-    if not snapshot.in_battle:
+    if (not snapshot.in_battle or max(snapshot.scores) >= 2 or
+            min(snapshot.raw.p1.hp, snapshot.raw.p2.hp) <= 0):
         raise ValueError("network input requires an active battle snapshot")
     if type(duration) is not int or not 1 <= duration <= 120:
         raise ValueError("hold duration must be between 1 and 120 frames")
@@ -24,6 +25,13 @@ def input_payload(snapshot, keys, duration):
         raise ValueError("invalid axes or buttons")
     return BODY.pack(1, snapshot.match, snapshot.raw.roundId, duration,
                      snapshot.updates, snapshot.updates + 5, *keys)
+
+
+def result_confirm_payload(snapshot):
+    if not snapshot.in_battle or max(snapshot.scores) < 2:
+        raise ValueError("result confirmation requires a completed match")
+    return BODY.pack(3, snapshot.match, snapshot.raw.roundId, 1,
+                     snapshot.updates, snapshot.updates + 5, 0, 0, 1, 0, 0, 0, 0, 0)
 
 
 class NetworkInputClient:
@@ -60,6 +68,9 @@ class NetworkInputClient:
 
     def release(self):
         return self._send(BODY.pack(2, 0, 0, 0, 0, 0, *([0] * 8)))
+
+    def confirm_result(self, snapshot):
+        return self._send(result_confirm_payload(snapshot))
 
     def wait_for_reply(self, sequence, timeout):
         if not self.view or type(sequence) is not int or sequence < 1 or timeout <= 0:

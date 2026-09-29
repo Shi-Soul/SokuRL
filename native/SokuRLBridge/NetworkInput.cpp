@@ -18,6 +18,7 @@ std::deque<Request> g_pending;
 LogicalInput g_held{};
 bool g_owned = false, g_hasObservation = false;
 unsigned g_match = 0, g_round = 0;
+unsigned g_phase = 0;
 std::uint64_t g_lastObservation = 0, g_expires = 0;
 
 unsigned load(const unsigned *p) {
@@ -72,13 +73,18 @@ void closeNetworkInput() {
 void serviceNetworkInput() {
     if (!g_block) return;
     const auto &state = currentNetworkState();
-    const bool fighting = (state.scene == 13 || state.scene == 14) && state.updates &&
+    const bool battle = (state.scene == 13 || state.scene == 14) && state.updates;
+    const bool finished = battle && (state.scores[0] >= 2 || state.scores[1] >= 2);
+    const bool fighting = battle && !finished &&
         state.raw.p1.hp > 0 && state.raw.p2.hp > 0;
-    if (!fighting || state.match != g_match || state.raw.roundId != g_round) {
+    const unsigned phase = finished ? 3 : fighting ? 2 : battle ? 1 : 0;
+    if ((!fighting && !finished) || phase != g_phase ||
+        state.match != g_match || state.raw.roundId != g_round) {
         clear();
         g_match = state.match;
         g_round = state.raw.roundId;
     }
+    g_phase = phase;
     const auto sequence = load(&g_block->requestSequence);
     if (sequence == load(&g_block->ackSequence)) return;
     MemoryBarrier();
@@ -87,9 +93,13 @@ void serviceNetworkInput() {
         g_block->observed, g_block->target, g_block->input};
     if (command == 2) { clear(); g_owned = false; acknowledge(sequence, 2); return; }
     unsigned result = 1; // Accepted; injection is reported separately.
-    if (command != 1 || !valid(request.input) || request.duration < 1 || request.duration > 120)
+    const auto &keys = request.input;
+    const bool confirm = command == 3 && request.duration == 1 && keys.a == 1 &&
+        keys.horizontalAxis == 0 && keys.verticalAxis == 0 && keys.b == 0 &&
+        keys.c == 0 && keys.d == 0 && keys.changeCard == 0 && keys.spellcard == 0;
+    if ((command != 1 && !confirm) || !valid(request.input) || request.duration < 1 || request.duration > 120)
         result = 3;
-    else if (!fighting || request.match != state.match || request.round != state.raw.roundId)
+    else if (!(confirm ? finished : fighting) || request.match != state.match || request.round != state.raw.roundId)
         result = 4;
     else if (request.observed > state.updates || request.observed > UINT64_MAX - 125 ||
         request.target != request.observed + 5)
