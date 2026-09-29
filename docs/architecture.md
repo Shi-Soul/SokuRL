@@ -1,112 +1,94 @@
-# SokuRL 架构与能力边界
+# 架构栈与数据流
 
-本文依据仓库源码编写。README 中的历史实验数字不代表本机验收结果。
+SokuRL 把真实游戏封装为双人强化学习环境。战斗规则来自原版引擎；学习算法通过统一观测和按键接口与引擎交互。本文描述合并后的 ABI 8 源码，实验结论另见[验收记录](env-validation.md)。
 
-## 系统解决什么问题
+## 技术栈及分工
 
-SokuRL 让外部 Python 程序控制《东方非想天则》1.10a 的对战输入，并读取每个模拟帧的状态。模拟帧指游戏完成一次战斗更新；窗口刷新和 Python 查询不计为模拟帧。
+| 层 | 技术 | 职责 |
+| --- | --- | --- |
+| 游戏 | th123 1.10a，Win32/x86 | 角色动作、碰撞、弹幕、伤害、天气、卡牌和随机演化 |
+| 模块加载与桥接 | SWRSToys、SokuLib、C++、MSVC x86、CMake | 加载 DLL，在游戏输入和战斗更新边界接入控制 |
+| 进程通信 | Windows 共享内存、Python 3.11 x64、ctypes | 按游戏进程编号交换命令、确认和逐帧状态 |
+| 工作进程 | Python 管道；Linux 下使用 Wine | 隔离游戏依赖，管理本工作进程拥有的实例 |
+| 环境 | NumPy、Gymnasium 空间、PettingZoo ParallelEnv | 定义双人接口、历史、动作延迟、奖励和结束条件 |
+| 学习包装 | 项目内的观测和动作转换 | 附加公开特征、己方按键历史、可选动作子集和奖励塑形 |
+| 学习算法 | PyTorch、Stable-Baselines3、sb3-contrib、TorchRL、BenchMARL、OpenSpiel | 网络推理、样本收集、优化及策略种群管理 |
+| 配置和证据 | Hydra YAML、JSON、模型与回放文件 | 保存配置、版本、种子、模型身份和对局结果 |
 
-游戏仍负责角色动作、碰撞、弹幕、伤害、随机数和资源加载。SokuRL 不包含游戏本体，也没有独立实现战斗模拟器。
+Python 依赖及选装分组见 [pyproject.toml](../pyproject.toml)。原生源码、补丁和构建文件的身份见[依赖锁定记录](../config/dependencies.lock.json)。安装 Python 包不会安装游戏或 DLL。
 
-## 进程与数据流
+## 进程之间如何连接
 
 ```mermaid
-flowchart LR
-    H[人类键盘或手柄] --> G[32 位游戏进程]
-    L[Python 启动器 sokurl.py] --> G
-    P[Python 控制程序] --> C[BridgeClient]
-    C <-->|命令、确认、状态、记录| M[按进程编号隔离的共享内存]
-    M <--> B[游戏内 SokuRLBridge]
-    B <-->|逻辑输入与战斗更新| G
-    C --> R[记录、场景重建与验收程序]
+flowchart TD
+    A[训练或评测进程：算法与模型] --> B[学习包装与双人环境]
+    B --> C[WorkerBackend]
+    C <-->|父子进程管道| D[rollout_worker / SokuGameBatch]
+    D <-->|按游戏进程编号隔离的共享内存| E[SokuRLBridge]
+    E <-->|双方逻辑按键与逐帧状态| F[原版游戏引擎]
+    E --> G[状态及渲染属性，按需采集 RGB]
+    G --> H[可见性过滤与双方视角编码]
+    H --> D
 ```
 
-Python 使用 64 位解释器，游戏和加载到游戏中的 DLL 使用 32 位。双方通过共享内存通信，不能把 Python 进程的指针宽度当作游戏指针宽度。
+Linux 训练进程运行 PyTorch 和 CUDA；Wine 中的 Python 工作进程运行 Windows 游戏接口，不导入 CUDA 或 NumPy。Windows 也通过显式的 `runtime.command` 启动工作进程。模型库不进入游戏进程。
 
-共享内存名称为 `Local\SokuRLBridge_<pid>`，其中 `pid` 是游戏进程编号。每个游戏实例有独立的命令、状态、帧记录和检查点。
+每个游戏的状态映射名为 `Local\SokuRLBridge_<pid>`。`pid` 是该游戏的进程编号。图像及渲染属性使用单独的共享内存，读取时核对模拟帧编号。管道只连接本程序创建的可信子进程，不是联网对战或远程服务协议。
 
-## 已实现的模块
+## 代码职责
 
-| 模块 | 责任 | 当前边界 |
-| --- | --- | --- |
-| `tools/sokurl.py` | 校验游戏、启动 Practice/VS/回放、查询和关闭指定进程 | 游戏目录写在模块常量中，未读取 `config/game.yaml` |
-| `native/SokuRLBridge/SokuRLBridge.cpp` | 在游戏输入和战斗更新函数处接入控制，发布状态，暂停和步进 | 游戏版本和内存地址固定；需要 SokuLib |
-| `native/SokuRLBridge/ControlBlock.hpp` | 定义 C++ 共享内存结构与命令编号 | 与 Python 结构必须逐字节一致 |
-| `native/RuntimeModules/CMakeLists.txt` | 构建运行所需的加载器和四个社区模块 | 使用安装文档中固定版本的第三方源码 |
-| `tools/bridge_shared.py` | Python 共享内存结构、命令发送、状态快照和帧读取 | 调用方负责等待确认并检查结果 |
-| `tools/frame_runtime.py` | 帧导航计划、检查点标识和记录计数 | 不直接运行游戏 |
-| `tools/frame_validation.py` | 启动检查点、重放输入、比较状态与实例隔离 | 同时被场景运行代码当作运行库使用 |
-| `tools/scenario_runner.py` | 保存和加载场景锚点、解析输入脚本、执行动作 | 文件格式是受限的 YAML 风格语法；不是完整 YAML 解析器 |
-| `tools/raw_recorder.py` | 把状态和输入写入 CSV、JSON 文件 | 需要调用方持续读取帧缓冲区 |
-| `tools/control_panel.py`、`tools/debug_panel.py` | 人工调试控制、帧导航和记录界面 | 不是面向玩家的完整启动界面 |
-| `tools/*validation.py` | 验证对战、回放、场景重建和加速一致性 | 需要真实游戏和已安装模块 |
-| `tests/test_bridge_protocol.py` | 检查结构尺寸、协议编号、帧规则、脚本与记录 | 不证明 DLL 能加载或游戏能对战 |
+以下 Python 路径均相对 `src/soku_rl/`；带 `tools/` 或 `native/` 的路径相对仓库根目录。
 
-`src/soku_rl/baselines.py` 提供状态决策树，`community_rules.py` 提供有记忆的社区规则子集。两者通过 `strategies.py` 创建独立的每局实例。
-
-`pomg.py` 定义双人博弈接口，`observations.py` 转换观测，`evaluation.py` 负责配对对局及胜率统计；这些模块不依赖 Windows。
-`tools/game_batch.py` 把接口接到真实游戏，`tools/evaluate.py` 提供配置和结果文件入口。详见[双人博弈与评估](strategy-evaluation.md)。
-
-Gymnasium 训练封装和学习算法仍未实现。旧的环境占位文件不构成可调用的训练接口。
-
-## 原生依赖
-
-SWRSToys 通过 `d3d9.dll` 加载模块。当前启动路径依赖以下组件：
-
-| 组件 | 用途 |
+| 文件或模块 | 管理的内容 |
 | --- | --- |
-| SokuLib | 编译桥接模块时使用的游戏结构和函数定义 |
-| SokuRLBridge | 命令处理、输入控制与状态采集 |
-| SkipIntro | 提供 Practice 预设以及 VS 启动所需角色、配色和卡组配置 |
-| WindowResizer | 窗口设置 |
-| MemoryPatch | 提供 `AllowMultiInstance` 多实例补丁 |
-| ReplayDnD | 从命令行加载回放 |
+| `pomg.py` | 双方观测、联合动作、时间步、策略和后端协议 |
+| `tools/sokurl.py`、`tools/game_batch.py` | 游戏启动、连接、批量步进、重置和关闭 |
+| `native/SokuRLBridge/ControlBlock.hpp`、`tools/bridge_shared.py` | C++ 与 Python 两端的协议布局及命令 |
+| `visibility.py`、`contours.py`、`visible_state.py` | 可见性判断、量化和公开状态编码 |
+| `observations.py`、`env/encoding.py` | 诊断观测及离散按键编码 |
+| `worker_pipe.py`、`tools/rollout_worker.py` | 父子进程请求与响应 |
+| `env/control.py` | 双方同时提交、延迟队列和当前保持的按键 |
+| `env/hisouten_env.py` | 共用的 Episode 逻辑与单局 PettingZoo 接口 |
+| `env/vector_env.py`、`env/factory.py` | 多局组织及单局构造 |
+| `learning_wrappers.py`、`learning_features.py` | 单局、多局共用的学习转换 |
+| `ppo_training.py`、`ppo_response.py` | 固定对手 PPO 与 PSRO 的 PPO 响应训练 |
+| `torchrl_env.py`、`benchmarl_task.py`、`benchmarl_training.py` | TorchRL 数据格式和 BenchMARL IPPO 任务 |
+| `spiel_nfsp.py`、`nfsp.py`、`nfsp_response.py` | NFSP 双网络、逐局模式、批量转移与最佳响应更新 |
+| `psro.py`、`population.py` | 策略种群、真实对局收益和混合策略 |
+| `policy_benchmark.py`、`training_artifacts.py`、`checkpoint_policy.py` | 策略对战、训练产物定位和模型配置检查 |
 
-源码中的 CMake 要求 `third_party/SokuMods/SokuLib`。初始检出只有 `third_party/SokuLib` 等占位目录，没有对应源码或子模块锁定信息。不能仅凭执行 `pip install -e .` 完成整个运行环境安装。
+## 一次决策如何执行
 
-## 一次程序控制的时序
+1. 算法收到双方各自的观测，同时给出两个动作编号。
+2. 学习包装层把动作编号转换为基础按键编号；环境检查双方动作齐全。
+3. `DelayedControls` 将联合按键放入延迟队列。在每个模拟帧开始前，取出已经到期的按键；其余时间保持原按键。
+4. 后端将双方输入作为同一命令交给桥接模块。游戏完成一次战斗更新后，桥接模块增加帧号并发布结果。
+5. Python 检查命令确认、目标帧号、暂停状态和丢帧计数，再生成双方观测。`Episode` 每帧更新历史及结束条件。
+6. 达到决策间隔或提前结束时，环境返回观测、奖励、终止、截断及公开信息；学习包装层再附加特征与塑形奖励。
 
-1. 启动器校验 `th123.exe` 的 MD5 为 `DF35D1FBC7B583317ADABE8CD9F53B2E`。
-2. 游戏加载 SWRSToys 与桥接 DLL，创建共享内存。
-3. Python 按进程编号连接，验证 ABI。ABI 是双方约定的数据结构、尺寸和字段布局；当前版本为 6。
-4. 控制程序发送暂停命令，等待确认，读取基准帧。
-5. `step_with_inputs(p1, p2)` 同时设置双方输入，并请求执行一个模拟帧。
-6. 桥接模块在 `KeymapManager::SetInputs` 处应用输入，在原始 `BattleManager::onProcess` 完成后增加帧号、计算状态哈希并发布状态。
-7. 调用方检查命令确认、结果码、帧号增加一和再次暂停，然后决定下一次输入。
+模拟帧只在游戏完成一次战斗更新后增加。窗口刷新、Python 查询和策略决策都不能计成游戏模拟帧。
 
-命令确认表示命令已被处理，不单独证明动作已完成。`wait_for_ack()` 超时后会返回最后一次快照，不抛出超时异常；调用方必须检查返回的 `ack_seq`，还要检查帧号和命令结果。
+## 两种多局组织
 
-## 人类游玩与程序控制
+| 路径 | 组织方式 | 复用的规则 |
+| --- | --- | --- |
+| PPO、NFSP、PSRO | `TwoPlayerVectorEnv` 通过一个工作进程管理多个游戏；支持指定对局子集的步进与重置 | Episode、DelayedControls、LearningEpisode |
+| BenchMARL IPPO | TorchRL `ParallelEnv` 组合单局工厂；每个单局拥有自己的工作进程 | 同一套单局与学习包装规则 |
 
-桥接函数先调用原始输入处理，再根据控制命令覆盖输入。无程序控制时，原始键盘或手柄输入路径仍存在；这属于源码结论，必须通过真实设备操作验收。
+环境编号和玩家编号是两个不同维度，不能直接展平为互不相关的单智能体任务。一个工作进程处理重置时，调用方须等该请求完成后才能继续提交请求。并发数和吞吐量需按实际运行路径测量。
 
-`send_action()` 控制 P1，适合连续运行中的有限帧动作。`step_with_inputs()` 同时控制 P1 和 P2，并在一个模拟帧后暂停，适合自动对战验收。后者不能直接作为实时人机对战的输入方案，因为它会覆盖双方输入并暂停游戏。
+## 协议、重置与资源所有权
 
-从自动控制切回人类操作需要释放受控输入并恢复运行。人类与程序各控制一方的实时模式，还需要明确玩家归属、断开连接后的输入释放和暂停恢复行为。
+ABI 指 C++ 与 Python 共同遵守的二进制布局及命令约定。当前版本为 8，双方布局必须一致；旧版本 DLL 会被拒绝。Python 为 64 位，游戏内地址仍按 32 位解释。
 
-## 状态记录与重建
+`ResetEpisode` 经过游戏场景生命周期重建对局，保留已有游戏进程。它会重置环境历史、延迟队列和按键。`GotoFrame` 仍返回不支持恢复的结果；外部输入重放和局内重置都不提供任意状态克隆。
 
-每帧含双方角色状态、最多各 64 个对象以及状态哈希。ABI v6 的 `RawFrameState` 为 10,596 字节，`ControlBlock` 为 10,884 字节。对象超限必须检查相应溢出标记。
+512 帧环形缓冲区采用单生产者、单消费者方式；不能让两个读取程序消费同一实例。帧不匹配、丢帧、超时或场景错误必须作为运行错误处理，不能当作策略输掉一局。
 
-512 帧环形缓冲区用于传输记录；它只有一个生产者和一个消费者。两个读取程序不能同时消费同一实例的记录。`dropped_frames` 不为零时，不能宣称记录完整。
+关闭只针对本后端创建的游戏。不同 Wine 环境若共用游戏目录，不能依靠 Windows 命名互斥量保护启动配置；独立运行需隔离可写游戏配置。已有故障和处理记录见[环境验收](env-validation.md)。
 
-源码保留了固定初始状态、重放双方输入和核对状态的重建逻辑，但当前命令处理直接拒绝 `GotoFrame`，返回 `CheckpointRestoreUnsupported`。对战中的 `EstablishCheckpoint` 也被拒绝。因此，Python 提供 `goto_frame()` 方法不代表原生模块支持恢复；当前不能把它当作强化学习的重置接口。
+## 仍需整理的边界
 
-现有可验证的完整重置方式是关闭本次游戏进程，再用相同配置和种子启动。只修改位置、生命值等简单字段不能恢复动作、动画、弹幕和随机状态。原生重建历史容量为 4,096 帧，也不是可以任意保存和恢复整个进程内存的存档。
+运行代码尚有 `tools/` 之间的导入：`game_batch.py` 依赖验收脚本中的等待与记录读取函数，场景执行也依赖 `frame_validation.py`。后续应逐项迁入有明确职责的运行模块，保留现有行为并独立验证。
 
-## 加速边界
-
-`--headless` 跳过已定位的战斗渲染区间，仍然创建窗口并初始化 Direct3D、资源和音频。`--unlimited` 还取消本地 VS 战斗中的计时等待，且要求同时开启 `--headless`。
-
-速度与稳定并发数必须在目标机器重新测量。README 中的 8 实例和每秒模拟帧数来自其他运行记录，不能作为本机配置依据。
-
-## 当前架构问题
-
-1. 策略与评估已进入 `src/soku_rl`；原生游戏的启动与同步仍在 `tools`，适配器依赖脚本目录导入。
-2. 场景执行依赖 `frame_validation.py`，运行逻辑和验收逻辑相互耦合。
-3. 原生桥接文件同时承担启动、输入、状态采集、同步和重建，修改影响难以局部判断。
-4. Python 与 C++ 手写两份协议定义，需要持续验证布局和版本一致性。
-5. 启动失败路径和确认超时行为尚未统一；新接口应保证明确失败和只清理自己启动的进程。
-6. 配置文件与实际启动常量并存。安装文档已记录第三方版本和部署清单；依赖获取、配置生成与部署仍需整理为统一安装入口。
-
-后续顺序和验收条件见 [开发计划](development-plan.md)。
+本次轻度清理只删除未使用的早期占位代码。没有重写原生桥接、迁移训练入口或改变环境协议。观测模型见[环境建模](environment-model.md)，算法分工见[训练算法](algorithms.md)。

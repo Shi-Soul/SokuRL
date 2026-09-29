@@ -1,91 +1,116 @@
-# 安装与验收
+# 安装、构建与部署
 
-## 依赖
+本项目需要单独提供游戏本体、Python 环境和原生运行模块。以下命令从仓库根目录执行；部署之前列出目标文件，确认只修改本任务使用的游戏目录。
 
-使用 Windows、Python 3.11 x64、MSVC x86 和 CMake。游戏为《东方非想天则》1.10a，`th123.exe` 的 MD5 必须为 `DF35D1FBC7B583317ADABE8CD9F53B2E`。
+## 运行要求与 Python
 
-游戏本体单独提供。不要替换或修改原始 `th123.exe`、`th123a.dat`、`th123b.dat`、`th123c.dat`。游戏放在仓库的 `th123_jp`，也可以使用本地目录联接指向已有安装。已有 `th105` 时，检查 `configex123.ini` 中的路径；修改前备份配置。
+| 组件 | 要求 |
+| --- | --- |
+| 游戏 | 《东方非想天则》1.10a，Win32/x86 |
+| `th123.exe` 的 MD5 | `DF35D1FBC7B583317ADABE8CD9F53B2E` |
+| Python | 仓库内 Python 3.11 x64 环境 |
+| 原生编译 | MSVC，目标 Win32/x86；CMake |
+| Linux 训练 | 原生 Python 与 CUDA，另配 Wine 游戏工作进程 |
 
-## Python 安装
+游戏位于 `th123_jp/`，也可使用本地目录联接。已有 `th105` 时核对 `configex123.ini` 的路径。不得替换原始 `th123.exe` 或 `th123a.dat`、`th123b.dat`、`th123c.dat`。
 
-以下命令使用标准 Windows 虚拟环境目录结构。先用环境管理器创建仓库内的 Python 3.11 环境，再执行：
+先创建仓库内 Python 3.11 环境。下文用标准虚拟环境路径 `.venv\Scripts\python.exe`；若使用 Conda 前缀环境，使用实际的 `.venv\python.exe`。不要为统一路径改动已有环境。
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v
 .\.venv\Scripts\python.exe scripts\00_check_game.py
 ```
 
-安装包含启动器必需的 `psutil`。当前控制路径不依赖训练框架；不必为了验证游戏接口安装深度学习软件。
+基础安装提供启动器所需的 `psutil`，不包含训练库。按任务安装选装依赖：
 
-## 原生源码版本
+| 分组 | 安装内容 |
+| --- | --- |
+| `.[dev,rl]` | 测试、NumPy、Gymnasium、PettingZoo、Hydra |
+| `.[rl,ppo]` | PPO 和循环 PPO |
+| `.[rl,nfsp]` | OpenSpiel NFSP |
+| `.[rl,psro]` | OpenSpiel PSRO 与 PPO 响应训练 |
+| `.[rl,marl]` | TorchRL、BenchMARL 及 OpenSpiel |
 
-此次构建使用以下固定提交。不能把 SokuLib 换成最新分支：提交 `0794becf1f578b32329604483be2112fe0afd4ee` 的输入管理器类型与现有桥接代码不兼容。
+例如只需检查环境与协议时，安装 `".[dev,rl]"`，然后运行：
 
-| 源码 | 提交 | 相对路径 |
-| --- | --- | --- |
-| [SokuMods](https://github.com/SokuDev/SokuMods) | `eb0574cea1eda70484b736eb192964ef87e50a67` | `third_party/SokuMods` |
-| [SokuLib](https://github.com/SokuDev/SokuLib) | `e96ff6941373703adc35a10831014cbcc6bac866` | `third_party/SokuMods/SokuLib` |
-| [SkipIntro](https://github.com/SokuDev/SkipIntro) | `fd945ff5c1c5b7de0ff7d03b988e9219a3674213` | `third_party/SokuMods/modules/SkipIntro/Soku-SkipIntro` |
-| [Detours](https://github.com/microsoft/Detours) | `64ec135a509884aa60ac6c19b59564f1da9cb2fa` | `third_party/SokuMods/detours` |
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
 
-可递归检出 SokuMods 的固定提交；也可下载该提交的源码归档，并按表格补齐三个子模块。归档文件不包含子模块内容。
+缺少可选训练库时，相关检查会跳过；报告必须保留跳过数量。测试通过不代表 DLL、真实对战或训练已经验收。
 
-`native/RuntimeModules` 构建加载器和四个社区模块：WindowResizer、SkipIntro、MemoryPatch、ReplayDnD。SokuRLBridge 由自己的构建目录生成。这样无需为了运行本项目构建 SokuMods 中其余插件。
+## 固定原生源码和补丁
 
-## 编译
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\bootstrap_sokumods.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_sokumods.ps1
+```
 
-在 MSVC 的 x86 开发者命令行中运行：
+获取脚本在忽略提交的 `third_party/SokuMods/` 中检出固定版本及递归子模块，验证 SkipIntro，并应用[已提交补丁](../patches/skipintro-replaydnd-command-line.patch)。已有目录版本不符时会拒绝继续，不会重置该目录。
+
+| 源码 | 固定提交 |
+| --- | --- |
+| SokuMods | `eb0574cea1eda70484b736eb192964ef87e50a67` |
+| SkipIntro | `fd945ff5c1c5b7de0ff7d03b988e9219a3674213` |
+
+提交、源码树、补丁、修改后文件及历史构建 DLL 的 SHA-256 统一记录在[依赖锁定文件](../config/dependencies.lock.json)。SokuLib 使用固定 SokuMods 提交所引用的子模块，不可单独切换到新版本。
+
+补丁让只有一个命令行参数的游戏启动交给 ReplayDnD，避免 SkipIntro 抢先进入练习模式而阻止回放加载。另一个文件的修改只补齐末尾换行。获取脚本重复运行时会核对已应用的补丁。
+
+## 编译两组 DLL
+
+在 Visual Studio 的 x86 开发者命令行中执行。社区运行模块与本项目桥接 DLL 分别构建：
 
 ```text
-cmake -S native/SokuRLBridge -B native/SokuRLBridge/build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
-cmake --build native/SokuRLBridge/build --target SokuRLBridge
-cmake -S native/RuntimeModules -B native/RuntimeModules/build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
-cmake --build native/RuntimeModules/build
+cmake -S third_party/SokuMods -B third_party/SokuMods/build -A Win32 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+cmake --build third_party/SokuMods/build --config Release --target swrstoys WindowResizer SkipIntro MemoryPatch ReplayDnD
+cmake -S native/SokuRLBridge -B native/SokuRLBridge/build -A Win32
+cmake --build native/SokuRLBridge/build --config Release --target SokuRLBridge
 ```
 
-这组命令使用开发者命令行所选的 x86 编译器。不要给 NMake 生成器加 `-A Win32`；使用 Visual Studio 生成器时才用该参数。不要在同一构建目录混用生成器。
+上述命令使用 Visual Studio 生成器。CMake 4 的兼容选项用于固定版本中较旧的依赖声明，不修改其源码。所有进入游戏的 DLL 都必须为 x86，不能随 Python 的位数编译成 x64。
 
-社区源码按 UTF-8 编译，避免机器默认字符集把注释误读为代码。构建输出应为 x86 DLL。
+验证社区模块：
 
-## 部署清单
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_sokumods.ps1 -BuildDirectory third_party\SokuMods\build\Release
+```
 
-游戏退出后部署。若目标文件已存在，先备份并逐项说明覆盖内容。
+该验证同时检查位数和锁定的 DLL 哈希。不同编译环境可能产生不同哈希；不匹配时需要查明并记录原因，不能当作已有构建的复现结果。
 
-| 构建结果或源配置 | 游戏目录内目标 |
+仓库另有 `native/RuntimeModules` 精简构建入口。若用 NMake，先在 x86 开发者命令行中指定 `-G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release`，且不传 `-A Win32`；输出没有 `Release/` 子目录。两种生成器不得共用构建目录，精简构建的产物也不能直接沿用另一种构建的哈希结论。
+
+## 部署文件
+
+先结束本任务拥有的目标游戏实例。不要终止其他任务的游戏。目标目录若正被其他任务使用，应改用独立运行目录。
+
+| 构建文件 | 游戏目录内目标 |
 | --- | --- |
-| `native/RuntimeModules/build/d3d9.dll` | `d3d9.dll` |
-| `native/SokuRLBridge/build/SokuRLBridge.dll` | `modules/SokuRLBridge/SokuRLBridge.dll` |
-| `native/RuntimeModules/build/WindowResizer.dll` | `modules/WindowResizer/WindowResizer.dll` |
-| `native/RuntimeModules/build/SkipIntro.dll` | `modules/SkipIntro/SkipIntro.dll` |
-| `native/RuntimeModules/build/MemoryPatch.dll` | `modules/MemoryPatch/MemoryPatch.dll` |
-| `native/RuntimeModules/build/ReplayDnD.dll` | `modules/ReplayDnD/ReplayDnD.dll` |
+| `third_party/SokuMods/build/Release/d3d9.dll` | `d3d9.dll` |
+| `third_party/SokuMods/build/Release/WindowResizer.dll` | `modules/WindowResizer/WindowResizer.dll` |
+| `third_party/SokuMods/build/Release/SkipIntro.dll` | `modules/SkipIntro/SkipIntro.dll` |
+| `third_party/SokuMods/build/Release/MemoryPatch.dll` | `modules/MemoryPatch/MemoryPatch.dll` |
+| `third_party/SokuMods/build/Release/ReplayDnD.dll` | `modules/ReplayDnD/ReplayDnD.dll` |
+| `native/SokuRLBridge/build/Release/SokuRLBridge.dll` | `modules/SokuRLBridge/SokuRLBridge.dll` |
 
-复制上述社区模块目录中的 INI 配置。`SWRSToys.ini` 使用以下模块列表：
+从 `config/runtime/` 复制 `SWRSToys.ini` 到游戏根目录；将另外四个 INI 文件复制到各自同名模块目录。先列出新增文件与将被覆盖的文件，再备份已有配置和模块。
 
-```ini
-[Module]
-WindowResizer=modules/WindowResizer/WindowResizer.dll
-SokuRLBridge=modules/SokuRLBridge/SokuRLBridge.dll
-SkipIntro=modules/SkipIntro/SkipIntro.dll
-MemoryPatch=modules/MemoryPatch/MemoryPatch.dll
-ReplayDnD=modules/ReplayDnD/ReplayDnD.dll
-```
+模板的 Practice 配置使用 1P 魔理沙、2P 灵梦和卡组 0；MemoryPatch 开启多实例支持。VS 启动器临时使用标题场景配置，经正常加载流程进入对战，并恢复启动配置。不同 Wine 环境不能共享这一可写配置目录。
 
-为配合现有验收程序，SkipIntro 的 GLOBAL 设置为 `scene_id=3`、`type=8`、`subtype=0`；P1 使用角色 1，P2 使用角色 0，双方卡组设为 0。MemoryPatch 只开启 `AllowMultiInstance`。VS 启动器会临时调整 SkipIntro 的场景配置并恢复原始内容。
+部署后的桥接 DLL 必须与 Python 同为 ABI 8。旧 ABI 7 的灵力字段和重置命令存在分支差异，不能混用。
 
-## 真实游戏验收
-
-先由人类确认画面、移动、跳跃和攻击，再运行程序控制：
+## 启动和验收
 
 ```powershell
 .\.venv\Scripts\python.exe tools\sokurl.py practice
 .\.venv\Scripts\python.exe tools\sokurl.py list
+.\.venv\Scripts\python.exe tools\sokurl.py status --pid <本次启动的进程编号>
 .\.venv\Scripts\python.exe tools\sokurl.py shutdown --pid <本次启动的进程编号>
-.\.venv\Scripts\python.exe tools\vsplayer_validation.py
 ```
 
-VS 验收报告要求双方攻击、对象生成、伤害和伤害持续均通过。程序会关闭它自己启动的游戏实例。报告位于 `logs/validation`。
+人类操作检查需确认真实画面、移动、跳跃和攻击。自动对战、加速一致性、回放及重置的完整命令见[原生运行流程](native-workflows.md)。训练工作进程命令与 Hydra 配置见[双人环境接口](multi-agent-env.md)和[算法说明](algorithms.md)。
 
-需要完整验证加速时，运行 README 中的正常、无渲染与无限速一致性验证。协议单元测试成功不代表真实游戏验收成功。
+## 更新依赖时保留什么
+
+一次依赖更新应同时提交版本锁定、必要补丁、安装说明及验证证据。先更新提交与源码树身份，再重做补丁和文件哈希；重新构建后记录 DLL 身份及真实运行结果。不得让运行必需的源码修改只留在被忽略的第三方目录。
