@@ -34,9 +34,9 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
                 record({"kind": "menu", "reply": batch["menu_reply"]})
             latest = {}
             for frame in batch["records"]:
-                scores = frame["scores"]
                 latest[frame["match"], frame["round"]] = frame["frame"]
             for frame in batch["records"]:
+                scores = frame["scores"]
                 metadata = {key: value for key, value in frame.items() if key != "observations"}
                 record({"kind": "frame", **metadata})
                 events = {event["kind"] for event in frame["events"]}

@@ -138,3 +138,17 @@ def test_closing_the_game_preserves_partial_results_without_inventing_a_win():
     assert result["termination"] == "game_closed"
     assert result["matches"] == 0 and result["rounds"] == 1
     assert result["last_scores"] == (1, 0) and result["accepted_commands"] == 1
+
+
+def test_final_score_is_not_replaced_by_a_later_match_in_the_same_batch():
+    class ResultBatch:
+        def request(self, operation, payload):
+            assert operation == "poll"
+            return {"closed": False, "menu_reply": "not_requested", "input_events": (), "records": [
+                frame(1, 1, 500, "match_finished", ("match_finished",), (2, 0)),
+                frame(2, 0, 1, "battle", ("round_started",), (0, 0)),
+            ]}
+
+    result = run_session(ResultBatch(), RecordingPolicy(), interface(), 0, 1, 1, 10., [].append)
+    assert result["termination"] == "matches_completed"
+    assert result["last_scores"] == (2, 0) and result["decisions"] == 0
