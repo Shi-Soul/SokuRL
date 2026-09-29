@@ -72,3 +72,15 @@ def test_disconnect_is_an_interruption_and_not_a_match_result():
     ], "accepted")
     with pytest.raises(ConnectionError, match="interrupted"):
         run_session(connection, RecordingPolicy(), interface(), 0, 1, 1, 10., [].append)
+
+
+def test_accepted_input_that_later_expires_stops_inference():
+    class ExpiredConnection:
+        def request(self, operation, payload):
+            assert operation == "poll"
+            return {"input_events": ({"request": 7, "result": "expired", "command_type": 1},)}
+
+    log = []
+    with pytest.raises(RuntimeError, match="7 expired"):
+        run_session(ExpiredConnection(), RecordingPolicy(), interface(), 0, 1, 1, 10., log.append)
+    assert log == [{"kind": "input_event", "request": 7, "result": "expired", "command_type": 1}]
