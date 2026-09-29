@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from bridge_shared import ACTION_INPUTS, BridgeClient
-from headless_validation import step_group, wait_for_frame_zero
+from headless_validation import step_group
+from frame_stream import wait_for_frame_zero
 import sokurl
 
 
@@ -42,7 +43,7 @@ def run_once(seed: int | None, frames: int, run_index: int) -> dict[str, object]
     transitions: list[dict[str, int]] = []
     started = time.perf_counter()
     try:
-        initial = wait_for_frame_zero(client, process.pid)
+        initial = wait_for_frame_zero(client, process.pid, 35.0)
         previous_pair = (initial.activeWeather, initial.displayedWeather)
         for frame in range(frames + 1):
             state = initial if frame == 0 else step_group(

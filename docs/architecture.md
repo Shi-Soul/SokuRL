@@ -44,6 +44,7 @@ Linux 训练进程运行 PyTorch 和 CUDA；Wine 中的 Python 工作进程运�
 | `pomg.py` | 双方观测、联合动作、时间步、策略和后端协议 |
 | `tools/sokurl.py`、`tools/game_batch.py` | 游戏启动、连接、批量步进、重置和关闭 |
 | `native/SokuRLBridge/ControlBlock.hpp`、`tools/bridge_shared.py` | C++ 与 Python 两端的协议布局及命令 |
+| `tools/frame_stream.py` | 检查初始帧，按顺序复制帧队列，再确认已读取的记录 |
 | `visibility.py`、`contours.py`、`visible_state.py` | 可见性判断、量化和公开状态编码 |
 | `observations.py`、`env/encoding.py` | 诊断观测及离散按键编码 |
 | `worker_pipe.py`、`tools/rollout_worker.py` | 父子进程请求与响应 |
@@ -89,6 +90,6 @@ ABI 指 C++ 与 Python 共同遵守的二进制布局及命令约定。当前版
 
 ## 仍需整理的边界
 
-运行代码尚有 `tools/` 之间的导入：`game_batch.py` 依赖验收脚本中的等待与记录读取函数，场景执行也依赖 `frame_validation.py`。后续应逐项迁入有明确职责的运行模块，保留现有行为并独立验证。
+`game_batch.py` 与验收脚本通过 `frame_stream.py` 共用初始帧等待和帧队列读取。环形队列及 32 位序号回绕在这个模块处理；目标缓冲区不足时，在复制或确认记录之前报错。批量环境与规则联赛直接使用桥接层的同步等待接口。
 
-本次轻度清理只删除未使用的早期占位代码。没有重写原生桥接、迁移训练入口或改变环境协议。观测模型见[环境建模](environment-model.md)，算法分工见[训练算法](algorithms.md)。
+场景执行仍依赖 `frame_validation.py` 中的练习场实例管理。后续需将这项职责迁入运行模块，并验证原有入口的行为。观测模型见[环境建模](environment-model.md)，算法分工见[训练算法](algorithms.md)。

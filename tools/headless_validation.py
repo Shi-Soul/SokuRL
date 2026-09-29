@@ -8,6 +8,7 @@ from pathlib import Path
 
 from bridge_shared import ACTION_INPUTS, BridgeClient, calculate_state_hash
 from frame_validation import copy_state, state_diff
+from frame_stream import wait_for_frame_zero
 import sokurl
 
 
@@ -52,28 +53,6 @@ def fixed_trace(frames: int) -> list[tuple[InputTuple, InputTuple]]:
         add(42)
     add(max(0, frames - len(trace)))
     return trace[:frames]
-
-
-def wait_for_frame_zero(client: BridgeClient, pid: int, timeout: float = 35.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        snapshot = client.snapshot()
-        if (
-            snapshot.in_gameplay
-            and snapshot.checkpoint_valid
-            and snapshot.game_frame == 0
-            and snapshot.run_state_name == "PAUSED"
-        ):
-            state = copy_state(snapshot.latest)
-            if state.stateHash != calculate_state_hash(state):
-                raise RuntimeError(f"PID {pid}: native/Python frame-zero hash mismatch")
-            client.drain_frames()
-            return state
-        time.sleep(0.005)
-    raise RuntimeError(f"PID {pid}: timed out waiting for paused VS frame zero; "
-                       f"gameplay={snapshot.in_gameplay} checkpoint={snapshot.checkpoint_valid} "
-                       f"frame={snapshot.game_frame} run_state={snapshot.run_state_name} "
-                       f"scene={snapshot.latest.sceneId} result={snapshot.result_code}")
 
 
 def step_group(
@@ -145,7 +124,7 @@ def run(frames: int, seed: int, include_unlimited: bool = False) -> dict[str, ob
         clients = [BridgeClient(process.pid) for process in processes]
 
         initial = [
-            wait_for_frame_zero(client, process.pid)
+            wait_for_frame_zero(client, process.pid, 35.0)
             for client, process in zip(clients, processes, strict=True)
         ]
         if any(state.stateHash != initial[0].stateHash for state in initial[1:]):

@@ -11,8 +11,8 @@ from pathlib import Path
 
 import psutil
 
-from bridge_shared import BridgeClient, BridgeUnavailable, FRAME_RING_CAPACITY, RawFrameState
-from headless_validation import wait_for_frame_zero
+from bridge_shared import BridgeClient, FRAME_RING_CAPACITY
+from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 
 
@@ -20,42 +20,12 @@ ROOT = Path(__file__).resolve().parents[1]
 REPORT_DIR = ROOT / "logs" / "validation"
 
 
-FRAME_SIZE = ctypes.sizeof(RawFrameState)
-
-
-def _drain_fast(client: BridgeClient, buffer) -> int:
-    block = client.block
-    write = block.ringWriteSeq
-    read = block.ringReadSeq
-    available = (write - read) & 0xFFFFFFFF
-    if available > FRAME_RING_CAPACITY:
-        raise BridgeUnavailable("ring sequence accounting is invalid")
-    if not available:
-        return 0
-    first_index = read % FRAME_RING_CAPACITY
-    first_count = min(available, FRAME_RING_CAPACITY - first_index)
-    ctypes.memmove(
-        ctypes.addressof(buffer),
-        ctypes.addressof(client.mapping.frames[first_index]),
-        first_count * FRAME_SIZE,
-    )
-    remaining = available - first_count
-    if remaining:
-        ctypes.memmove(
-            ctypes.addressof(buffer) + first_count * FRAME_SIZE,
-            ctypes.addressof(client.mapping.frames[0]),
-            remaining * FRAME_SIZE,
-        )
-    block.ringReadSeq = write
-    return available
-
-
 def _wait_ack(client: BridgeClient, sequence: int, buffer=None, timeout: float = 5.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         snapshot = client.snapshot()
         if buffer is not None:
-            _drain_fast(client, buffer)
+            drain_frames_into(client, buffer)
         if snapshot.ack_seq == sequence:
             return snapshot
     raise RuntimeError(f"PID {client.pid}: command {sequence} was not acknowledged")
@@ -80,7 +50,7 @@ def benchmark(worker_count: int, duration: float, seed: int, mode: str) -> dict[
             client = BridgeClient(process.pid)
             clients.append(client)
             buffers.append((ctypes.c_ubyte * (FRAME_RING_CAPACITY * FRAME_SIZE))())
-            wait_for_frame_zero(client, process.pid)
+            wait_for_frame_zero(client, process.pid, 35.0)
 
         psutil.cpu_percent(interval=None)
         for process in processes:
@@ -98,7 +68,7 @@ def benchmark(worker_count: int, duration: float, seed: int, mode: str) -> dict[
                         client.block.ringWriteSeq - client.block.ringReadSeq
                     ) & 0xFFFFFFFF
                     max_ring_backlog[index] = max(max_ring_backlog[index], backlog)
-                    if not _drain_fast(client, buffer):
+                    if not drain_frames_into(client, buffer):
                         time.sleep(0.0005)
             except Exception as error:
                 consumer_errors.append(f"PID {client.pid}: {error}")

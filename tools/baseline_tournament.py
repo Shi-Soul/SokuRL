@@ -13,10 +13,8 @@ from omegaconf import DictConfig, OmegaConf
 
 from soku_rl.observations import observe
 from soku_rl.strategies import strategy_from_config
-from bridge_shared import BridgeClient, FRAME_RING_CAPACITY
-from headless_validation import wait_for_frame_zero
-from interaction_benchmark import wait_group
-from unlimited_benchmark import FRAME_SIZE, _drain_fast
+from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
+from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 
 
@@ -35,7 +33,7 @@ def play_batch(config, seed, pairs):
         for process, pair in zip(processes, pairs, strict=True):
             client = BridgeClient(process.pid)
             clients.append(client)
-            state = wait_for_frame_zero(client, process.pid)
+            state = wait_for_frame_zero(client, process.pid, 35.0)
             states.append(state)
             buffers.append((ctypes.c_ubyte * (FRAME_RING_CAPACITY * FRAME_SIZE))())
             policy_pair = []
@@ -67,7 +65,7 @@ def play_batch(config, seed, pairs):
             active_clients = [clients[index] for index in active]
             sequences = [client.step_with_inputs(pair[0].inputs, pair[1].inputs)
                          for client, pair in zip(active_clients, decisions, strict=True)]
-            snapshots = wait_group(active_clients, sequences, frame, "ready")
+            snapshots = wait_for_steps(active_clients, sequences, [frame] * len(active_clients), 10.0)
             finished = []
             for index, snapshot in zip(active, snapshots, strict=True):
                 state = snapshot.latest
@@ -79,7 +77,7 @@ def play_batch(config, seed, pairs):
                                                    (state.p2.hp, state.p2ObjectCount))):
                     record["minimum_hp"][side] = min(record["minimum_hp"][side], hp)
                     record["max_objects"][side] = max(record["max_objects"][side], count)
-                _drain_fast(clients[index], buffers[index])
+                drain_frames_into(clients[index], buffers[index])
                 knocked_out = state.p1.hp <= 0 or state.p2.hp <= 0
                 if knocked_out or frame == config["max_frames"]:
                     winner = "timeout"

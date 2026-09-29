@@ -6,8 +6,7 @@ from soku_rl.visible_state import observe_visible_states
 from soku_rl.visibility import VisibilityConfig
 from soku_rl.pomg import Outcome, TimeStep
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
-from headless_validation import wait_for_frame_zero
-from unlimited_benchmark import FRAME_SIZE, _drain_fast
+from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 
 
@@ -148,7 +147,7 @@ class SokuGameBatch:
         states = {}
         for slot, snapshot in zip(slots, snapshots, strict=True):
             states[slot] = self._observe(slot, snapshot.latest, snapshot.dropped_frames)
-            _drain_fast(self.clients[slot], self.buffers[slot])
+            drain_frames_into(self.clients[slot], self.buffers[slot])
         self.active.difference_update(s for s, state in states.items() if state.ended)
         return states
 

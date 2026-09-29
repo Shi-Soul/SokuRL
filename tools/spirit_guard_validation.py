@@ -7,7 +7,7 @@ from pathlib import Path
 
 from bridge_shared import ACTION_INPUTS, BridgeClient
 from frame_validation import InputPair, PracticeInstance, copy_state
-from headless_validation import wait_for_frame_zero
+from frame_stream import wait_for_frame_zero
 import sokurl
 
 
@@ -38,7 +38,7 @@ def run_once(seed: int, injected_spirit: int, patch_after_frame: int = 253) -> d
     client: BridgeClient | None = None
     try:
         client = BridgeClient(process.pid)
-        initial = wait_for_frame_zero(client, process.pid)
+        initial = wait_for_frame_zero(client, process.pid, 35.0)
         instance = PracticeInstance(process, client, 0)
         states = [initial]
         for inputs in pressure_trace():

@@ -9,8 +9,8 @@ import time
 from pathlib import Path
 
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
-from headless_validation import fixed_trace, wait_for_frame_zero
-from unlimited_benchmark import FRAME_SIZE, _drain_fast
+from headless_validation import fixed_trace
+from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 
 RUN_STATE_PAUSED = 1
@@ -72,7 +72,7 @@ def benchmark(config):
         for index, process in enumerate(processes):
             client = BridgeClient(process.pid)
             clients.append(client)
-            initial_hashes.append(wait_for_frame_zero(client, process.pid).stateHash)
+            initial_hashes.append(wait_for_frame_zero(client, process.pid, 35.0).stateHash)
             buffers.append((ctypes.c_ubyte * (FRAME_RING_CAPACITY * FRAME_SIZE))())
             print(f"ready {index + 1}/{workers} pid={process.pid}", flush=True)
         if len(set(initial_hashes)) != 1:
@@ -103,7 +103,7 @@ def benchmark(config):
                 for process, initial in zip(processes, initial_hashes, strict=True):
                     client = BridgeClient(process.pid)
                     clients.append(client)
-                    if wait_for_frame_zero(client, process.pid).stateHash != initial:
+                    if wait_for_frame_zero(client, process.pid, 35.0).stateHash != initial:
                         raise RuntimeError("restart changed initial state hash")
                 reset_seconds.append(time.perf_counter() - reset_started)
             started = time.perf_counter()
@@ -119,7 +119,7 @@ def benchmark(config):
                 elif hashes[0] != expected_hashes[frame - 1]:
                     raise RuntimeError(f"reset replay mismatch at frame {frame}")
                 for client, buffer in zip(clients, buffers, strict=True):
-                    _drain_fast(client, buffer)
+                    drain_frames_into(client, buffer)
                 batch_latencies.append(time.perf_counter() - batch_started)
             elapsed = time.perf_counter() - started
             episode_reports.append({
