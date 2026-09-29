@@ -1,96 +1,77 @@
-# 训练算法与产物
+# 共享 PPO 与多智能体训练
 
-所有训练算法使用同一环境规则和学习包装。算法负责策略、样本和优化；观测过滤、控制延迟、奖励及对局结束仍由环境定义。公共入口为 `tools/train.py`，配置位于 `config/algorithm/`。
+全部新训练使用 `rl/ppo.py` 创建的 Stable-Baselines3 PPO；需要循环记忆时使用同一配置空间中的 sb3-contrib RecurrentPPO。MARL 层只决定双方何时学习、对手从哪里来、是否维护平均策略或种群，不再实现自己的 PPO 或 DQN 更新。
 
-## 五种配置对应的学习任务
+| 配置 | 学习组织 | 导出策略 |
+| --- | --- | --- |
+| `algorithm=ppo` | 分别训练两个座位；每局从固定规则池抽取对手。 | 两份 PPO 模型。 |
+| `algorithm=ippo` | 同时收集双方当前策略的轨迹，分别更新各自的 PPO。 | 两份 PPO 模型。 |
+| `algorithm=nfsp` | 分阶段训练双方 PPO 响应，用历史响应行为拟合平均策略。 | 两份平均策略，使用相同 PPO 模型容器保存。 |
+| `algorithm=psro` | 对当前对手种群训练 PPO 响应，再扩展收益表和混合权重。 | 两方种群、全部成员模型与混合权重。 |
 
-| 配置 | 方法与实现库 | 对手如何产生 | 导出策略 |
-| --- | --- | --- | --- |
-| `ppo` | 近端策略优化：Stable-Baselines3 PPO | 每局从固定规则池抽取对手 | 两个座位分别训练的前馈网络 |
-| `recurrent_ppo` | 带记忆的 PPO：sb3-contrib RecurrentPPO | 同一固定规则池 | 两个座位分别训练的循环网络 |
-| `ippo` | 独立 PPO：BenchMARL 与 TorchRL | 双方策略都在学习 | 两个玩家组各自的策略 |
-| `nfsp` | 神经虚拟自博弈：OpenSpiel NFSP | 每局选择最佳响应或平均策略模式 | 两方的平均策略网络 |
-| `psro` | 策略空间响应预言机：OpenSpiel PSRO 与 PPO 响应训练 | 从对手种群的混合分布抽取成员 | 两个座位的种群及混合权重 |
+网络类型由 `rl=ppo` 或 `rl=recurrent_ppo` 选择。NFSP 的监督样本池目前要求前馈数值观测；不能将其配置为循环网络或图像观测。固定规则对手要求规则可读取的数值观测。
 
-“最佳响应”指针对给定对手分布，尽力提高收益的策略；这里由有限预算的学习过程近似得到，不是精确求解。“混合策略”指按概率抽取策略成员，成员负责整局。上述方法已经有适配代码，不等于全部完成当前版本的训练和强度验收。
+## PPO 更新与时间上限
 
-## 固定规则对手：PPO 与循环 PPO
-
-`ppo_training.py` 依次训练两个座位；每个座位只更新自己的模型，对手来自规则池。`OpponentMixtureVecEnv` 把双人环境转换为 Stable-Baselines3 所需的单方视角，另一方仍经过相同的环境约束。
-
-PPO 用当前策略采样，再限制每轮策略更新幅度。循环 PPO 使用 LSTM，即能在决策之间保存和更新记忆的网络；记忆由每局独立实例管理，结束后清空。两者都能利用观测历史，但循环模型另有内部记忆。
-
-当前固定规则路径只接受数值观测；图像自博弈走 IPPO 或 PSRO。初始化可选新模型、完整 PPO 检查点或仅网络权重。继续检查点训练要保持算法、优化器、观测和动作配置一致；仅加载权重会重新创建优化器。
-
-最终模型位于 `player_0/final.zip` 和 `player_1/final.zip`。检查点继续训练不意味着能逐位复现先前的采样和随机轨迹。
-
-## 双方独立学习：IPPO
-
-`torchrl_env.py` 将 PettingZoo 数据转换为 TorchRL 张量结构；`benchmarl_task.py` 定义双方玩家组；`benchmarl_training.py` 创建 BenchMARL 实验。
-
-两个玩家分别学习自己的策略和值函数，不读取完整引擎状态。数值观测使用前馈模型，图像使用卷积模型。图像与己方按键历史作为不同输入处理。环境的图像布局转换发生在适配层，不改变观测内容。
-
-BenchMARL 通过多个单局工作进程采样。其采样结构与一个工作进程管理多个游戏的 `TwoPlayerVectorEnv` 不同，性能应分别测量。最终模型与实验配置保存在 BenchMARL 产物目录；项目的产物加载器负责定位与验证。
-
-## 近似平均策略：NFSP
-
-`VectorNFSP` 复用 OpenSpiel 的两类网络与样本池：
-
-- 强化学习网络估计动作价值，通过经验回放学习最佳响应。
-- 平均策略网络用监督学习拟合历史最佳响应行为。蓄水池抽样让固定容量样本池保留跨时间的行为样本。
-
-每局、每名玩家独立抽取一种模式，并保持整局。默认最佳响应概率为 0.1；其余局使用平均策略。所有模式下的环境转移都进入强化学习训练计数，最佳响应行为用于平均策略学习。并行对局共享各玩家的网络与样本池，但不共享前一状态或逐局模式。
-
-当前默认 `response_update=bounded_double_q`：在线网络选下一动作，目标网络估计该动作价值，再把目标限制在已知收益范围。终局收益的绝对值不超过 1，血量势函数系数为 \(\alpha\)，因此当前不折扣的有限对局满足：
+`config/rl/ppo.yaml` 是 PPO 超参数的唯一来源，各 MARL 配置引用同一份设置。设概率比为 \(r_t(\theta)\)，优势估计为 \(\hat A_t\)，PPO 的截断目标为：
 
 \[
-G'_{i,t}=z_i-\Phi_i(o_t),\qquad
-G'_{i,t}\in[-1-\alpha,1+\alpha].
+L^{\mathrm{clip}}(\theta)=\mathbb E_t\left[
+\min\left(r_t(\theta)\hat A_t,
+\operatorname{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat A_t\right)\right].
 \]
 
-`response_update=openspiel` 保留上游更新作对照。该改动的训练指标包括预测范围、目标范围和裁剪比例；这些指标不单独证明胜率提高。
+策略损失、价值损失、熵项、梯度裁剪和优化器更新均由上游 PPO 执行。IPPO 的 `JointRollouts` 只负责同时收集双方数据，再调用同一个缓冲区的 GAE 和模型的 `train()`。
 
-当前 NFSP 仅接受一维数值观测。模型文件包含推理权重、优化器及统计，但缺少完整样本池和全部随机数状态，不能精确恢复训练现场。
+所有路径声明 `timeout_payoff=zero_at_horizon`：到达对局帧数上限后收益为零，并结束该有限时域任务。训练不对该时限之外的状态自举；评测仍保留 `time_limit` 标签，不能把它记成原游戏双杀。
 
-## 扩展策略种群：PSRO
+血量塑形使用双方血量差构成的势函数。启用时必须设置 \(\gamma=1\)，终止或超时时令下一势函数为零：
 
-`SampledPSROSolver` 复用 OpenSpiel 的种群和混合策略求解，用真实游戏对局替代上游游戏树递归。每个座位默认从均匀随机策略开始，每轮：
+\[
+r'_t=r_t+\Phi(o_{t+1})-\Phi(o_t),\qquad
+G'_t=G_t-\Phi(o_t).
+\]
 
-1. 按对手当前混合分布抽样，使用 PPO 训练新的近似响应。
-2. 保留旧成员，将新策略加入对应座位的种群。
-3. 用真实对局估计新增收益矩阵项。
-4. 通过投影复制动态更新混合权重。该求解过程按估计收益调整各成员概率，并将结果限制在允许的概率集合内。
+因此它不会改变给定初始观测下按整局收益排序的策略。若折扣不为 1，当前入口拒绝启用这项塑形。
 
-每局固定抽取的对手，不能中途切换。游戏不提供任意状态克隆；收益矩阵由有限次采样估计，因此不能把当前产物称为精确均衡。
+## NFSP 的具体实现
 
-`population.json` 记录两方成员、模型相对路径、文件指纹、收益矩阵和混合权重。交付时一并保留该文件、训练 `config.yaml` 和所有响应模型。该包支持加载与评测，不包含精确恢复全部 PSRO 训练状态的信息。
+这是使用 PPO 响应的分阶段 NFSP 变体，不是原 OpenSpiel DQN-NFSP。每个阶段先冻结双方的响应与平均模型；训练一方时，对手在每局开始抽取响应或平均策略，概率由 `anticipatory_param` 决定，整局不切换。
 
-`algorithm.initial_population.player_0` 和 `player_1` 可分别配置初始成员。`kind: uniform` 使用均匀随机策略；`kind: sb3` 或 `sb3_recurrent` 需同时提供 `path` 和 `training_config`，加载已训练的 PPO 策略。加载前核对观测、延迟和动作配置，两个座位的模型随后分别复制为运行目录中的 `initial-p0.zip`、`initial-p1.zip`。种群包不依赖外部模型文件继续存在，循环策略的记忆仍按每局隔离。
+学习方用当前 PPO 策略采样，只用这批轨迹执行 PPO 更新。其观测与动作进入蓄水池；蓄水池使有限容量中的样本均匀代表已经见过的响应行为。平均策略通过动作负对数似然学习这些样本。平均网络复用 PPO 的网络结构与保存格式，但该监督目标不属于第二套强化学习算法。
 
-`algorithm.response.initialization` 显式选择响应网络的初始化方式：`parent_weights` 延续原先从前馈 PPO 父策略复制权重的行为；`fresh` 为每个响应建立新网络和优化器。当前响应训练器使用前馈 PPO，因此用循环 PPO 初始化种群时必须选择 `fresh`，不能把循环网络参数装入前馈网络。这项功能只指定初始种群，不恢复旧 PSRO 的收益矩阵、样本或随机数状态。
+每方更新后才进入下一阶段。有限训练预算、函数近似和分阶段对手分布都不提供精确最佳响应或收敛到均衡的保证。
 
-## 配置组合和时间上限
+检查点保存双方响应模型、平均模型、优化器、样本池、已见样本数、监督更新数和抽样随机状态。观测无损压缩，恢复时保留样本顺序。
 
-`config/train.yaml` 默认组合 `algorithm=nfsp`、`track=human`、`wrappers=raw`，设备为 `cuda:0`。启动前必须提供 `runtime.command`，它是工作进程命令的参数列表；未配置会报错，请求 CUDA 但不可用也会报错。
+## PSRO 的具体实现
 
-若已按机器设置好本地配置，可通过以下覆盖项选择路径：
+OpenSpiel 负责策略种群、响应选择和投影复制动态；PPO 负责训练近似响应。收益表中的每一项由真实环境完整对局估计。旧成员保持冻结，每局固定抽取一个成员。
 
-| 任务 | Hydra 覆盖项 |
+`algorithm.response.initialization` 选择 `fresh` 或 `parent_weights`。前者创建新网络；后者只复制选中父策略的参数，重新建立优化器。父策略与响应网络结构不匹配时不能复制。
+
+`population.json` 保存成员相对路径和指纹、双方收益表、混合权重、已完成迭代、评测记录及抽样状态。继续训练先恢复已有表，再只评测新增成员所需的项；不会重新抽样覆盖旧表。恢复后的运行目录保留已有成员文件的独立副本。
+
+旧种群若缺少 `training_state`，仍可用于推理和评测，但不能据此恢复原训练现场。它可作为新的初始策略来源。
+
+## 统一加载、保存与继续训练
+
+`policy/loader.py` 为训练对手、评测和实时对战提供同一加载函数。前馈与循环 PPO、NFSP 平均模型、PSRO 混合策略、规则和 ONNX 部署模型均通过此入口。旧 NFSP 与 BenchMARL 模型保留加载兼容；新训练不依赖其学习实现。
+
+| 任务 | 配置或产物 |
 | --- | --- |
-| 固定规则池前馈训练 | `algorithm=ppo wrappers=learning` |
-| 固定规则池记忆训练 | `algorithm=recurrent_ppo wrappers=learning` |
-| 双方独立训练 | `algorithm=ippo wrappers=learning` |
-| 平均策略训练 | `algorithm=nfsp wrappers=learning` |
-| 种群响应训练 | `algorithm=psro wrappers=learning` |
-| 超人状态训练 | 另选 `track=superhuman wrappers=superhuman_learning` |
-| 图像 IPPO | `algorithm=ippo episode.observation_mode=image wrappers=image_learning` |
+| 从头建立 PPO | `initial_policies.player_0/1: {kind: fresh}`。 |
+| 继续 PPO 或 IPPO | 每座位指定 `kind: checkpoint`、模型 `path` 和原 `training_config`。 |
+| 仅加载 PPO 权重开始新训练 | 每座位指定 `kind: weights`、模型 `path` 和原 `training_config`；优化器重建。 |
+| 继续 NFSP | `algorithm.resume` 指定 `kind: checkpoint`、`training.pt` 路径及原训练配置。 |
+| 继续 PSRO | `algorithm.resume` 指定 `kind: checkpoint`、`population.json` 路径及原训练配置。 |
+| 最终单模型策略 | `player_0/final.zip`、`player_1/final.zip` 与 `config.yaml`。 |
+| 最终种群策略 | `population.json`、其中引用的全部模型与 `config.yaml`。 |
 
-所有当前算法都显式采用 `timeout_payoff=zero_at_horizon`：达到时限后不估计未来收益，但评测保留超时标签。启用血量塑形要求折扣为 1。游戏模拟帧、每局决策次数、双人样本数和算法更新次数不是同一统计单位，比较训练预算时必须注明。
+继续训练会核对观测、动作、历史、延迟、角色卡组及相关算法配置。模型和优化器恢复不等于恢复正在运行的游戏；继续训练从新对局开始，不能声称逐位延续中断时的游戏现场。
 
-## 如何确认结果可用
+运行入口仍为 `tools/train.py`。正式训练请求 CUDA 而 CUDA 不可用时立即报错。测试中的简短优化器检查使用模拟后端，只用于核对更新、保存和恢复，不作为策略强度证据。
 
-训练入口保存解析后的 `config.yaml`、源码与软件身份 `identity.json`，并在 `result.json` 中记录成功或错误。模型读取还要核对赛道、观测、延迟、动作包装及文件指纹；仅维度相同不能证明兼容。
+## 当前验证边界
 
-`tools/benchmark_training.py` 要求训练成功结束，并使用对应最终模型。它沿用保存的训练条件；例如旧的 12 帧延迟模型仍按 12 帧评测，不改成当前默认 5 帧。
-
-参数变化证明执行了优化；完整独立对局才用于评价强度。使用验证集选择配置后，再执行独立测试集。模型、配置、完整结果及可复现回放共同构成交付证据，详见[交付清单](training-acceptance.md)。
+前馈与循环 IPPO 的更新、保存、加载、继续训练已由接口测试覆盖；NFSP 检查样本池和平均模型的恢复；PSRO 检查继续扩展种群时旧收益与成员文件的保留。完整神 AI 的真实游戏行为验证单独记录在[行为核对文档](community-ai.md)。这些检查不代表新版策略已经完成正式训练或强度验收。

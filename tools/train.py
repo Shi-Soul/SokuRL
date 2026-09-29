@@ -50,7 +50,7 @@ def main(cfg: DictConfig):
     interface = LearningInterface(episode, learning)
     if algorithm == "nfsp" and (interface.observation_space.shape is None
                                or len(interface.observation_space.shape) != 1):
-        raise ValueError("the OpenSpiel NFSP adapter requires numeric state observations")
+        raise ValueError("the NFSP average-policy reservoir requires numeric state observations")
     if algorithm == "ppo" and episode.observation_mode == "image":
         raise ValueError("fixed-rule PPO requires state observations; image self-play uses IPPO or PSRO")
     if learning.health_potential_scale:

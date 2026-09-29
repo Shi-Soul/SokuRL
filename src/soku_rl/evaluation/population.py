@@ -37,7 +37,7 @@ class PopulationEvaluator:
                         self.records.append({
                             "policies": [p.name for p in policies],
                             "fingerprints": [p.fingerprint for p in policies],
-                            "world_seed": seeds[slot], "policy_seeds": private_seeds[slot],
+                            "world_seed": seeds[slot], "policy_seeds": list(private_seeds[slot]),
                             "returns": returns[slot].tolist(),
                             "final": infos[slot][AGENTS[0]],
                         })

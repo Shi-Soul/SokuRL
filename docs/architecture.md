@@ -1,97 +1,66 @@
-# 架构栈与数据流
+# 架构与职责
 
-SokuRL 把真实游戏封装为双人强化学习环境。战斗规则来自原版引擎；学习算法通过统一观测和按键接口与引擎交互。本文描述合并后的 ABI 8 源码，实验结论另见[验收记录](env-validation.md)。
+Python 训练代码分为 Env、RL、MARL 三层。Policy 定义可运行的策略；play 和 evaluation 调用策略及环境，不拥有另一套学习算法。
 
-## 技术栈及分工
+| 目录 | 职责 |
+| --- | --- |
+| `src/soku_rl/env/` | 游戏时间步、角色和卡组选择、观测、双方按键、历史、延迟、奖励、结束条件和后端通信。 |
+| `src/soku_rl/rl/` | 唯一的 PPO 创建、恢复、保存和更新流程，以及单方训练视角、双人轨迹收集、网络输入编码和样本存储。 |
+| `src/soku_rl/marl/` | IPPO 的双方学习组织、NFSP 的平均策略、PSRO 的种群与对手分布；强化学习更新均调用 RL 层。 |
+| `src/soku_rl/policy/` | 策略定义、逐局实例、加载器、模型与规则实现。 |
+| `src/soku_rl/evaluation/` | 对战收益采样、基准评测和结果统计。 |
+| `src/soku_rl/play/` | 实时对局、逐局策略状态和比赛生命周期。 |
+| `tools/` | Hydra 命令入口、Windows 游戏工作进程和原生通信。目前该目录仍需按运行与验证职责进一步整理。 |
+| `native/SokuRLBridge/` | MSVC x86 DLL：在原游戏输入和战斗更新位置控制步进、读取状态。 |
 
-| 层 | 技术 | 职责 |
-| --- | --- | --- |
-| 游戏 | th123 1.10a，Win32/x86 | 角色动作、碰撞、弹幕、伤害、天气、卡牌和随机演化 |
-| 模块加载与桥接 | SWRSToys、SokuLib、C++、MSVC x86、CMake | 加载 DLL，在游戏输入和战斗更新边界接入控制 |
-| 进程通信 | Windows 共享内存、Python 3.11 x64、ctypes | 按游戏进程编号交换命令、确认和逐帧状态 |
-| 工作进程 | Python 管道；Linux 下使用 Wine | 隔离游戏依赖，管理本工作进程拥有的实例 |
-| 环境 | NumPy、Gymnasium 空间、PettingZoo ParallelEnv | 定义双人接口、历史、动作延迟、奖励和结束条件 |
-| 学习包装 | 项目内的观测和动作转换 | 附加公开特征、己方按键历史、可选动作子集和奖励塑形 |
-| 学习算法 | PyTorch、Stable-Baselines3、sb3-contrib、TorchRL、BenchMARL、OpenSpiel | 网络推理、样本收集、优化及策略种群管理 |
-| 配置和证据 | Hydra YAML、JSON、模型与回放文件 | 保存配置、版本、种子、模型身份和对局结果 |
+配置只有 `config/` 一套 Hydra 空间。`config/rl/` 定义共享 PPO 设置，`config/algorithm/` 定义对手与种群组织，`config/track/` 选择拟人或超人环境。
 
-Python 依赖及选装分组见 [pyproject.toml](../pyproject.toml)。原生源码、补丁和构建文件的身份见[依赖锁定记录](../config/dependencies.lock.json)。安装 Python 包不会安装游戏或 DLL。
+## 策略接口
 
-## 进程之间如何连接
+`Policy` 保存策略名称和文件或规则指纹。`spawn(seed)` 创建一局中一个座位独占的 `Actor`；`Actor.act(observation)` 返回动作。每个实例独占记忆和随机数状态。
+
+- `RLPolicy` 表示由学习参数定义的策略，包括前馈 PPO、循环 PPO、NFSP 平均策略和部署模型。
+- `RulePolicy` 表示显式规则，包括均匀随机、项目规则和原版神 AI 脚本。
+- `MixturePolicy` 在一局开始时抽取一个成员，整局使用该成员。
+
+`policy/loader.py` 是共同加载入口，评测和对战复用它。`policy/contract.py` 核对观测、动作、历史和延迟配置。旧 NFSP 与 BenchMARL 权重保留只读加载兼容；新训练不使用它们的强化学习实现。
+
+环境不导入具体策略。逻辑输入在 `env/encoding.py` 定义；诊断状态记录在 `env/observation/diagnostic.py` 定义。规则的动作词表转换属于 `policy/rules/observed_rules.py`。种群收益采样属于 `evaluation/population.py`。
+
+## 游戏与策略之间的数据流
 
 ```mermaid
-flowchart TD
-    A[训练或评测进程：算法与模型] --> B[学习包装与双人环境]
-    B --> C[WorkerBackend]
-    C <-->|父子进程管道| D[rollout_worker / SokuGameBatch]
-    D <-->|按游戏进程编号隔离的共享内存| E[SokuRLBridge]
-    E <-->|双方逻辑按键与逐帧状态| F[原版游戏引擎]
-    E --> G[状态及渲染属性，按需采集 RGB]
-    G --> H[可见性过滤与双方视角编码]
-    H --> D
+flowchart LR
+    A[策略实例] -->|动作| B[Env]
+    B --> C[游戏工作进程]
+    C --> D[桥接 DLL]
+    D --> E[原版游戏]
+    E -->|逐帧状态| D
+    D --> C
+    C -->|双方观测| B
+    B -->|各自观测| A
 ```
 
-Linux 训练进程运行 PyTorch 和 CUDA；Wine 中的 Python 工作进程运行 Windows 游戏接口，不导入 CUDA 或 NumPy。Windows 也通过显式的 `runtime.command` 启动工作进程。模型库不进入游戏进程。
+`Episode` 共用历史、延迟和结束规则；PettingZoo 单局接口与 `TwoPlayerVectorEnv` 批量接口调用同一实现。PPO、IPPO、NFSP、PSRO 都使用该批量环境。TorchRL 保留为外部环境适配器，不再承担 IPPO 训练。
 
-每个游戏的状态映射名为 `Local\SokuRLBridge_<pid>`。`pid` 是该游戏的进程编号。图像及渲染属性使用单独的共享内存，读取时核对模拟帧编号。管道只连接本程序创建的可信子进程，不是联网对战或远程服务协议。
+一个动作由水平、垂直方向和六个按钮组成。双方在同一个模拟帧提交输入。只有游戏完成战斗更新才增加模拟帧号；窗口刷新和 Python 查询不增加帧号。
 
-## 代码职责
+## 两类观测
 
-以下 Python 路径均相对 `src/soku_rl/`；带 `tools/` 或 `native/` 的路径相对仓库根目录。
+拟人模式使用图像或经过可见性过滤的公开状态，并执行配置中的决策间隔与动作延迟。
 
-| 文件或模块 | 管理的内容 |
-| --- | --- |
-| `pomg.py` | 双方观测、联合动作、时间步、策略和后端协议 |
-| `tools/sokurl.py`、`tools/game_batch.py` | 游戏启动、连接、批量步进、重置和关闭 |
-| `native/SokuRLBridge/ControlBlock.hpp`、`tools/bridge_shared.py` | C++ 与 Python 两端的协议布局及命令 |
-| `tools/frame_stream.py` | 检查初始帧，按顺序复制帧队列，再确认已读取的记录 |
-| `visibility.py`、`contours.py`、`visible_state.py` | 可见性判断、量化和公开状态编码 |
-| `observations.py`、`env/encoding.py` | 诊断观测及离散按键编码 |
-| `worker_pipe.py`、`tools/rollout_worker.py` | 父子进程请求与响应 |
-| `env/control.py` | 双方同时提交、延迟队列和当前保持的按键 |
-| `env/hisouten_env.py` | 共用的 Episode 逻辑与单局 PettingZoo 接口 |
-| `env/vector_env.py`、`env/factory.py` | 多局组织及单局构造 |
-| `learning_wrappers.py`、`learning_features.py` | 单局、多局共用的学习转换 |
-| `ppo_training.py`、`ppo_response.py` | 固定对手 PPO 与 PSRO 的 PPO 响应训练 |
-| `torchrl_env.py`、`benchmarl_task.py`、`benchmarl_training.py` | TorchRL 数据格式和 BenchMARL IPPO 任务 |
-| `spiel_nfsp.py`、`nfsp.py`、`nfsp_response.py` | NFSP 双网络、逐局模式、批量转移与最佳响应更新 |
-| `psro.py`、`population.py` | 策略种群、真实对局收益和混合策略 |
-| `policy_benchmark.py`、`training_artifacts.py`、`checkpoint_policy.py` | 策略对战、训练产物定位和模型配置检查 |
+超人模式使用 `privileged_state`，每帧决策、零环境延迟。原神 AI 和学习策略收到相同的双方角色、全部对象、碰撞框、手牌、技能和角色专用字段。每个 32 位字段用两个分量表示，以免浮点表示丢失低位。对象超出声明容量时立即报错，不能截断后继续训练。
 
-## 一次决策如何执行
+共享 PPO 编码器按原顺序处理全部对象，并保留双方角色字段及己方动作历史。前馈 PPO 的轨迹缓冲区和 NFSP 样本池无损压缩观测，取样时恢复原数组；GAE、采样顺序和 PPO 损失仍使用上游实现。循环 PPO 仍使用上游循环缓冲区。
 
-1. 算法收到双方各自的观测，同时给出两个动作编号。
-2. 学习包装层把动作编号转换为基础按键编号；环境检查双方动作齐全。
-3. `DelayedControls` 将联合按键放入延迟队列。在每个模拟帧开始前，取出已经到期的按键；其余时间保持原按键。
-4. 后端将双方输入作为同一命令交给桥接模块。游戏完成一次战斗更新后，桥接模块增加帧号并发布结果。
-5. Python 检查命令确认、目标帧号、暂停状态和丢帧计数，再生成双方观测。`Episode` 每帧更新历史及结束条件。
-6. 达到决策间隔或提前结束时，环境返回观测、奖励、终止、截断及公开信息；学习包装层再附加特征与塑形奖励。
+环境初始化使用 `episode.match.player_0` 和 `player_1`，每方分别指定 `character`、`palette`、`deck`。角色范围为 0 至 19，卡组编号为 0 至 3。
 
-模拟帧只在游戏完成一次战斗更新后增加。窗口刷新、Python 查询和策略决策都不能计成游戏模拟帧。
+## 运行边界与当前缺口
 
-## 两种多局组织
+游戏与 DLL 为 32 位，Python 可为 64 位；内存中的游戏地址始终按 32 位解释。桥接 ABI 当前为 8，布局不符必须报错。父子进程管道只连接本任务创建的可信工作进程。
 
-| 路径 | 组织方式 | 复用的规则 |
-| --- | --- | --- |
-| PPO、NFSP、PSRO | `TwoPlayerVectorEnv` 通过一个工作进程管理多个游戏；支持指定对局子集的步进与重置 | Episode、DelayedControls、LearningEpisode |
-| BenchMARL IPPO | TorchRL `ParallelEnv` 组合单局工厂；每个单局拥有自己的工作进程 | 同一套单局与学习包装规则 |
+读取超人观测要求游戏暂停在指定帧。重置通过原游戏场景生命周期执行，不提供任意状态恢复。图像环境重建被选中的游戏实例，状态环境可复用实例。关闭只处理本后端拥有的进程。
 
-环境编号和玩家编号是两个不同维度，不能直接展平为互不相关的单智能体任务。一个工作进程处理重置时，调用方须等该请求完成后才能继续提交请求。并发数和吞吐量需按实际运行路径测量。
+离线环境与实时网络对战的时钟不同。目前实时入口仍限定公开状态、每 3 帧决策和 5 帧输入延迟；完整超人实时观测与控制尚未接通。官方 `.rep` 与环境轨迹的互转也尚未完成，不能把现有诊断重放文件称为官方回放。
 
-## 协议、重置与资源所有权
-
-ABI 指 C++ 与 Python 共同遵守的二进制布局及命令约定。当前版本为 8，双方布局必须一致；旧版本 DLL 会被拒绝。Python 为 64 位，游戏内地址仍按 32 位解释。
-
-状态观测的 `ResetEpisode` 经过游戏场景生命周期重建对局，保留已有游戏进程。图像观测重建被选中实例的游戏进程，因为原生场景重载在两帧特效上留下可复现的像素差异；未选中的实例保持原进程和进度。这项处理增加图像模式的重置耗时，不增加状态模式的渲染。工作进程通过 `reset_methods` 报告各观测模式的重置方式。
-
-两种方式都会重置环境历史、延迟队列和按键。`GotoFrame` 仍返回不支持恢复的结果；外部输入重放和局内重置都不提供任意状态克隆。
-
-512 帧环形缓冲区采用单生产者、单消费者方式；不能让两个读取程序消费同一实例。帧不匹配、丢帧、超时或场景错误必须作为运行错误处理，不能当作策略输掉一局。
-
-关闭只针对本后端创建的游戏。不同 Wine 环境若共用游戏目录，不能依靠 Windows 命名互斥量保护启动配置；独立运行需隔离可写游戏配置。已有故障和处理记录见[环境验收](env-validation.md)。
-
-## 仍需整理的边界
-
-`game_batch.py` 与验收脚本通过 `frame_stream.py` 共用初始帧等待和帧队列读取。环形队列及 32 位序号回绕在这个模块处理；目标缓冲区不足时，在复制或确认记录之前报错。批量环境与规则联赛直接使用桥接层的同步等待接口。
-
-场景执行仍依赖 `frame_validation.py` 中的练习场实例管理。后续需将这项职责迁入运行模块，并验证原有入口的行为。观测模型见[环境建模](environment-model.md)，算法分工见[训练算法](algorithms.md)。
+完整脚本的来源、缺失定义修补及逐帧证据见[神 AI 行为核对](community-ai.md)。算法与继续训练见[训练算法](algorithms.md)。
