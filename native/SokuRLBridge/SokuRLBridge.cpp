@@ -770,16 +770,17 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
                     publishResult(SokuRLBridge::ResultCode::InvalidCommand);
                 } else {
                     const auto &select = SokuLib::currentScene->to<SokuLib::Select>();
-                    const auto cursor = seat ? select.rightCursor.cursorPos : select.leftCursor.cursorPos;
+                    const auto selected = seat ? SokuLib::gameParams.rightPlayerInfo.character :
+                        SokuLib::gameParams.leftPlayerInfo.character;
                     const auto stage = seat ? select.rightSelectionStage : select.leftSelectionStage;
                     // Use the local menu's original packed inputs so the peer sees
                     // the same selection. Never overwrite either player's character.
-                    if (cursor == character)
+                    if (selected == character)
                         self->input.a = 1;
                     else if (stage != 0)
                         self->input.b = 1;
                     else
-                        self->input.horizontalAxis = cursor < character ? 1 : -1;
+                        self->input.horizontalAxis = 1;
                     publishResult(SokuRLBridge::ResultCode::Complete);
                 }
                 g_lastCommandSeq = sequence;
