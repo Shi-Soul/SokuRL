@@ -13,9 +13,19 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
     completed, rounds, decisions, skipped, accepted = 0, 0, 0, 0, 0
     dropped = {"late": 0, "wrong_round": 0}
     started = time.monotonic()
+    scores = (0, 0)
+
+    def result(termination):
+        return {"matches": completed, "rounds": rounds, "decisions": decisions,
+                "accepted_commands": accepted, "dropped_commands": dropped,
+                "skipped_decisions": skipped, "termination": termination,
+                "seconds": time.monotonic()-started, "last_scores": scores}
+
     try:
         while time.monotonic()-started < timeout:
             batch = connection.request("poll", {})
+            if batch["closed"]:
+                return result("game_closed")
             for event in batch["input_events"]:
                 record({"kind": "input_event", **event})
                 if event["result"] == "expired" and event["command_type"] == 1:
@@ -24,6 +34,7 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
                 record({"kind": "menu", "reply": batch["menu_reply"]})
             latest = {}
             for frame in batch["records"]:
+                scores = frame["scores"]
                 latest[frame["match"], frame["round"]] = frame["frame"]
             for frame in batch["records"]:
                 metadata = {key: value for key, value in frame.items() if key != "observations"}
@@ -34,10 +45,7 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
                 if "match_finished" in events:
                     completed += 1
                     if completed == matches:
-                        return {"matches": completed, "rounds": rounds, "decisions": decisions,
-                                "accepted_commands": accepted, "dropped_commands": dropped,
-                                "skipped_decisions": skipped,
-                                "seconds": time.monotonic()-started, "last_scores": frame["scores"]}
+                        return result("matches_completed")
                 if frame["phase"] != "battle":
                     if live.active:
                         live.stop()

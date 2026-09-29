@@ -125,10 +125,13 @@ class NetworkGame:
         raise TimeoutError("network host did not open its UDP socket")
 
     def poll(self):
-        if self.process.poll() is not None:
-            raise EOFError("owned network game exited")
+        exit_code = self.process.poll()
+        if exit_code is not None:
+            if exit_code != 0:
+                raise RuntimeError(f"owned network game failed with exit code {exit_code}")
+            return {"closed": True}
         if self.peer is not None and not self.peer.is_running():
-            raise EOFError("local human player closed their game")
+            return {"closed": True}
         cursor, snapshots = self.clients["history"].read_after(self.cursor, 2.)
         records = []
         for snapshot in snapshots:
@@ -179,7 +182,7 @@ class NetworkGame:
         if not latest.in_battle:
             self._check_dialogs()
         self.input_cursor, input_events = self.clients["input_events"].read_after(self.input_cursor, 2.)
-        return {"records": records, "cursor": cursor, "input_events": input_events, "menu_reply": menu_reply,
+        return {"closed": False, "records": records, "cursor": cursor, "input_events": input_events, "menu_reply": menu_reply,
                 "pid": self.process.pid}
 
     def watch_local_peer(self, pid):

@@ -89,7 +89,9 @@ def main(cfg):
                                 print(f"本场结束，比分 {event['scores'][0]}:{event['scores'][1]}。", flush=True)
                 report["result"] = run_session(connection, policy, interface, seat, config["seed"],
                     config["session"]["matches"], config["session"]["timeout"], record)
-        report["success"] = True
+        report["success"] = report["result"]["termination"] == "matches_completed"
+        if report["result"]["termination"] == "game_closed":
+            print("游戏已关闭，本次启动的对战进程已退出。", flush=True)
     except BaseException as error:
         report["error"] = repr(error)
         raise

@@ -14,7 +14,7 @@ class Connection:
 
     def request(self, operation, payload):
         if operation == "poll":
-            return {"menu_reply": "not_requested", "input_events": (), "records": [next(self.frames)]}
+            return {"closed": False, "menu_reply": "not_requested", "input_events": (), "records": [next(self.frames)]}
         assert operation == "submit"
         self.commands.append(payload)
         return {"reply": self.reply}
@@ -85,7 +85,7 @@ def test_backlog_keeps_observation_history_but_skips_obsolete_decisions():
     class BatchedConnection(Connection):
         def request(self, operation, payload):
             if operation == "poll":
-                return {"menu_reply": "not_requested", "input_events": (), "records": next(self.frames)}
+                return {"closed": False, "menu_reply": "not_requested", "input_events": (), "records": next(self.frames)}
             return super().request(operation, payload)
 
     batch = [frame(1, 0, index, "battle", ("round_started",) if index == 1 else (), (0, 0))
@@ -112,9 +112,29 @@ def test_accepted_input_that_later_expires_stops_inference():
     class ExpiredConnection:
         def request(self, operation, payload):
             assert operation == "poll"
-            return {"input_events": ({"request": 7, "result": "expired", "command_type": 1},)}
+            return {"closed": False, "input_events": ({"request": 7, "result": "expired", "command_type": 1},)}
 
     log = []
     with pytest.raises(RuntimeError, match="7 expired"):
         run_session(ExpiredConnection(), RecordingPolicy(), interface(), 0, 1, 1, 10., log.append)
     assert log == [{"kind": "input_event", "request": 7, "result": "expired", "command_type": 1}]
+
+
+def test_closing_the_game_preserves_partial_results_without_inventing_a_win():
+    class ClosingConnection(Connection):
+        def request(self, operation, payload):
+            if operation == "poll":
+                try:
+                    return super().request(operation, payload)
+                except StopIteration:
+                    return {"closed": True}
+            return super().request(operation, payload)
+
+    connection = ClosingConnection([
+        frame(1, 0, 1, "battle", ("round_started",), (0, 0)),
+        frame(1, 0, 2, "between_rounds", ("score_changed",), (1, 0)),
+    ], "accepted")
+    result = run_session(connection, RecordingPolicy(), interface(), 0, 1, 100, 10., [].append)
+    assert result["termination"] == "game_closed"
+    assert result["matches"] == 0 and result["rounds"] == 1
+    assert result["last_scores"] == (1, 0) and result["accepted_commands"] == 1
