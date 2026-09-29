@@ -345,4 +345,30 @@ gpu41 全量检查为 **191 项通过、1 项跳过、2 个参数子检查通过
 | spirit_siege | 53 | 9 | 2 |
 | skill_cycle | 62 | 2 | 0 |
 
-此评测使用运行时固定的历史桥接 DLL，SHA-256 为 `8b06c69fcdd7799792bb1bf67d4f69904181a75ef9aee5e707c4da281f697025`，不能当作新版联网 DLL 的兼容性证据。相同模型、包装和运行配置已冻结，`recurrent-human-latency5-shared131072-test` 开始独立测试：32 个预留种子与验证集不相交，共 960 局，使用 GPU。独立测试尚未完成；以上成绩仅属于验证集。
+此评测使用运行时固定的历史桥接 DLL，SHA-256 为 `8b06c69fcdd7799792bb1bf67d4f69904181a75ef9aee5e707c4da281f697025`，不能当作新版联网 DLL 的兼容性证据。
+
+## 拟人循环 PPO 独立测试通过
+
+`recurrent-human-latency5-shared131072-test` 固定相同模型、包装和运行配置，使用与验证集不相交的 32 个预留种子、两个座位及 15 个规则，共完成 **960 局**，耗时 **9266.553458278999 秒**。服务器原始 `result.json` 明确记录 `success=true`。
+
+结果为 **725 胜、176 负、59 次超时、0 次双重击倒**；包含超时局的胜率为 `725/960`。对 **12/15** 个规则的胜率严格超过 50%，达到拟人赛道既定门槛。未超过 50% 的规则为 `pressure`、`graze_hunter`、`hit_and_run`。
+
+| 规则 | 胜 | 负 | 超时 |
+| --- | ---: | ---: | ---: |
+| rush | 60 | 4 | 0 |
+| zoning | 63 | 1 | 0 |
+| counter | 64 | 0 | 0 |
+| community_combo | 40 | 24 | 0 |
+| community_guard | 63 | 1 | 0 |
+| pressure | 26 | 37 | 1 |
+| footsies | 53 | 11 | 0 |
+| anti_air | 64 | 0 | 0 |
+| air_rush | 38 | 10 | 16 |
+| bullet_wall | 64 | 0 | 0 |
+| graze_hunter | 20 | 16 | 28 |
+| hit_and_run | 29 | 30 | 5 |
+| corner_trap | 34 | 27 | 3 |
+| spirit_siege | 44 | 14 | 6 |
+| skill_cycle | 63 | 1 | 0 |
+
+这是固定规则对手路径的离线独立测试。它不证明超人赛道、PSRO、NFSP 或完整实时联网对战已全部验收。
