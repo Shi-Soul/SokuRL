@@ -6,6 +6,7 @@
 #include "NetworkState.hpp"
 #include "NetworkInput.hpp"
 #include "NetworkSelection.hpp"
+#include "ProfileDeck.hpp"
 
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
@@ -287,9 +288,13 @@ bool installUnlimitedPacingHook()
     return true;
 }
 
-void configureVsPlayer(SokuLib::PlayerInfo &info, bool right, std::uint32_t character,
+bool configureVsPlayer(SokuLib::PlayerInfo &info, bool right, std::uint32_t character,
     std::uint32_t palette, std::uint32_t deck)
 {
+    auto &profile = right ? SokuLib::profile2 : SokuLib::profile1;
+    auto &source = SokuRLBridge::profileDeck(profile, character, deck);
+    if (source.size != 20)
+        return false;
     const auto initializeProfile = reinterpret_cast<ProfileInitializeMethod>(PROFILE_INITIALIZE);
     info.character = static_cast<SokuLib::Character>(character);
     info.isRight = right;
@@ -302,10 +307,9 @@ void configureVsPlayer(SokuLib::PlayerInfo &info, bool right, std::uint32_t char
             reinterpret_cast<SokuLib::KeyManager *>(FALLBACK_KEY_MANAGER);
         initializeProfile(&SokuLib::profile2, -1);
         info.keyManager = reinterpret_cast<SokuLib::KeyManager **>(P2_KEYMAP_MANAGER_PTR);
-        auto &source = SokuLib::profile2.cards[character][deck];
         for (int i = 0; i < source.size; ++i)
             info.effectiveDeck.push_back(source[i]);
-        return;
+        return true;
     }
 
     *reinterpret_cast<signed char *>(P1_INPUT_DEVICE) = -1;
@@ -313,9 +317,9 @@ void configureVsPlayer(SokuLib::PlayerInfo &info, bool right, std::uint32_t char
         reinterpret_cast<SokuLib::KeyManager *>(FALLBACK_KEY_MANAGER);
     initializeProfile(&SokuLib::profile1, -1);
     info.keyManager = reinterpret_cast<SokuLib::KeyManager **>(P1_KEYMAP_MANAGER_PTR);
-    auto &source = SokuLib::profile1.cards[character][deck];
     for (int i = 0; i < source.size; ++i)
         info.effectiveDeck.push_back(source[i]);
+    return true;
 }
 
 CheckpointIdentity readIdentity()
@@ -1102,10 +1106,14 @@ int __fastcall titleOnProcess(SokuLib::Title *title)
     *reinterpret_cast<signed char *>(INPUT_MANAGER_CLUSTER_DEVICE) = -1;
     SokuLib::setBattleMode(SokuLib::BATTLE_MODE_VSPLAYER,
         SokuLib::BATTLE_SUBMODE_PLAYING1);
-    configureVsPlayer(SokuLib::leftPlayerInfo, false, g_vsP1Character,
-        g_vsP1Palette, g_vsP1Deck);
-    configureVsPlayer(SokuLib::rightPlayerInfo, true, g_vsP2Character,
-        g_vsP2Palette, g_vsP2Deck);
+    if (!configureVsPlayer(SokuLib::leftPlayerInfo, false, g_vsP1Character,
+            g_vsP1Palette, g_vsP1Deck) ||
+        !configureVsPlayer(SokuLib::rightPlayerInfo, true, g_vsP2Character,
+            g_vsP2Palette, g_vsP2Deck)) {
+        publishResult(SokuRLBridge::ResultCode::TargetUnavailable);
+        g_vsBootstrapArmed = false;
+        return SokuLib::SCENE_TITLE;
+    }
     SokuLib::gameParams.stageId = static_cast<unsigned char>(g_vsStage);
     SokuLib::gameParams.musicId = static_cast<unsigned char>(g_vsMusic);
     if (g_vsSeedRequested)
