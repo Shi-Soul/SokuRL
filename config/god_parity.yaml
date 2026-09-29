@@ -11,4 +11,6 @@ validation:
   scripts: all
   seats: [0, 1]
   opponent_character: 0
+  shards: 1
+  shard: 0
 output: logs/validation/god-parity-${now:%Y%m%d-%H%M%S}

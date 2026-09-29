@@ -96,9 +96,13 @@ def main(config):
     reference = Reference(Path(config.validation.reference_library).resolve(strict=True))
     names = (sorted(name for name in package.files if name[:2].isdigit() and "_main" in name)
              if config.validation.scripts == "all" else list(config.validation.scripts))
+    if not 0 <= config.validation.shard < config.validation.shards <= len(names):
+        raise ValueError("validation requires 0 <= shard < shards <= script count")
+    names = names[config.validation.shard::config.validation.shards]
     report = {"package": package.fingerprint, "original_package": package.original_fingerprint,
               "repairs": {name: value.decode("ascii") for name, value in package.repairs.items()},
               "reader_repair": "Initialize new Obj x, y, xspeed, yspeed to zero before the upstream float read filter.",
+              "reference_sha256": hashlib.sha256(Path(config.validation.reference_library).read_bytes()).hexdigest(),
               "bridge_sha256": hashlib.sha256((sokurl.GAME_DIR / "modules/SokuRLBridge/SokuRLBridge.dll").read_bytes()).hexdigest(),
               "results": []}
     OmegaConf.save(config, output / "config.yaml")
