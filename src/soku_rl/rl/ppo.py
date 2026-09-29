@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 
 from gymnasium import spaces
+from hydra.utils import get_class
 from stable_baselines3 import PPO
 
 from soku_rl.policy.contract import read_training_contract
@@ -44,8 +45,13 @@ def parameter_hash(policy):
 
 
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
+    parameters = dict(config["ppo"])
+    architecture = dict(parameters.get("policy_kwargs", {}))
+    if "features_extractor_class" in architecture:
+        architecture["features_extractor_class"] = get_class(architecture["features_extractor_class"])
+    parameters["policy_kwargs"] = architecture
     if source == {"kind": "fresh"}:
-        return algorithm(policy_type, env, seed=seed, device=device, **config["ppo"]), source
+        return algorithm(policy_type, env, seed=seed, device=device, **parameters), source
     if set(source) != {"kind", "path", "training_config"} or source["kind"] not in {"checkpoint", "weights"}:
         raise ValueError("initial policy must be fresh, a training checkpoint, or policy weights")
     training = read_training_contract(source["training_config"], interface)
@@ -60,7 +66,7 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
             raise ValueError("policy weights require the same network architecture")
         initial = algorithm.load(path, device=device)
         source_steps = initial.num_timesteps
-        model = algorithm(policy_type, env, seed=seed, device=device, **config["ppo"])
+        model = algorithm(policy_type, env, seed=seed, device=device, **parameters)
         model.policy.load_state_dict(initial.policy.state_dict(), strict=True)
     else:
         model = algorithm.load(path, env=env, device=device)
