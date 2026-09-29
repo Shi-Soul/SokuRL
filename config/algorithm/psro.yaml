@@ -1,4 +1,5 @@
 name: psro
+resume: {kind: fresh}
 iterations: 4
 simulations_per_entry: 32
 prd_iterations: 10000

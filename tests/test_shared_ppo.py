@@ -96,3 +96,33 @@ def test_nfsp_averages_share_loader_and_resume_reservoirs(tmp_path):
             env.interface, "cpu")
         assert isinstance(policy, RLPolicy)
     env.close()
+
+
+def test_psro_continues_existing_population_without_resampling_old_payoffs(tmp_path):
+    pytest.importorskip("open_spiel")
+    from soku_rl.marl.psro import train_psro
+    torch.set_num_threads(1)
+    env = fixture_env()
+    response = fixture_config("mlp") | {"initialization": "parent_weights", "timesteps_per_response": 8}
+    config = {"name": "psro", "iterations": 1, "simulations_per_entry": 2,
+        "prd_iterations": 20, "timeout_payoff": "zero_at_horizon", "response": response,
+        "initial_population": {a: {"kind": "uniform"} for a in ("player_0", "player_1")},
+        "resume": {"kind": "fresh"}}
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir(); second.mkdir()
+    report = train_psro(env, config, "cpu", 23, first)
+    contract = first / "config.yaml"
+    OmegaConf.save(OmegaConf.create({"episode": asdict(env.interface.episode),
+        "wrappers": asdict(env.interface.config), "algorithm": config}), contract)
+    config["resume"] = {"kind": "checkpoint", "path": str(first / "population.json"),
+                        "training_config": str(contract)}
+    resumed = train_psro(env, config, "cpu", 99, second)
+    assert resumed["iteration"] == 2
+    assert [len(role) for role in resumed["populations"]] == [3, 3]
+    assert resumed["training_state"]["responses"] == 4
+    assert resumed["evaluation_games"][:len(report["evaluation_games"])] == report["evaluation_games"]
+    for old, new in zip(report["meta_game"], resumed["meta_game"], strict=True):
+        assert np.array_equal(old, np.asarray(new)[:2, :2])
+    assert all((second / entry["path"]).is_file() for role in resumed["populations"]
+               for entry in role if entry["kind"] != "uniform")
+    env.close()
