@@ -1,0 +1,56 @@
+"""Drive one local policy through full original network matches."""
+import time
+
+from .env.encoding import decode_action
+from .live_policy import LivePolicy
+
+
+def run_session(connection, policy, interface, seat, seed, matches, timeout, record):
+    if (type(matches) is not int or matches < 1 or timeout <= 0
+            or type(seed) is not int or not 0 <= seed < 0xFFFFFFFF):
+        raise ValueError("positive match count, timeout and supported uint32 seed are required")
+    live = LivePolicy(policy, interface, seat)
+    completed, rounds, decisions = 0, 0, 0
+    started = time.monotonic()
+    try:
+        while time.monotonic()-started < timeout:
+            batch = connection.request("poll", {})
+            if batch["menu_reply"] != "not_requested":
+                record({"kind": "menu", "reply": batch["menu_reply"]})
+            for frame in batch["records"]:
+                metadata = {key: value for key, value in frame.items() if key != "observations"}
+                record({"kind": "frame", **metadata})
+                events = {event["kind"] for event in frame["events"]}
+                if "match_interrupted" in events:
+                    raise ConnectionError(f"network match {frame['match']} was interrupted")
+                if "match_finished" in events:
+                    completed += 1
+                    if completed == matches:
+                        return {"matches": completed, "rounds": rounds, "decisions": decisions,
+                                "seconds": time.monotonic()-started, "last_scores": frame["scores"]}
+                if frame["phase"] != "battle":
+                    if live.active:
+                        live.stop()
+                    continue
+                if frame["seat"] != seat:
+                    raise RuntimeError("network seat differs from the configured policy seat")
+                if "round_started" in events:
+                    live.start_round(frame["frame"], frame["observations"], (seed+rounds) % 0xFFFFFFFF)
+                    rounds += 1
+                else:
+                    live.observe(frame["frame"], frame["observations"])
+                if live.decision_due:
+                    command = live.act()
+                    response = connection.request("submit", {"match": frame["match"],
+                        "frame": frame["frame"], "keys": decode_action(command).inputs,
+                        "duration": interface.episode.decision_frames})
+                    record({"kind": "command", "match": frame["match"], "round": frame["round"],
+                            "command": command, **response})
+                    if response["reply"] != "accepted":
+                        raise RuntimeError(f"network action rejected: {response['reply']} at {frame['frame']}")
+                    decisions += 1
+            if not batch["records"]:
+                time.sleep(.001)
+        raise TimeoutError(f"network session completed {completed}/{matches} matches before its deadline")
+    finally:
+        live.stop()

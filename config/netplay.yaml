@@ -1,0 +1,19 @@
+defaults:
+  - train
+  - _self_
+
+candidate:
+  name: learned
+  policy: ???
+network:
+  role: host
+  address: 127.0.0.1
+  port: 10800
+  automate_menu: false
+session:
+  matches: 2
+  timeout: 3600.0
+runtime:
+  command: ???
+  mute_audio: false
+output: logs/netplay/${candidate.name}-${network.role}-${now:%Y%m%d-%H%M%S}
