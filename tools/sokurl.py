@@ -18,6 +18,7 @@ import psutil
 from ctypes import wintypes
 
 from bridge_shared import BridgeClient, BridgeUnavailable
+from startup_dialogs import blocking_dialogs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -362,6 +363,7 @@ def _launch_vs_group_from_title(
             processes.append(process)
         pending = list(processes)
         deadline = time.monotonic() + timeout
+        next_dialog_check = time.monotonic()
         while time.monotonic() < deadline:
             for process in pending[:]:
                 exit_code = process.poll()
@@ -376,6 +378,11 @@ def _launch_vs_group_from_title(
                     pass
             if not pending:
                 return processes
+            if time.monotonic() >= next_dialog_check:
+                dialogs = blocking_dialogs({process.pid for process in pending})
+                if dialogs:
+                    raise RuntimeError(f"game startup blocked by dialogs: {dialogs}")
+                next_dialog_check = time.monotonic() + 1.0
             time.sleep(0.01)
         stalled = []
         for process in pending:
