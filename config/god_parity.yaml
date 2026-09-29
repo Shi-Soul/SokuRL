@@ -13,4 +13,5 @@ validation:
   opponent_character: 0
   shards: 1
   shard: 0
+  stop_file: ${output}/STOP
 output: logs/validation/god-parity-${now:%Y%m%d-%H%M%S}

@@ -49,6 +49,8 @@ def episode(package, script, seat, config, reference, output):
         result["decks"] = [p["deck"] for p in current.observations[0].players]
         with gzip.open(output / "frames.jsonl.gz", "wt", encoding="utf-8") as trace:
             while not current.ended and current.frame < episode_config.max_frames:
+                if current.frame % 60 == 0 and Path(config.validation.stop_file).is_file():
+                    raise InterruptedError("validation stop requested")
                 reference.dll.reference_reload(reader.value(0x8985E4, "I"), 1,
                                                current.observations[0].world["weather"])
                 players_equal(reference, current.observations[0].players)
@@ -102,13 +104,16 @@ def main(config):
     names = names[config.validation.shard::config.validation.shards]
     report = {"package": package.fingerprint, "original_package": package.original_fingerprint,
               "repairs": {name: value.decode("ascii") for name, value in package.repairs.items()},
-              "reader_repair": "Initialize new Obj x, y, xspeed, yspeed to zero before the upstream float read filter.",
+              "reader_repairs": ["Initialize new object floats to zero before the original read filter.",
+                                 "Use packaged 0.93 collision conversion order and hit-box flags."],
               "reference_sha256": hashlib.sha256(Path(config.validation.reference_library).read_bytes()).hexdigest(),
               "bridge_sha256": hashlib.sha256((sokurl.GAME_DIR / "modules/SokuRLBridge/SokuRLBridge.dll").read_bytes()).hexdigest(),
               "results": []}
     OmegaConf.save(config, output / "config.yaml")
     for name in names:
         for seat in config.validation.seats:
+            if Path(config.validation.stop_file).is_file():
+                raise InterruptedError("validation stop requested; completed reports are preserved")
             case = output / f"{Path(name).stem}-seat{seat}"
             case.mkdir()
             result = episode(package, name, seat, config, reference, case)
