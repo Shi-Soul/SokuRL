@@ -96,6 +96,7 @@ def main(config):
              if config.validation.scripts == "all" else list(config.validation.scripts))
     report = {"package": package.fingerprint, "original_package": package.original_fingerprint,
               "repairs": {name: value.decode("ascii") for name, value in package.repairs.items()},
+              "reader_repair": "Initialize new Obj x, y, xspeed, yspeed to zero before the upstream float read filter.",
               "bridge_sha256": hashlib.sha256((sokurl.GAME_DIR / "modules/SokuRLBridge/SokuRLBridge.dll").read_bytes()).hexdigest(),
               "results": []}
     OmegaConf.save(config, output / "config.yaml")

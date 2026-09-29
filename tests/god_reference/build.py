@@ -23,7 +23,14 @@ def generate(upstream, output):
     utility = (upstream / "utility.h").read_bytes()
     parts.append(utility[:utility.index(b"bool IsSWR")])
     for name in ("obj_base.h", "obj.h", "character.h"):
-        parts.append((upstream / name).read_bytes())
+        source = (upstream / name).read_bytes()
+        if name == "obj.h":
+            # ObjBase's float read filter can reject negative zero or tiny
+            # speeds. The published Obj constructor leaves the destination
+            # uninitialized. Complete that missing initialization explicitly;
+            # otherwise the reference exposes unrelated host stack bytes.
+            source = source.replace(b"base_addr = addr;", b"base_addr = addr; x = y = speed.x = speed.y = 0;")
+        parts.append(source)
     parts.append(b"Character my_data(Character::MY), enemy_data(Character::ENEMY);\n")
     parts.append(b"short GetCardId(int player,int n);\n")
     for name in ("obj_base.cpp", "character.cpp"):
