@@ -64,5 +64,18 @@ def test_continuation_restores_optimizer_and_supports_new_vector_size(tmp_path, 
         with pytest.raises(ValueError, match="optimizer configuration"):
             initialize_ppo(algorithm, policy, env, contract,
                 config | {"ppo": config["ppo"] | {"gamma": .9}}, spec, "cpu", 19)
+        tuning = config | {"ppo": config["ppo"] | {"gae_lambda": .995, "learning_rate": .0001}}
+        weights = spec | {"kind": "weights"}
+        initialized, metadata = initialize_ppo(algorithm, policy, env, contract, tuning, weights, "cpu", 19)
+        assert parameter_hash(initialized.policy) == parameter_hash(initial.policy)
+        assert initialized.num_timesteps == 0 and metadata["source_steps"] == 64
+        assert initialized.policy.optimizer.state_dict()["state"] == {}
+        assert initialized.policy.optimizer.param_groups[0]["lr"] == .0001
+        assert initialized.gae_lambda == .995
+        with pytest.raises(ValueError, match="episode configurations differ"):
+            initialize_ppo(algorithm, policy, env, changed, tuning, weights, "cpu", 19)
+        with pytest.raises(ValueError, match="network architecture"):
+            initialize_ppo(algorithm, policy, env, contract,
+                tuning | {"ppo": tuning["ppo"] | {"policy_kwargs": {"net_arch": [8]}}}, weights, "cpu", 19)
     finally:
         env.close()
