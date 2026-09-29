@@ -19,10 +19,28 @@ class ProcessMemory:
         self.handle = self.kernel.OpenProcess(0x0010, False, pid)
         if not self.handle:
             raise OSError(ctypes.get_last_error(), "cannot open owned game for observation")
+        self.pages = {}
+
+    def begin_frame(self):
+        self.pages.clear()
 
     def read(self, address, size):
         if type(address) is not int or not 0 < address < 2**32 or not 0 < size <= 65536:
             raise ValueError(f"invalid 32-bit game memory read: address={address!r}, size={size}")
+        result = bytearray()
+        while size:
+            page = address & ~4095
+            if page not in self.pages:
+                self.pages[page] = self.read_page(page)
+            offset = address - page
+            count = min(size, 4096 - offset)
+            result.extend(self.pages[page][offset:offset + count])
+            address += count
+            size -= count
+        return bytes(result)
+
+    def read_page(self, address):
+        size = 4096
         buffer = ctypes.create_string_buffer(size)
         count = ctypes.c_size_t()
         if (not self.kernel.ReadProcessMemory(self.handle, address, buffer, size, ctypes.byref(count))
@@ -147,6 +165,7 @@ class PrivilegedReader:
         before = client.snapshot()
         if before.run_state_name != "PAUSED" or before.game_frame != raw.frameId:
             raise RuntimeError("privileged reads require the exact paused simulation frame")
+        self.memory.begin_frame()
         if self.segment != raw.segmentId:
             self.previous = [None, None]
             self.segment = raw.segmentId

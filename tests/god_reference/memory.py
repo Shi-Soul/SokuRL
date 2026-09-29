@@ -18,6 +18,9 @@ class Memory:
         values, index = self.region(address, size)
         return bytes(values[index:index + size])
 
+    def begin_frame(self):
+        pass
+
     def write(self, address, kind, *values):
         data = struct.pack("<" + kind, *values)
         region, index = self.region(address, len(data))
