@@ -20,20 +20,17 @@ from network_launch import start_games
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="netplay")
 def main(cfg):
+    if cfg.human.enabled:
+        if type(cfg.human.seat) is not int or cfg.human.seat not in (1, 2):
+            raise ValueError("human.seat must be 1 or 2")
+        cfg.network.role = "join" if cfg.human.seat == 1 else "host"
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     episode = EpisodeConfig(**config["episode"])
     if (episode.observation_mode, episode.decision_frames, episode.latency_frames) != ("state", 3, 5):
         raise ValueError("the network bridge requires public state, decision_frames=3 and latency_frames=5")
     if config["network"]["role"] not in ("host", "join"):
         raise ValueError("network role must be host or join")
-    if config["human"]["enabled"]:
-        if type(config["human"]["seat"]) is not int or config["human"]["seat"] not in (1, 2):
-            raise ValueError("human.seat must be 1 or 2")
-        seat = 2-config["human"]["seat"]
-        config["network"]["role"] = ("host", "join")[seat]
-        cfg.network.role = config["network"]["role"]
-    else:
-        seat = ("host", "join").index(config["network"]["role"])
+    seat = ("host", "join").index(config["network"]["role"])
     interface = LearningInterface(episode, LearningConfig(**config["wrappers"]))
     if (type(config["session"]["matches"]) is not int or config["session"]["matches"] < 1
             or config["session"]["timeout"] <= 0):
