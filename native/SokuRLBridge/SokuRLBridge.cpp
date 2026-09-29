@@ -4,6 +4,7 @@
 #include "SceneReset.hpp"
 #include "NetworkStart.hpp"
 #include "NetworkState.hpp"
+#include "NetworkInput.hpp"
 
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
@@ -736,6 +737,7 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
         return;
     const auto scene = *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID);
     SokuRLBridge::observeNetworkScene(scene);
+    SokuRLBridge::applyNetworkInput(self);
     const bool networkSelection = scene == SokuLib::SCENE_SELECTSV ||
         scene == SokuLib::SCENE_SELECTCL;
     // Network startup selects the local keyboard. Inject before the original
@@ -950,6 +952,7 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         SokuRLBridge::publishNetworkState(state,
             static_cast<unsigned char>(manager->leftCharacterManager.score),
             static_cast<unsigned char>(manager->rightCharacterManager.score));
+        SokuRLBridge::serviceNetworkInput();
         return result;
     }
     const bool gameplay = isSupportedGameplay();
@@ -1169,6 +1172,7 @@ bool createMapping()
 void closeMapping()
 {
     SokuRLBridge::closeNetworkState();
+    SokuRLBridge::closeNetworkInput();
     SokuRLBridge::closeImageCapture();
     if (g_control)
         store32(&g_control->connected, 0);
@@ -1232,7 +1236,7 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE, HMODULE)
     g_history.reserve(SokuRLBridge::INPUT_HISTORY_CAPACITY);
     if (!createMapping())
         return false;
-    if (!SokuRLBridge::initializeNetworkState()) {
+    if (!SokuRLBridge::initializeNetworkState() || !SokuRLBridge::initializeNetworkInput()) {
         closeMapping();
         return false;
     }

@@ -68,6 +68,7 @@ void observeNetworkScene(std::uint32_t scene)
 
 std::uint64_t nextNetworkUpdate() { return g_state->updates + 1; }
 std::uint32_t networkMatch() { return g_state->match; }
+const NetworkState &currentNetworkState() { return *g_state; }
 
 void publishNetworkState(const RawFrameState &raw, unsigned leftScore, unsigned rightScore)
 {

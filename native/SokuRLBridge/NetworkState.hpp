@@ -22,5 +22,6 @@ void closeNetworkState();
 void observeNetworkScene(std::uint32_t scene);
 std::uint64_t nextNetworkUpdate();
 std::uint32_t networkMatch();
+const NetworkState &currentNetworkState();
 void publishNetworkState(const RawFrameState &raw, unsigned leftScore, unsigned rightScore);
 }
