@@ -8,6 +8,7 @@ import pytest
 pytest.importorskip("lupa.lua51")
 
 from soku_rl.env import EpisodeConfig
+from soku_rl.env.encoding import decode_action
 from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.observation.memory_schema import FIGHTER_NAMES, WORLD_NAMES
 from soku_rl.env.observation.privileged import PrivilegedObservation, encode_privileged, decode_privileged
@@ -43,16 +44,24 @@ def test_flag_and_address_low_bits_survive_the_learning_observation():
 @pytest.mark.skipif(not NAMES, reason="external original community package is not installed")
 @pytest.mark.parametrize("name", NAMES)
 def test_every_published_character_strategy_executes_with_declared_repairs(name):
+    from god_reference.scheduler import OriginalScheduler
     package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
     episode = EpisodeConfig(7200, 1, 1, 0, "privileged_state", VISIBILITY, LEGACY_MATCH)
     policy = GodPolicy(name, package, name, episode)
     first, second = policy.spawn(37), policy.spawn(37)
     current = observation(int(name[:2]))
-    encoded = encode_privileged(current)
-    for frame in range(12):
-        # Update only the two clock fields; the source sees an unchanged stance.
-        encoded[1], encoded[3] = frame / 65536., frame / 65536.
-        assert first.act(encoded) == second.act(encoded)
+    reference = OriginalScheduler(package, name, 37, current)
+    try:
+        for frame in range(12):
+            current.world.update(frame=frame, battle_time=frame)
+            if frame:
+                reference.advance(current)
+            encoded = encode_privileged(current)
+            first_action = first.act(encoded)
+            assert first_action == second.act(encoded)
+            assert decode_action(first_action).inputs == reference.inputs()
+    finally:
+        reference.close()
     assert first.lua is not second.lua
     assert first.api.requested is not second.api.requested
     assert not first.failures and not second.failures

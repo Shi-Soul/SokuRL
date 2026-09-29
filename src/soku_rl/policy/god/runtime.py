@@ -102,5 +102,7 @@ class GodActor:
             self.step = self.lua.globals()[b"make_step"]()
             self.started = True
         self.step()
+        if self.failures:
+            raise RuntimeError(f"original strategy failed: {self.failures[-1]!r}")
         self.last_frame = frame
         return encode_action(self.api.inputs())
