@@ -12,7 +12,7 @@ from .observed_rules import RulePolicy
 from .strategies import rule_implementation
 from .learning_wrappers import LearningRulePolicy
 from .ppo_response import OpponentMixtureVecEnv
-from .checkpoint_policy import read_training_contract
+from .policy_contract import read_training_contract
 
 
 def parameter_hash(policy):

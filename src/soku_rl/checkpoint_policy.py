@@ -1,5 +1,5 @@
 """Load trusted training artifacts as per-episode categorical policies."""
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
@@ -7,9 +7,8 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch import nn
-from omegaconf import OmegaConf
 
-from .learning_wrappers import LearningConfig
+from .policy_contract import read_training_contract
 from .population import PPOPolicy, UniformPolicy, MixturePolicy
 
 
@@ -62,19 +61,6 @@ def _mlp(widths, activation):
         if index < len(widths) - 2:
             layers.append(activation())
     return nn.Sequential(*layers)
-
-
-def read_training_contract(path, interface):
-    episode = interface.episode
-    training = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
-    if training["episode"] != asdict(episode):
-        raise ValueError("checkpoint and evaluation episode configurations differ")
-    # Artifacts from before the wrapper feature have the original identity contract.
-    expected = (LearningConfig(**training["wrappers"]) if "wrappers" in training else
-                LearningConfig("full", False, 0, 0.))
-    if expected != interface.config:
-        raise ValueError("checkpoint and evaluation learning wrappers differ")
-    return training
 
 
 def load_population(name, spec, interface, device, path, identity):
