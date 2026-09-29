@@ -15,6 +15,7 @@ class ScriptAPI:
         self.globals[b"key_delay"] = 0
         self.globals[b"data_delay"] = 0
         self.globals[b"weather_delay"] = 300
+        self.read_delays = self.lua.eval(b"function() return key_delay,data_delay,weather_delay end")
         for name in ("key_on", "key_off", "key_reset", "get_key_stat", "get_key_map",
                      "get_skill_lv", "get_card_id", "get_card_cost", "get_card_cost2",
                      "get_obj_data", "get_obj_attackarea", "get_obj_hitarea", "get_attackarea",
@@ -204,8 +205,8 @@ class ScriptAPI:
         return ()
 
     def observe(self, observation):
-        for key in self.delays:
-            self.delays[key] = int(self.globals[key])
+        for key, value in zip(self.delays, self.read_delays(), strict=True):
+            self.delays[key] = int(value)
         self.observation = observation
         world = observation.world
         for name, value in world.items():
@@ -236,9 +237,9 @@ class ScriptAPI:
                 distance = (1 if left < own["x"] < right else
                             min(distance, int(min(abs(left - own["x"]), abs(right - own["x"])))))
         self.globals[b"obj_dis"], self.globals[b"obj_dis2"] = distance, centre
-        if world["weather2"] == 19 and 1000 - self.globals[b"weather_delay"] < world["weather_time"]:
+        if world["weather2"] == 19 and 1000 - self.delays[b"weather_delay"] < world["weather_time"]:
             self.globals[b"weather"] = world["weather2"]
-        delay = int(self.globals[b"data_delay"])
+        delay = self.delays[b"data_delay"]
         if delay != self.data_delay:
             self.delayed_actions = [0] * delay
             self.delayed_blocks = [0] * delay

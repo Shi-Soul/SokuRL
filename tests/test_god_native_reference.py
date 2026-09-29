@@ -13,6 +13,7 @@ from lupa.lua51 import LuaRuntime
 from god_reference.build import generate
 from god_reference.memory import game_memory
 from god_reference.reader import Reference
+from god_reference.compare import players_equal
 from soku_rl.env.observation.memory_schema import OBJECT_NAMES, FIGHTER_FIELDS
 from soku_rl.policy.god.api import ScriptAPI
 from test_god_scripts import observation
@@ -95,25 +96,7 @@ def test_all_character_fields_and_objects_match_original_reader(reference, chara
         reference.dll.reference_reload(0x100000, 1, weather)
         players = tuple(reader.fighter(0x101000 + seat * 0x10000, seat, weather) for seat in (0, 1))
         reader.previous = players
-        for seat, player in enumerate(players):
-            prefix = "my_" if seat == 0 else "enemy_"
-            for name in (*FIGHTER_FIELDS, "char", "spell", "card", "obj_n"):
-                assert player[name] == reference.value(prefix + name), (character, weather, seat, name)
-            for index, entity in enumerate((player, *player["objects"])):
-                expected = reference.entity(seat, index - 1, OBJECT_NAMES)
-                for name, value in expected.items():
-                    assert entity[name] == value, (character, index, name)
-                for attack, kind in enumerate(("hitarea", "attackarea")):
-                    for box_index, box in enumerate(entity[kind]):
-                        assert box == reference.box(seat, index - 1, attack, box_index)
-            for kind, name in ((2, "skills"), (3, "special"), (4, "keys")):
-                limit = 15 if name == "skills" else len(player[name])
-                for index in range(limit):
-                    assert player[name][index] == reference.dll.reference_field(seat, kind, index)
-            for index in range(5):
-                assert player["cards"][2*index] == reference.dll.reference_field(seat, 0, index)
-                assert player["cards"][2*index+1] == reference.dll.reference_field(seat, 1, index)
-        assert not reference.errors
+        players_equal(reference, players)
 
 
 def test_float_filter_keeps_the_same_persistent_fighter_value(reference):

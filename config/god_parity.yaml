@@ -1,0 +1,14 @@
+defaults:
+  - train
+  - override rules: god
+  - override track: superhuman
+  - _self_
+runtime:
+  command: []
+validation:
+  game_directory: ???
+  reference_library: ???
+  scripts: all
+  seats: [0, 1]
+  opponent_character: 0
+output: logs/validation/god-parity-${now:%Y%m%d-%H%M%S}
