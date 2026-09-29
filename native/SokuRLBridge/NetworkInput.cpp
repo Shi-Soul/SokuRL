@@ -1,40 +1,39 @@
 #include "NetworkInput.hpp"
 #include "NetworkInputEvents.hpp"
+#include "NetworkInputSchedule.hpp"
 #include "NetworkState.hpp"
 #include <InputManager.hpp>
 #include <Windows.h>
 #include <cwchar>
-#include <deque>
 
 namespace {
 using namespace SokuRLBridge;
 HANDLE g_handle = nullptr;
 NetworkInputBlock *g_block = nullptr;
-struct Request {
-    unsigned sequence, command, match, round, duration;
-    std::uint64_t observed, target;
-    LogicalInput input;
-};
-std::deque<Request> g_pending;
-LogicalInput g_held{};
 bool g_owned = false, g_hasObservation = false;
 unsigned g_match = 0, g_round = 0;
 unsigned g_phase = 0;
-std::uint64_t g_lastObservation = 0, g_expires = 0;
+std::uint64_t g_lastObservation = 0;
 
 unsigned load(const unsigned *p) {
     return InterlockedCompareExchange(reinterpret_cast<volatile LONG *>(const_cast<unsigned *>(p)), 0, 0);
 }
-void record(const Request &request, unsigned kind, std::uint64_t at) {
+void record(const ScheduledNetworkInput &request, unsigned kind, std::uint64_t at) {
+    if (kind == 8) {
+        InterlockedIncrement(&g_block->statusSequence);
+        MemoryBarrier();
+        g_block->injectedSequence = request.sequence;
+        g_block->injectedAt = at;
+        MemoryBarrier();
+        InterlockedIncrement(&g_block->statusSequence);
+    }
     appendNetworkInputEvent({request.sequence, kind, request.command, request.match,
         request.round, request.duration, request.observed, request.target, at});
 }
+NetworkInputSchedule g_schedule(record);
 void clear(std::uint64_t at) {
-    for (const auto &request : g_pending) record(request, 10, at);
-    g_pending.clear();
-    g_held = {};
+    g_schedule.clear(at);
     g_hasObservation = false;
-    g_expires = 0;
 }
 bool valid(const LogicalInput &v) {
     return v.horizontalAxis >= -1 && v.horizontalAxis <= 1 &&
@@ -97,7 +96,7 @@ void serviceNetworkInput() {
     if (sequence == load(&g_block->ackSequence)) return;
     MemoryBarrier();
     const auto command = g_block->command;
-    const Request request{sequence, command, g_block->match, g_block->round, g_block->duration,
+    const ScheduledNetworkInput request{sequence, command, g_block->match, g_block->round, g_block->duration,
         g_block->observed, g_block->target, g_block->input};
     if (command == 2) {
         clear(state.updates); g_owned = false;
@@ -120,10 +119,10 @@ void serviceNetworkInput() {
     else if (g_hasObservation && (request.observed < g_lastObservation ||
         request.observed - g_lastObservation < 3))
         result = 6;
-    else if (g_pending.size() >= 64)
+    else if (g_schedule.size() >= 64)
         result = 7;
     if (result == 1) {
-        g_pending.push_back(request);
+        g_schedule.push(request);
         g_lastObservation = request.observed;
         g_hasObservation = g_owned = true;
     }
@@ -149,24 +148,8 @@ void applyNetworkInput(SokuLib::KeymapManager *keyboard) {
         *reinterpret_cast<SokuLib::KeymapManager **>(network + 0x208);
     if (keyboard != target)
         return;
-    if (state.updates >= g_expires) g_held = {};
-    while (!g_pending.empty() && g_pending.front().target <= state.updates) {
-        const auto request = g_pending.front();
-        g_pending.pop_front();
-        // The network input hook can be skipped while waiting for the peer.
-        // Never apply a command after its specified boundary.
-        if (request.target != state.updates) { record(request, 9, state.updates); continue; }
-        g_held = request.input;
-        g_expires = request.target + request.duration;
-        InterlockedIncrement(&g_block->statusSequence);
-        MemoryBarrier();
-        g_block->injectedSequence = request.sequence;
-        g_block->injectedAt = state.updates;
-        MemoryBarrier();
-        InterlockedIncrement(&g_block->statusSequence);
-        record(request, 8, state.updates);
-    }
-    keyboard->input = {g_held.horizontalAxis, g_held.verticalAxis, g_held.a,
-        g_held.b, g_held.c, g_held.d, g_held.changeCard, g_held.spellcard};
+    const auto &held = g_schedule.apply(state.updates);
+    keyboard->input = {held.horizontalAxis, held.verticalAxis, held.a,
+        held.b, held.c, held.d, held.changeCard, held.spellcard};
 }
 }
