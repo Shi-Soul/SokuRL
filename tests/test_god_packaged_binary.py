@@ -48,3 +48,16 @@ def test_object_query_returns_the_packaged_eleven_fields(reference):
     expected = reference.object_values(0x103000)
     assert len(expected) == 11
     assert api.get_obj_data(0, 0) == expected
+
+
+@pytest.mark.parametrize("character", (0, 3, 5, 12))
+def test_option_query_preserves_all_matching_objects(reference, character):
+    value = observation(character)
+    objects = tuple({"act": act, "x": 100.5 + i, "y": 20.25 + i, "img": 1,
+                     "attackarea_n": 0, "attackarea": ()}
+                    for i, act in enumerate((888, 805, 805, 899, 801, 852, 855)))
+    value.players[0].update(objects=objects, obj_n=len(objects))
+    api = ScriptAPI(LuaRuntime(encoding=None, unpack_returned_tuples=True), 1)
+    api.observe(value)
+    for index in range(-1, 9):
+        assert api.get_opt_xy(0, index) == reference.option_xy(character, objects, index)

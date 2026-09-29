@@ -108,6 +108,20 @@ class BinaryReference:
             raise RuntimeError("packaged Lua return count differs from captured values")
         return tuple(self.lua_results)
 
+    def option_xy(self, character, objects, index):
+        player, start, stride = 0x603000, 0x604000, 0x238
+        self.write(player + 0x254, "I", character)
+        self.write(player + 0x280, "2I", start, start + stride * len(objects))
+        for i, obj in enumerate(objects):
+            target = start + i * stride
+            self.cpu.mem_write(target, bytes(stride))
+            self.write(target + 8, "2f", obj["x"], obj["y"])
+            self.write(target + 26, "h", obj["act"])
+            self.write(target + 32, "i", obj["img"])
+            self.write(target + 42, "b", obj["attackarea_n"])
+        result = self.call(0x426A00, player, (index & 0xFFFFFFFF,))
+        return self.read(result + 8, "2f") if result else ()
+
     def call(self, function, this, arguments):
         self.write(0x708000, "I" * (len(arguments) + 1), 0x611000, *arguments)
         self.cpu.reg_write(UC_X86_REG_ESP, 0x708000)

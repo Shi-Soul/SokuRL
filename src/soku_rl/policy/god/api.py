@@ -200,14 +200,16 @@ class ScriptAPI:
     def get_opt_xy(self, player, index):
         entity = self.player(player)
         character = entity["char"]
-        if character not in (3, 5, 12) or (character == 5 and index != 0):
+        if character not in (3, 5, 12) or index < 0 or (character == 5 and index != 0):
             return ()
         for obj in entity["objects"]:
             matches = ((character == 3 and obj["attackarea_n"] == 0 and obj["act"] == 805 and obj["img"] != 221)
                        or (character == 5 and obj["act"] == 899)
                        or (character == 12 and obj["act"] in (801, 852, 855)))
             if matches:
-                return (obj["x"], obj["y"]) if index == 0 else ()
+                if index == 0:
+                    return obj["x"], obj["y"]
+                index -= 1
         return ()
 
     def observe(self, observation):
