@@ -55,6 +55,7 @@ SokuRL 用原版《东方非想天则》1.10a 引擎运行双人对战，通过 
 | `tools/train.py` | 通过 `algorithm=ppo/recurrent_ppo/ippo/nfsp/psro` 选择训练 |
 | `tools/benchmark_training.py` | 按已保存配置评测完成的训练 |
 | `tools/render_replay.py` | 用真实游戏重放动作并生成视频 |
+| `tools/netplay.py` | 加载 GPU 策略参加原游戏网络比赛；见[联网配置与验收](docs/network-play.md) |
 | `tools/sokurl.py` | 启动、查询和关闭指定游戏进程 |
 
 默认训练组合是 `algorithm=nfsp`、`track=human`、`wrappers=raw`。90 动作和附加学习特征需显式选择 `wrappers=learning`；不能把可选配置写成默认行为。`runtime.command` 必须配置工作进程启动命令。AI 工作进程默认静音，`runtime.mute_audio=true` 只改变该游戏进程的音量。
