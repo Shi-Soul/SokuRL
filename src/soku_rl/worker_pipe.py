@@ -43,8 +43,8 @@ def send(stream, value):
     stream.flush()
 
 
-class WorkerBackend:
-    """One persistent Python/Wine worker owns independently reset game slots."""
+class WorkerConnection:
+    """Exchange bounded requests with one owned Python/Wine worker."""
     def __init__(self, command, cwd, log_path, timeout, launch_timeout, mute_audio):
         if not command or timeout <= launch_timeout or launch_timeout <= 0:
             raise ValueError("worker timeout must exceed the positive launch timeout")
@@ -70,7 +70,7 @@ class WorkerBackend:
         self.lock = threading.Lock()
         threading.Thread(target=self._read_replies, daemon=True).start()
         try:
-            self.identity = self._request("initialize", {"protocol": PROTOCOL, "launch_timeout": launch_timeout})
+            self.identity = self.request("initialize", {"protocol": PROTOCOL, "launch_timeout": launch_timeout})
         except BaseException:
             self.close()
             raise
@@ -82,7 +82,7 @@ class WorkerBackend:
         except BaseException as error:
             self.replies.put(error)
 
-    def _request(self, operation, payload):
+    def request(self, operation, payload):
         with self.lock:
             if self.closed or self.broken:
                 raise RuntimeError("worker is closed or failed")
@@ -98,21 +98,12 @@ class WorkerBackend:
                 self.broken = True
                 raise
 
-    def reset_slots(self, seeds):
-        return self._request("reset", seeds)
-
-    def configure_observation(self, mode):
-        return self._request("configure_observation", mode)
-
-    def step(self, actions):
-        return self._request("step", actions)
-
     def close(self):
         if self.closed:
             return
         try:
             if not self.broken and self.process.poll() is None:
-                self._request("close", {})
+                self.request("close", {})
         finally:
             self.closed = True
             self.process.stdin.close()
@@ -126,4 +117,17 @@ class WorkerBackend:
             # A failed request already reported the worker's original exception.
             # Cleanup must not replace it with an exit-code-only exception.
             if self.process.returncode and not self.broken:
-                raise RuntimeError(f"rollout worker exited with code {self.process.returncode}")
+                raise RuntimeError(f"worker exited with code {self.process.returncode}")
+
+
+class WorkerBackend(WorkerConnection):
+    """Adapt a worker connection to independently reset offline game slots."""
+
+    def reset_slots(self, seeds):
+        return self.request("reset", seeds)
+
+    def configure_observation(self, mode):
+        return self.request("configure_observation", mode)
+
+    def step(self, actions):
+        return self.request("step", actions)
