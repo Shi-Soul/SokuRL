@@ -2,6 +2,7 @@
 #include "ImageCapture.hpp"
 #include "AudioMute.hpp"
 #include "SceneReset.hpp"
+#include "NetworkStart.hpp"
 
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
@@ -1026,6 +1027,7 @@ int __fastcall titleOnProcess(SokuLib::Title *title)
         !SokuRLBridge::retiredBattleSceneDestroyed())
         return SokuLib::SCENE_TITLE;
     const auto result = (title->*g_originalTitleProcess)();
+    SokuRLBridge::processNetworkStart(*title, result);
     if (!g_vsBootstrapArmed || g_vsBootstrapComplete)
         return result;
 
@@ -1222,6 +1224,10 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE, HMODULE)
     }
     g_unlimitedPacing = environmentValue(L"SOKURL_UNLIMITED_PACING", 0) == 1;
     g_vsBootstrapArmed = environmentValue(L"SOKURL_VS_BOOTSTRAP", 0) == 1;
+    if (!SokuRLBridge::initializeNetworkStart(g_vsBootstrapArmed, g_unlimitedPacing)) {
+        closeMapping();
+        return false;
+    }
     if (g_vsBootstrapArmed) {
         g_vsP1Character = environmentValue(L"SOKURL_VS_P1_CHARACTER", 1);
         g_vsP2Character = environmentValue(L"SOKURL_VS_P2_CHARACTER", 0);

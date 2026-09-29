@@ -19,6 +19,8 @@ add_subdirectory("${SOKUMODS_ROOT}/SokuLib" "${CMAKE_BINARY_DIR}/SokuLib" EXCLUD
 add_library(SokuRLBridge MODULE
     SceneReset.hpp
     SceneReset.cpp
+    NetworkStart.hpp
+    NetworkStart.cpp
     AudioMute.hpp
     AudioMute.cpp
     ControlBlock.hpp
