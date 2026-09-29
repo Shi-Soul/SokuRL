@@ -87,16 +87,22 @@ class LearningEpisode:
 
     def reset(self, observations, infos):
         for agent in AGENTS:
-            self.history[agent].clear()
-            self.history[agent].extend([decode_action(256).inputs] * self.interface.config.action_history)
-            self.potential[agent] = self._potential(observations[agent])
+            self.reset_agent(agent, observations[agent])
         return self._observations(observations, infos), infos
+
+    def reset_agent(self, agent, observation):
+        self.history[agent].clear()
+        self.history[agent].extend([decode_action(256).inputs] * self.interface.config.action_history)
+        self.potential[agent] = self._potential(observation)
+
+    def record_command(self, agent, command):
+        self.history[agent].append(decode_action(command).inputs)
 
     def step(self, commands, result):
         observations, rewards, terms, truncs, infos = result
         shaped, output_infos = {}, {}
         for agent in AGENTS:
-            self.history[agent].append(decode_action(commands[agent]).inputs)
+            self.record_command(agent, commands[agent])
             current = 0. if terms[agent] or truncs[agent] else self._potential(observations[agent])
             difference = current - self.potential[agent]
             self.potential[agent] = current
@@ -109,19 +115,19 @@ class LearningEpisode:
         return scale * health_potential(observation, self.interface.episode.observation_mode) if scale else 0.
 
     def _observations(self, observations, infos):
-        result = {}
-        for agent, observation in observations.items():
-            if isinstance(self.interface.observation_space, spaces.Dict):
-                result[agent] = {"image": observation,
-                    "commands": np.asarray(self.history[agent], np.float32).reshape(-1)}
-                continue
-            parts = [observation]
-            if self.interface.config.relative_features:
-                parts.append(relative_features(observation, self.interface.episode, infos[agent]["frame"]))
-            if self.interface.config.action_history:
-                parts.append(np.asarray(self.history[agent], np.float32).reshape(-1))
-            result[agent] = np.concatenate(parts) if len(parts) > 1 else observation
-        return result
+        return {agent: self.observation(agent, observation, infos[agent]["frame"])
+                for agent, observation in observations.items()}
+
+    def observation(self, agent, observation, frame):
+        if isinstance(self.interface.observation_space, spaces.Dict):
+            return {"image": observation,
+                "commands": np.asarray(self.history[agent], np.float32).reshape(-1)}
+        parts = [observation]
+        if self.interface.config.relative_features:
+            parts.append(relative_features(observation, self.interface.episode, frame))
+        if self.interface.config.action_history:
+            parts.append(np.asarray(self.history[agent], np.float32).reshape(-1))
+        return np.concatenate(parts) if len(parts) > 1 else observation
 
 
 class LearningParallelEnv(BaseParallelWrapper):
