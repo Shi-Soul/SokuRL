@@ -160,8 +160,9 @@ class NetworkGame:
         menu_reply = "not_requested"
         now = time.monotonic()
         if self.result_confirmation:
-            menu_reply = self.clients["input"].read_reply(self.result_confirmation)
-            if menu_reply != "pending":
+            reply = self.clients["input"].read_reply(self.result_confirmation)
+            if reply != "pending":
+                menu_reply = reply
                 self.result_confirmation = 0
         if self.settings["automate_menu"] and not self.result_confirmation and now >= self.next_confirm:
             if latest.scene in (8, 9):
