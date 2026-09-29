@@ -100,6 +100,10 @@ void processNetworkStart(const SokuLib::Title &title, int nextScene)
         reinterpret_cast<const unsigned char *>(&title) + 0x68C);
     if (title.menuState == 0 || menuFrames < 16 || SokuLib::menuManager.isInMenu)
         return;
+    // Automated menu entry has no physical key event to select its input device.
+    // setBattleMode reads this signed byte through 0x40A8E0; -1 selects keyboard.
+    // Leaving zero selects joystick 0 even when the device list is empty.
+    *reinterpret_cast<signed char *>(0x0089A2BC) = -1;
     auto *menu = SokuLib::MenuConnect::create();
     SokuLib::activateMenu(menu);
     g_started = true;
