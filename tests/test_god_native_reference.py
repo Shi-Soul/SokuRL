@@ -124,6 +124,19 @@ def test_float_filter_keeps_the_same_persistent_fighter_value(reference):
         assert own["xspeed"] == reference.value("my_xspeed")
 
 
+def test_removed_hand_card_retains_the_original_persistent_slot(reference):
+    memory = game_memory(1)
+    reference.initialize(memory)
+    reader = PrivilegedReader(memory)
+    for pointer in (0, 0x102310, 0, 0x102300):
+        memory.write(0x102210, "I", pointer)
+        reference.dll.reference_reload(0x100000, 1, 0)
+        players = tuple(reader.fighter(0x101000 + seat * 0x10000, seat, 0) for seat in (0, 1))
+        reader.previous = players
+        players_equal(reference, players)
+    assert reference.null_card_reads == 2
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="the original Windows CRT is required")
 def test_random_sequence_matches_the_original_windows_crt():
     crt = C.CDLL("msvcrt")

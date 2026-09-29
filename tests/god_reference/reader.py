@@ -27,8 +27,13 @@ class Reference:
 
     def initialize(self, memory):
         self.errors = []
+        self.null_card_reads = 0
 
         def read(address, target, size):
+            if address == 0 and size == 4:
+                # Match the failed Win32 read without changing its destination.
+                self.null_card_reads += 1
+                return 0
             try:
                 C.memmove(target, memory.read(address, size), size)
                 return 1

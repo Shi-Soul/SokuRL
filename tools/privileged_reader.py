@@ -145,7 +145,10 @@ class PrivilegedReader:
         for index in range(5):
             if weather != 11 and maximum > 0 and index < entity["spell"] // 500:
                 card = self.value(table + ((point + index) % maximum) * 4, "I")
-                cards.extend(self.value(card, "2h"))
+                # The original reader leaves this persistent slot unchanged
+                # when a card is removed and its table entry becomes null.
+                prior = (0, 0) if previous is None else previous["cards"][index * 2:index * 2 + 2]
+                cards.extend(prior if card == 0 else self.value(card, "2h"))
             else:
                 cards.extend((-1, -1))
         entity["cards"] = tuple(cards)
