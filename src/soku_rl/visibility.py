@@ -105,5 +105,5 @@ def quantize_gauge(value, maximum, quantum):
 
 
 def quantize_spirit(value, maximum, quantum):
-    """Decode the bridge's 16-bit spirit word and project its visible gauge."""
+    """Project the bridge's signed spirit value into its visible gauge."""
     return quantize_gauge(spirit_fraction(value, maximum), 1, quantum)

@@ -55,7 +55,12 @@ canonical FNV-1a-64 hash and a field-by-field diff after each frame.
 
 ## Shared memory ABI
 
-ABI version 6 uses 4-byte packing:
+ABI version 8 uses 4-byte packing. It combines `ResetEpisode` with the signed
+resource fields added upstream. The two development branches used version 7
+for different semantics, so clients must reject version 7 for control.
+Spirit fields are signed 32-bit ABI values
+that preserve the game's signed 16-bit resource semantics, including transient
+negative values. The structure sizes are unchanged from version 6:
 
 - 10884-byte `ControlBlock` with sequenced commands and a seqlock-protected live
   `RawFrameState`.

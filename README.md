@@ -4,7 +4,7 @@
 
 实测报告：[Linux 并行采样与 RL 施工决策](docs/linux-performance.md)。
 
-当前原生模块拒绝 `GotoFrame`，不能把下文历史上的帧导航与场景重建说明当作已完成的任意状态恢复接口。ABI 7 新增 `ResetEpisode`，通过游戏内部场景流程重建对局，保留游戏进程；完整轨迹验证正在进行。公共接口为 PettingZoo 双人环境，默认提供经过可见性和精度过滤的状态，也支持真实图像。已接入 TorchRL、BenchMARL IPPO、OpenSpiel NFSP 和 PSRO；最终策略胜率和联网人机对战尚未验收。入口与分层见[双人环境文档](docs/multi-agent-env.md)。
+当前原生模块拒绝 `GotoFrame`，不能把下文历史上的帧导航与场景重建说明当作已完成的任意状态恢复接口。ABI 8 合并了保留进程的 `ResetEpisode` 和有符号灵力字段；重置通过游戏场景流程重建对局。旧 ABI 7 的完整轨迹验证已通过，合并后的版本需要重新验证。公共接口为 PettingZoo 双人环境，默认提供经过可见性和精度过滤的状态，也支持真实图像。已接入 TorchRL、BenchMARL IPPO、OpenSpiel NFSP 和 PSRO；最终策略胜率和联网人机对战尚未验收。入口与分层见[双人环境文档](docs/multi-agent-env.md)。
 
 AI 工作进程默认静音，配置为 `runtime.mute_audio=true`。模块只在该游戏进程内把音乐和音效的音量设为零，不修改系统总音量、原始游戏文件或保存的游戏音量配置。
 
@@ -24,7 +24,7 @@ The public RL interface is a two-player PettingZoo environment. Training adapter
 use BenchMARL IPPO and OpenSpiel NFSP and PSRO. Policy quality and network play
 still need validation. See the current Chinese RL guide linked above.
 
-## Supported Runtime
+## SokuRL Platform Highlights
 
 - Game: Touhou Hisoutensoku 1.10a
 - Executable: `th123_jp/th123.exe`
@@ -32,66 +32,178 @@ still need validation. See the current Chinese RL guide linked above.
 - Game architecture: Win32/x86
 - Python environment: repository-local Python 3.11 x64 in `.venv`
 - Native compiler: MSVC Win32/x86
-- Bridge ABI: version 7
+- Bridge ABI: version 8
 
-The 64-bit Python process controls the 32-bit game out of process. All pointers
-read from th123 memory are therefore represented explicitly as 32-bit values.
-Every DLL loaded by th123 must be built for x86.
+Historical platform measurements from upstream commit `b40607c`:
 
-Verify the installed game before running anything:
+- **28,000+ sim-FPS** on one unlocked worker, about 467x real time
+- **150,000+ aggregate sim-FPS** with 8 recording-stable workers
+- **10,000-frame deterministic equivalence** across rendered, headless, and
+  unlimited execution
+- **14,954-frame expert replay capture** with zero dropped records
+- Replay-verified spell-card selection/consumption and signed spirit observation
+- Deterministic reconstruction with up to **55 live objects** in one player's
+  object list
+- Automated local VS Player startup with independent P1/P2 logical control
+
+These historical measurements cover the native simulation loop. They do not
+measure Python observation generation or policy inference. Current training and
+validation results are recorded in [the validation log](docs/env-validation.md).
+
+The learning stack includes fixed-opponent PPO, BenchMARL IPPO, and OpenSpiel
+NFSP and PSRO. Human-track training uses one decision every 3 frames and a
+5-frame action delay. Final policy benchmarks and network play remain open.
+
+## Architecture
+
+```text
+SokuRL
+  +-- SokuRL Platform
+  |     +-- SokuRLBridge
+  |     +-- replay and deterministic reconstruction
+  |     +-- ScenarioRunner
+  |     +-- PID-isolated accelerated workers
+  |
+  +-- SokuRL Learning Stack
+        +-- PPO, recurrent PPO, and IPPO
+        +-- NFSP and PSRO self-play
+        +-- opponent adaptation              (future)
+```
+
+The platform's runtime topology is:
+
+```text
+                 trainer / controller
+                         |
+                observations / actions
+                         |
+             PID-isolated shared memory
+              +----------+----------+
+              |          |          |
+              v          v          v
+          th123 #1   th123 #2   th123 #N
+              |          |          |
+           original   original   original
+            battle     battle     battle
+            engine     engine     engine
+```
+
+Each worker runs the original th123 simulation. SokuRL Platform observes and
+controls the game at its logical frame boundary, so collision, animation,
+hitstop, weather, cards, projectiles, and character-specific behavior still
+come from the game.
+
+## Project Status
+
+```text
+SokuRL Platform
+[x] native simulation backend
+[x] per-frame structured state and deterministic hashes
+[x] dual-player logical input
+[x] deterministic replay, reset, and frame seek
+[x] PID-isolated parallel workers
+[x] battle render skipping
+[x] faster-than-real-time local VS simulation
+
+SokuRL Learning Stack
+[x] PettingZoo observation and action spaces
+[x] configurable rewards and fixed-rule PPO
+[x] IPPO, NFSP, and PSRO training adapters
+[ ] online opponent adaptation
+```
+
+## Requirements
+
+- Windows
+- A legally obtained Touhou Hisoutensoku 1.10a installation
+- `th123.exe` MD5: `DF35D1FBC7B583317ADABE8CD9F53B2E`
+- Conda or Miniforge for a repository-local Python 3.11 x64 environment
+- Git
+- MSVC with Win32/x86 support for native bridge builds
+
+The game executable and proprietary game data are **not distributed with this
+repository**. SokuRL does not patch `th123.exe`, `th123a.dat`, `th123b.dat`, or
+`th123c.dat` on disk.
+
+Place a legally obtained th123 1.10a installation at `SokuRL/th123_jp/`, so the
+supported executable is available as `SokuRL/th123_jp/th123.exe`.
+
+Clone SokuRL and create the repository-local Python 3.11 x64 environment. The
+documented command uses a Conda prefix because it creates the expected
+`.venv\python.exe` layout without activating the Conda base environment:
+
+```powershell
+git clone https://github.com/NoFumoNoWork/SokuRL.git
+cd SokuRL
+conda create --prefix .\.venv python=3.11 pip -y
+.\.venv\python.exe -m pip install -r requirements.txt
+.\.venv\python.exe -m pip install -e . --no-deps
+.\.venv\python.exe -c "import struct; assert struct.calcsize('P') == 8; print('Python x64 OK')"
+```
+
+`requirements.txt` pins the direct runtime dependency used by the launcher and
+validation tools. The editable install exposes the `src/` package while
+`--no-deps` keeps `requirements.txt` as the single resolved dependency input.
+
+Fetch the pinned native dependencies:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\bootstrap_sokumods.ps1
+```
+
+The bootstrap script creates the ignored local checkout
+`third_party/SokuMods/`, checks out SokuMods commit
+`eb0574cea1eda70484b736eb192964ef87e50a67`, initializes its recursive
+submodules, verifies SkipIntro commit
+`fd945ff5c1c5b7de0ff7d03b988e9219a3674213`, and applies the versioned SokuRL
+patch described below. Existing checkouts at another commit are rejected rather
+than reset.
+
+All dependency identities and hashes are versioned in
+[`config/dependencies.lock.json`](config/dependencies.lock.json). Verify an
+existing source checkout at any time with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_sokumods.ps1
+```
+
+| Locked input | Identity |
+| --- | --- |
+| SokuMods commit | `eb0574cea1eda70484b736eb192964ef87e50a67` |
+| SokuMods Git tree | `1dcbebecbdd4a774c39a1f0d015385fe227858c2` |
+| SkipIntro upstream commit | `fd945ff5c1c5b7de0ff7d03b988e9219a3674213` |
+| SkipIntro upstream Git tree | `d1b300e9d89029bb02f3feeaff9bc3b50ddde95b` |
+| SokuRL SkipIntro patch SHA-256 | `C69800049A88DB9BBB998F7AD474F12E2BE87A7A7D5DE0D741C0036118F5DA5F` |
+
+Verify a local installation with:
 
 ```powershell
 .\.venv\python.exe scripts\00_check_game.py
 ```
 
-SokuRL does not patch `th123.exe`, `th123a.dat`, `th123b.dat`, or `th123c.dat`
-on disk.
-
-## Runtime Stack
-
-The current game installation loads these SWRSToys modules:
-
-```ini
-[Module]
-WindowResizer=modules/WindowResizer/WindowResizer.dll
-SokuRLBridge=modules/SokuRLBridge/SokuRLBridge.dll
-SkipIntro=modules/SkipIntro/SkipIntro.dll
-MemoryPatch=modules/MemoryPatch/MemoryPatch.dll
-ReplayDnD=modules/ReplayDnD/ReplayDnD.dll
-```
-
-- **SokuRLBridge** exposes state and logical controls through shared memory.
-- **SkipIntro** owns the stable default Practice preset and initial selections.
-- **MemoryPatch** enables the existing community `AllowMultiInstance` patch.
-- **ReplayDnD** loads a `.rep` directly from the th123 command line.
-- **WindowResizer** configures the game window without changing simulation.
-
-The persistent SkipIntro preset remains Practice (`type=8`). The VS launcher
-temporarily starts at Title under a named mutex, passes process-local launch
-parameters to the bridge, and restores the exact original INI bytes.
-
 ## Quick Start
 
-All Python commands use the repository-local environment:
+Complete the SokuMods build, native bridge build, and runtime deployment steps
+below before running these commands.
 
 ```powershell
+# Stable local Practice preset
 .\.venv\python.exe tools\sokurl.py practice
+
+# Local VS Player through the normal Title -> Loading -> Battle lifecycle
 .\.venv\python.exe tools\sokurl.py vs
+
+# Keep the original simulation but skip complex battle rendering
 .\.venv\python.exe tools\sokurl.py vs --headless
+
+# Headless local VS without the original 60 FPS wall-clock wait
 .\.venv\python.exe tools\sokurl.py vs --headless --unlimited
 ```
 
-| Command | Behavior |
-| --- | --- |
-| `practice` | Starts the configured local Practice preset and sends acknowledged in-game confirm inputs until battle is ready. |
-| `vs` | Starts local VS Player through the legitimate Title, Loading, and Battle lifecycle. |
-| `vs --headless` | Keeps all game initialization and simulation but skips the confirmed complex battle-render interval. |
-| `vs --headless --unlimited` | Also removes the VS battle wall-clock wait while preserving one original update per main-loop iteration. |
+`--unlimited` requires `--headless`. Practice and normal VS retain their
+original pacing and rendering behavior.
 
-`--unlimited` is rejected unless `--headless` is also present. Practice and
-normal VS never enable the unlimited pacing hook.
-
-Process management is PID-aware:
+Manage running workers by PID:
 
 ```powershell
 .\.venv\python.exe tools\sokurl.py list
@@ -99,115 +211,85 @@ Process management is PID-aware:
 .\.venv\python.exe tools\sokurl.py shutdown --pid 1234
 ```
 
-Shutdown requests a normal window close first and terminates only after a
-timeout.
+## What the Platform Exposes
 
-## Local VS Player Bootstrap
+### Structured battle state
 
-The supported VS path does not use SkipIntro `type=3` and does not write a scene
-ID. After the original `Title::onProcess` has initialized Title-owned state,
-SokuRLBridge:
+Every actual simulation update produces a `RawFrameState` containing:
 
-1. Selects fallback local input ownership.
-2. Calls the game's `setBattleMode(VSPLAYER, PLAYING1)` routine.
-3. Initializes both profiles, key managers, palettes, and effective decks.
-4. Sets the configured stage and music.
-5. Returns `SCENE_LOADING` from Title so the original game creates the battle.
+- Scene, battle mode/submode, stage, round, timer, weather, and RNG seed
+- P1/P2 position, velocity, facing, HP, spirit, cards, action state, animation,
+  hitstop, untech, airborne state, flags, and effective logical input
+- Up to 64 objects per player with explicit overflow reporting
+- Object ownership/type, action and animation state, position, velocity, HP,
+  hitstop, hit/hurt boxes, and active state
+- A canonical FNV-1a-64 state hash
 
-The old direct `type=3` CSelect experiment is not supported. It skipped P2
-device/profile ownership and produced repeatable invalid-parameter crashes.
+Spirit is exposed with the game's signed 16-bit semantics in bridge ABI v8.
+Transient values such as `-88` therefore remain negative instead of appearing
+as `65448`. Hand-card IDs follow the game's selected-card order.
 
-## PID-Isolated Multi-Instance Control
+The shared-memory ABI uses a 512-frame SPSC ring. A consumer can detect any
+recording loss through `dropped_frames`; overflow is never hidden.
 
-Each th123 process publishes a separate mapping:
+### Logical actions and frame control
 
-```text
-Local\SokuRLBridge_<pid>
-```
+SokuRL Platform injects the game's logical `KeyInput`, not Windows keyboard
+events. This removes window focus, keyboard layout, and IME from the control
+path.
 
-Commands, state, frame counters, ring buffers, and checkpoints are bound to that
-PID. Stepping or pausing one worker does not advance another worker.
-SokuRL relies on MemoryPatch's existing `AllowMultiInstance` implementation and
-does not patch the single-instance check itself.
+Available controls include:
 
-## Per-Frame Battle State
+- Atomic P1/P2 direction and A/B/C/D/card input
+- Pause and resume
+- `+1F` and `+NF`
+- Episode reset through the game's scene lifecycle
 
-The canonical simulation boundary is `BattleManager::onProcess`. A SokuRL frame
-increments only after one call to the original battle update. Rendering,
-wall-clock time, Python polling, and paused main-loop calls do not increment the
-simulation frame.
+`Goto frame N` and `-1F` are disabled in the current native module.
+The historical reconstruction measurements below do not establish support for
+restoring an arbitrary battle state.
 
-Each `RawFrameState` contains:
+One platform simulation frame is one call to the original
+`BattleManager::onProcess`. The unlimited worker does not batch multiple updates
+into one main-loop iteration or substitute a custom timestep.
 
-- Global scene, battle mode/submode, stage, round, timer, weather, and RNG seed.
-- P1/P2 character ID, position, velocity, facing, HP, spirit, card gauge/count,
-  hand IDs, action/sequence/subsequence, animation frame, elapsed action time,
-  hitstop, untech, airborne state, frame/attack flags, and effective logical
-  input.
-- Up to 64 objects per player with explicit overflow reporting.
-- Object owner/list identity, runtime type identity, action and animation state,
-  position, velocity, direction, HP, hitstop, hit/hurt-box counts, character
-  index, and active state.
-- A canonical FNV-1a-64 deterministic state hash.
+### Deterministic reconstruction
 
-ABI v6 uses a 512-frame single-producer/single-consumer ring and a 4096-frame
-native reconstruction history. A lossless recording requires
-`dropped_frames == 0`; overflow is reported and is never silently ignored.
-
-## Logical Input, Pause, and Frame Navigation
-
-The bridge operates on the game's logical `KeyInput`, not Windows keyboard
-events. The bridge and Python reconstruction tools together support:
-
-- Atomic P1/P2 logical input for exactly one simulation frame.
-- Horizontal/vertical directions and A/B/C/D/card inputs.
-- Pause and resume.
-- `+1F` and `+NF` stepping.
-- `Goto frame N` through fresh-process checkpoint reconstruction, followed by freeze.
-- `-1F` as `Goto(current - 1)`.
-
-Input is applied at the game's `KeymapManager::SetInputs` boundary before the
-BattleManager consumes it. This avoids window focus, keyboard layout, and IME
-dependencies.
-
-## Checkpoints and Deterministic Reconstruction
-
-SokuRL does not implement a raw process-memory savestate. Frame loading uses:
+The platform does not copy raw process memory. It reconstructs a target state
+through the original simulation:
 
 ```text
 deterministic frame-zero checkpoint
   -> replay recorded P1/P2 logical inputs
-  -> run the original game simulation to the target
-  -> restore only documented simple scalar fields when required
-  -> freeze and validate the complete state hash
+  -> simulate to the target frame
+  -> restore documented scalar state when required
+  -> freeze and compare the complete state hash
 ```
 
-The documented scalar patch is limited to timer/weather, player position and
-speed, facing, HP, spirit, and card counters. Actions, animation, hitstop,
-flags, hands, projectiles, and object lists have no direct write path and must
-be reconstructed by the original simulation.
+The scalar patch is limited to timer/weather, position, velocity, facing, HP,
+spirit, and card counters. Actions, animation, hitstop, projectiles, and object
+lists must match through re-simulation. A mismatch reports the first divergent
+simulation frame and a field/object diff.
 
-Hash mismatches stop reconstruction and report the first divergent simulation
-frame plus a field-by-field and object-by-object diff.
+For local VS and Practice traces, reconstruction injects the recorded P1/P2
+logical inputs. For a `.rep`, the checkpoint reuses ReplayInputManager's native
+input stream: observed `KeyInput` alone does not encode every replay command
+decision. Complex state is still simulated and compared on every frame.
 
-## Replay Playback and Seeking
+### Replay capture and seek
 
-ReplayDnD owns `.rep` loading. SokuRLBridge freezes the first replay battle state
-at frame zero and then uses the same state, input, stepping, and validation
-machinery as Practice.
+ReplayDnD starts a `.rep` directly. The platform freezes replay frame zero and
+can play normally or simulate to a requested frame:
 
 ```powershell
 .\.venv\python.exe tools\sokurl.py replay path\match.rep
 .\.venv\python.exe tools\sokurl.py replay path\match.rep --frame 5000
 ```
 
-The first command starts normal replay playback. The second simulates from
-replay frame zero to frame 5000 and leaves the game frozen there.
+### ScenarioRunner v1
 
-## ScenarioRunner v1
-
-ScenarioRunner saves reproducible Practice anchors and runs deterministic
-per-frame scripts from them.
+ScenarioRunner saves reproducible Practice anchors and runs per-frame opponent
+scripts from them:
 
 ```powershell
 .\.venv\python.exe tools\sokurl.py anchor save graze_test --pid 1234
@@ -215,13 +297,8 @@ per-frame scripts from them.
 .\.venv\python.exe tools\sokurl.py script run scenarios\graze_test.yaml --pid 5678
 ```
 
-Anchor documents under `anchors/` use `SokuRLAnchor/v1`. They contain the
-checkpoint identity, target frame/hash, and the dual-input/simple-state setup
-history needed to reconstruct the target in a fresh process. Loading leaves the
-new process frozen only after the reconstructed hash matches.
-
-Scripts support `wait`, numpad-relative directions, direction plus A/B/C/D,
-explicit per-frame `raw` sequences, and nested `repeat` blocks.
+Scripts support waits, numpad-relative directions, direction/button inputs,
+explicit raw sequences, and nested repeats:
 
 ```yaml
 anchor: graze_test
@@ -234,131 +311,321 @@ script:
   - wait: 60
 ```
 
-`24C` remains an explicit raw sequence because no ambiguous move macro is
-promoted without runtime evidence.
+## How VS Workers Start
 
-## Headless Rendering and Unlimited Pacing
+The stable VS launcher uses the game's Title lifecycle. After Title initializes
+its input and profile state, the bridge binds both local players, calls the
+game's VS battle-mode routine, and returns through the original Loading path.
 
-M2-A installs a battle-only render dispatcher at `0x00407FAE`. In headless
-scene 5 it skips `0x00407FB4..0x00408047` and rejoins at `0x00408048`.
-Initialization, HWND/D3D, textures, resources, audio, animation/effects,
-collision, objects, RNG, and loading remain active.
+It does not write a scene ID or use SkipIntro's incomplete direct VS CSelect
+path. The persistent SkipIntro configuration remains the stable Practice preset.
 
-M2-B redirects only the `WaitForSingleObject` operand at `0x00419689` inside the
-frame-wait function at `0x004195E0`. In unlimited local VS battle the original
-event is polled with timeout 0 instead of `INFINITE`. It does not call multiple
-BattleManager updates, invent a timestep, or change hitstop/input/animation
-cadence.
+MemoryPatch supplies the existing community multi-instance patch. Each process
+then owns an independent mapping:
 
-## Acceptance Results
+```text
+Local\SokuRLBridge_<pid>
+```
 
-All figures below were measured on the current development machine and are not
-portable hardware guarantees.
+## Headless and Unlimited Execution
 
-### Core Bridge and Reconstruction
+Headless mode skips only the confirmed complex battle draw/present interval.
+The window, D3D device, resources, audio, animation, effects, collision, RNG,
+and object updates remain initialized and active.
 
-- Practice reached `PRACTICE_READY` after seven acknowledged logical confirms.
-- Projectile Practice trace: 1043 frames, 21 P1 objects, no overflow.
-- Reconstruction targets 472, 479, 916, and 917 matched exactly.
-- Repeated forward/backward seeks matched, including `-1F` then `+1F` identity.
-- Two simultaneous processes retained distinct mappings and independent frame
-  counters.
+Unlimited mode changes the VS battle frame wait from blocking to non-blocking.
+The original main loop and one-update-per-frame semantics remain intact.
 
-Local report: `logs/validation/frame-validation-20260928-100935.json`
+## Validation
 
-### Replay Validation
+The repository includes small, sanitized JSON artifacts for the headline
+results:
 
-- Recorded 14,954 contiguous replay states with zero dropped frames.
-- Observed up to 39/55 P1/P2 objects plus extensive airborne and hitstop state.
-- Reconstruction targets 1558 and 5190 matched every stable field and object.
+- [M2-B determinism and throughput](docs/validation/m2b-summary.json)
+- [Expert replay capture and seek](docs/validation/replay-summary.json)
+- [Practice reconstruction and ScenarioRunner](docs/validation/reconstruction-summary.json)
+- [Spell-card and signed-spirit validation](docs/validation/resources-summary.json)
 
-Local report: `logs/validation/replay-validation-20260928-104655.json`
+### Determinism
 
-### ScenarioRunner
+- Rendered, headless paced, and headless unlimited execution matched for the
+  required 3,000-frame trace and a 10,000-frame long run.
+- The long-run final hash was `CC6DB833624518B5`.
+- All three modes recorded zero divergent frames and zero dropped records.
+- Coverage included A/B/C attacks, projectile spawn/movement/despawn, damage,
+  hitstop, untech, airborne state, and corner interaction.
 
-- Anchor reconstruction passed 20/20 fresh-process loads.
-- Projectile script passed 3/3 load/run/reset cycles with identical traces and
-  final hashes.
-- Accepted script observed `5B`, explicit raw `24C`, and up to 15 objects.
+### Throughput
 
-Local report: `logs/validation/scenario-validation-20260928-152941.json`
+These measurements come from one development machine and are not portable
+hardware guarantees.
 
-### VS Player and M2-A
-
-- Title-context VS startup passed 20/20 runs with at least 300 battle frames.
-- Both players performed logical attacks, created projectiles, and dealt
-  persistent VS damage.
-- Headless startup passed 20/20 runs.
-- Normal versus headless matched all 3000 per-frame hashes, including projectile
-  spawn/movement/despawn, damage, hitstop, untech, airborne state, and corner
-  interaction.
-- Both comparison processes reported zero dropped frames.
-
-Local reports: `logs/validation/vs-stress-20260928-203316.json` and
-`logs/validation/m2a-validation-20260928-2113.json`
-
-### M2-B Determinism and Performance
-
-- Normal rendered, paced headless, and unlimited headless matched for 3000
-  required frames and a 10,000-frame long run.
-- The 10,000-frame final hash was `CC6DB833624518B5`; no divergence or dropped
-  record occurred in any mode.
-- Single-instance rates were 60.03 rendered, 60.00 paced headless, and 28,059.60
-  unlimited simulation frames per second.
-
-| Workers | Mean sim-FPS per worker | Aggregate sim-FPS | Mean system CPU | Dropped records | Result |
+| Workers | Mean sim-FPS / worker | Aggregate sim-FPS | Mean system CPU | Dropped | Result |
 | ---: | ---: | ---: | ---: | ---: | --- |
 | 1 | 28,059.60 | 28,059.60 | 27.22% | 0 | Stable |
 | 4 | 24,063.98 | 96,255.94 | 49.63% | 0 | Stable |
 | 8 | 18,832.74 | 150,661.89 | 92.75% | 0 | Stable |
-| 16 | 12,935.27 | 206,964.27 | 99.84% | 139 | Saturated; not recording-stable |
+| 16 | 12,935.27 | 206,964.27 | 99.84% | 139 | CPU-saturated |
 
-The accepted full-recording worker count on this machine is eight. At 16
-workers all simulations remained alive, but two 512-slot frame rings overflowed
-under full CPU contention and one process missed graceful shutdown timeout.
-Per-process Direct3D GPU utilization was not available, so no GPU number is
-claimed.
+Eight workers were recording-stable on the test machine. At 16 workers, all
+simulations remained alive but two frame rings overflowed under full CPU
+contention, so the 16-worker result is a saturation measurement rather than an
+accepted lossless configuration.
 
-Local report: `logs/validation/m2b-validation-20260928-2150.json`
+### Other acceptance results
 
-### Regression and File Safety
+- Local VS startup: 20/20 successful runs
+- Headless startup: 20/20 successful runs
+- Practice reconstruction targets: all hashes matched
+- Scenario anchors: 20/20 fresh-process loads
+- Scenario projectile runs: 3/3 identical traces and final hashes
+- Expert replay: 14,954 contiguous frames, zero drops, up to 55 live objects
+- Expert replay spell-card consumption: frame 3663 and 5822 reconstructions
+  matched complete state hashes with zero field differences
+- Signed spirit: `-88` round-trip and recovery matched across 3/3 deterministic
+  VS runs; the supplied replay itself remained positive (minimum 50/16)
+- Unit tests: 19/19 passed
+- Two-process frame stepping: PID-isolated
 
-- Existing unit tests: 17/17 passed.
-- Default Practice behavior passed after M2-A and M2-B.
-- Normal VS remained paced at approximately 60 simulation FPS.
-- Deployed bridge is Win32/x86.
-- Current deployed bridge SHA-256:
-  `BDF68AF07B9780805A16BCFD3CAD20C089E96F3C7C867B6524802055C6EC5ACA`.
-- `th123.exe` MD5 remains `DF35D1FBC7B583317ADABE8CD9F53B2E`.
-- Protected `.dat` hashes remained unchanged.
+## Runtime Modules
 
-## Validation Commands
+The tested local setup uses these SWRSToys modules:
+
+```ini
+[Module]
+WindowResizer=modules/WindowResizer/WindowResizer.dll
+SokuRLBridge=modules/SokuRLBridge/SokuRLBridge.dll
+SkipIntro=modules/SkipIntro/SkipIntro.dll
+MemoryPatch=modules/MemoryPatch/MemoryPatch.dll
+ReplayDnD=modules/ReplayDnD/ReplayDnD.dll
+```
+
+Community module sources live under `third_party/SokuMods/`; the local game
+installation remains outside version control.
+
+## SkipIntro Reproducibility
+
+SokuRL Platform does not build an unmodified upstream SkipIntro. The pinned
+upstream source is patched so that a launch with one command-line argument
+leaves startup to ReplayDnD:
+
+```cpp
+// ReplayDnD owns command-line file/directory launches and needs Logo to run.
+if (__argc == 2)
+    return;
+```
+
+Without this change, SkipIntro can intercept startup before ReplayDnD loads a
+`.rep` file or replay directory. The exact source change is committed as
+[`patches/skipintro-replaydnd-command-line.patch`](patches/skipintro-replaydnd-command-line.patch).
+The bootstrap script applies it inside SkipIntro's own Git checkout and is
+idempotent, so a second run verifies the already-applied patch. The patch also
+normalizes the missing final newline in `Soku.hpp`; that second file has no
+runtime behavior change. Both patched-file hashes are recorded in the dependency
+lock.
+
+The deployed Practice preset is versioned at
+[`config/runtime/SkipIntro.ini`](config/runtime/SkipIntro.ini):
+
+```ini
+[GLOBAL]
+scene_id = 3
+menu_id = 0
+type = 8
+subtype = 0
+
+[P1]
+character = 1
+palette = 0
+deck = 0
+
+[P2]
+character = 0
+palette = 0
+deck = 0
+```
+
+This selects local Practice with P1 Marisa and P2 Reimu. `sokurl.py vs`
+temporarily changes only the startup scene to Title, performs the validated
+Title-context VS bootstrap, and restores the file afterward. Replay launches
+pass the `.rep` path to `th123.exe`; the patch above keeps SkipIntro out of that
+command-line path so ReplayDnD can own it.
+
+## Build SokuMods Modules
+
+Open an **x86 Developer Command Prompt for Visual Studio**. From the SokuRL
+root, configure the pinned checkout and build only the modules used here:
+
+```cmd
+cmake -S third_party\SokuMods -B third_party\SokuMods\build -A Win32 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+cmake --build third_party\SokuMods\build --config Release --target swrstoys WindowResizer SkipIntro MemoryPatch ReplayDnD
+```
+
+The policy compatibility option is required with CMake 4.x because the pinned
+SokuMods dependency graph includes older projects such as mbedtls. It changes
+CMake policy compatibility only; it does not patch those upstream sources.
+
+After building, verify the recorded DLL SHA-256 values and x86 PE architecture:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\verify_sokumods.ps1 `
+  -BuildDirectory third_party\SokuMods\build\Release
+```
+
+The resulting Win32 binaries are:
+
+```text
+third_party/SokuMods/build/Release/d3d9.dll
+third_party/SokuMods/build/Release/WindowResizer.dll
+third_party/SokuMods/build/Release/SkipIntro.dll
+third_party/SokuMods/build/Release/MemoryPatch.dll
+third_party/SokuMods/build/Release/ReplayDnD.dll
+```
+
+## Build the Native Bridge
+
+Open an **x86 Developer Command Prompt for Visual Studio**, then run:
+
+```cmd
+cmake -S native\SokuRLBridge -B native\SokuRLBridge\build -A Win32
+cmake --build native\SokuRLBridge\build --config Release --target SokuRLBridge
+```
+
+The output is:
+
+```text
+native\SokuRLBridge\build\Release\SokuRLBridge.dll
+```
+
+Do not build the bridge as x64.
+
+`SokuRLBridge` links against the pinned
+`third_party/SokuMods/SokuLib` checkout prepared by the bootstrap script.
+
+## Deploy the Runtime
+
+The repository includes the exact tested module configurations under
+`config/runtime/`. After building SokuMods and SokuRLBridge, deploy only the mod
+files:
+
+```powershell
+$game = Resolve-Path .\th123_jp
+$release = Resolve-Path .\third_party\SokuMods\build\Release
+
+Copy-Item "$release\d3d9.dll" "$game\d3d9.dll"
+Copy-Item .\config\runtime\SWRSToys.ini "$game\SWRSToys.ini"
+
+foreach ($module in @("WindowResizer", "SkipIntro", "MemoryPatch", "ReplayDnD")) {
+    $destination = Join-Path $game "modules\$module"
+    New-Item -ItemType Directory -Force $destination | Out-Null
+    Copy-Item "$release\$module.dll" "$destination\$module.dll"
+    Copy-Item ".\config\runtime\$module.ini" "$destination\$module.ini"
+}
+
+$bridge = Join-Path $game "modules\SokuRLBridge"
+New-Item -ItemType Directory -Force $bridge | Out-Null
+Copy-Item .\native\SokuRLBridge\build\Release\SokuRLBridge.dll `
+  "$bridge\SokuRLBridge.dll"
+```
+
+This creates:
+
+```text
+th123_jp/
+  d3d9.dll
+  SWRSToys.ini
+  modules/
+    WindowResizer/WindowResizer.dll + WindowResizer.ini
+    SokuRLBridge/SokuRLBridge.dll
+    SkipIntro/SkipIntro.dll + SkipIntro.ini
+    MemoryPatch/MemoryPatch.dll + MemoryPatch.ini
+    ReplayDnD/ReplayDnD.dll + ReplayDnD.ini
+```
+
+The templates enable only the required multi-instance memory patch, configure
+ReplayDnD for automatic shutdown and muted music, and preserve the deterministic
+SkipIntro Practice preset. These commands do not overwrite `th123.exe` or any
+`.dat` file. Review or back up existing mod DLLs and `.ini` files before
+replacing an existing setup.
+
+## Updating SokuMods or SkipIntro
+
+Treat the dependency lock, patch, README, and validation evidence as one change.
+When SokuMods or SkipIntro is updated:
+
+1. Update the repository commit and Git tree hash in
+   `config/dependencies.lock.json`.
+2. Rebase or regenerate every patch under `patches/`; never leave a required
+   source edit only in the ignored checkout.
+3. Update the patch SHA-256 and every patched-file SHA-256 in the lock.
+4. Rebuild Win32 from a clean directory, update the verified output hashes, and
+   run `scripts/verify_sokumods.ps1` with `-BuildDirectory`.
+5. Document behavior changes, especially SkipIntro startup ownership and config
+   semantics, in this README and commit all related files together.
+
+The verifier fails on a different commit, tree, patch, patched-file set, source
+hash, output hash, or non-x86 DLL. This keeps an upstream update visible in Git
+instead of silently changing the ignored `third_party/SokuMods/` checkout.
+
+## Reproduce the Validations
+
+The expert replay used for the published 14,954-frame result is not distributed
+with this repository. Its byte identity is:
+
+```text
+size:    58,565 bytes
+SHA-256: 3C08B5AFD23DF5ACDF80F058E05E8C6323EB554C5FF8D59BD610CEB0F91A32F7
+```
+
+The public [replay validation summary](docs/validation/replay-summary.json)
+records the same identity. A byte-identical replay is required to reproduce
+that exact 14,954-frame / 55-object experiment. Other `.rep` files can still be
+used to exercise the same capture and reconstruction harness.
 
 ```powershell
 .\.venv\python.exe -m unittest discover -s tests -p "test_*.py" -v
 .\.venv\python.exe tools\frame_validation.py
-.\.venv\python.exe tools\replay_validation.py
+.\.venv\python.exe tools\replay_validation.py C:\path\to\match.rep
 .\.venv\python.exe tools\scenario_validation.py --loads 20 --runs 3
-.\.venv\python.exe tools\vs_stress_validation.py --runs 20 --frames 300
 .\.venv\python.exe tools\vs_stress_validation.py --headless --runs 20 --frames 300
 .\.venv\python.exe tools\headless_validation.py --unlimited --frames 10000
 .\.venv\python.exe tools\unlimited_benchmark.py --mode unlimited --workers 8 --duration 5
 ```
 
-Runtime JSON reports are written under `logs/validation/`.
+Full local run logs are written to `logs/validation/` and excluded from Git.
+The curated summaries under `docs/validation/` are versioned.
 
-## Native Build
+### Restricted sandbox test failure
 
-Initialize the Visual Studio x86 environment and build Release:
+The test suite creates a temporary recording directory under `tests/`. In a
+filesystem-restricted runner, this test can fail even when the implementation is
+healthy:
 
-```cmd
-call "T:\VisualStudio\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
-cmake -S native\SokuRLBridge -B native\SokuRLBridge\build -A Win32
-cmake --build native\SokuRLBridge\build --config Release --target SokuRLBridge
+```text
+test_writer_outputs_manifest_and_zero_drop_validity ... ERROR
+PermissionError: [WinError 5] Access is denied:
+  D:\...\SokuRL\tests\tmp...\<timestamp>
 ```
 
-The output is `native\SokuRLBridge\build\Release\SokuRLBridge.dll`. Do not build
-the bridge as x64.
+This means the runner allowed the first temporary directory but denied its
+nested session directory. It is a filesystem sandbox restriction, not a bridge,
+protocol, or recorder assertion failure. Rerun the same suite from a normal host
+PowerShell with write access to the repository:
+
+```powershell
+.\.venv\python.exe -m unittest discover -s tests -p "test_*.py" -v
+```
+
+The host-side verification for this revision passed all 17 tests. A failed
+sandbox run can leave its `tests/tmp...` directory behind. List candidate
+directories first, then remove only the exact path confirmed to belong to the
+failed test:
+
+```powershell
+Get-ChildItem .\tests -Force -Directory -Filter "tmp*"
+Remove-Item -LiteralPath .\tests\tmp<confirmed-name> -Recurse -Force
+```
 
 ## Known Limits
 
@@ -367,43 +634,39 @@ ten stateful tactics. PPO training and policy evaluation use the same roster.
 The new tactics support both public state and diagnostic state observations.
 
 - Only th123 1.10a with the documented executable hash is supported.
-- The accelerated worker still creates a window and initializes D3D, resources,
-  and audio. It is render-skipping, not a standalone simulator.
-- The 16-worker benchmark exceeded lossless frame-consumer capacity on the test
-  machine; eight workers were stable.
-- In the Practice dummy path, P2 movement is controllable but P2 B/C attacks are
-  filtered even when effective input is captured. The accepted ScenarioRunner
-  projectile scenario therefore controls `opponent: p1`.
-- `24C` is exposed as a raw sequence rather than a guaranteed named macro.
-- Checkpoint history is short range and deterministic; it is not a raw memory
-  savestate.
-- PPO, training replay datasets, and policy training are not implemented.
+- Headless workers still create a window and initialize D3D, resources, and
+  audio. SokuRL Platform is not a standalone reimplementation of the game.
+- Eight workers were lossless on the validation machine; 16 workers saturated
+  CPU and overflowed two frame rings.
+- Practice currently accepts P2 movement input but filters P2 B/C attacks. The
+  accepted projectile ScenarioRunner script controls `opponent: p1`.
+- `24C` remains an explicit raw input sequence rather than a named macro.
+- Native `GotoFrame` remains disabled. Episode reset creates a new battle.
+  Action replay can reproduce a recorded trajectory; it is not a memory snapshot.
+- Policy benchmarks for both tracks and network human play are not yet complete.
 
 ## Repository Layout
 
 ```text
-native/SokuRLBridge/     injected Win32 bridge and shared-memory ABI
+native/SokuRLBridge/     Win32 bridge and shared-memory ABI
+config/runtime/          tested SWRSToys module configuration templates
+config/dependencies.lock.json  pinned upstream identities and hashes
+requirements.txt         pinned Python runtime dependencies
 tools/sokurl.py          launcher and process lifecycle CLI
 tools/bridge_shared.py   Python ABI and command client
-tools/frame_validation.py
-tools/replay_validation.py
-tools/scenario_runner.py
-tools/scenario_validation.py
-tools/headless_validation.py
-tools/unlimited_benchmark.py
+tools/scenario_runner.py anchors and scripted actions
+tools/*_validation.py    deterministic and runtime validation harnesses
+docs/validation/         publishable machine-readable summaries
+patches/                 versioned patches for pinned upstream dependencies
 scenarios/               deterministic script examples
-anchors/                 generated anchor documents
-logs/validation/         machine-readable acceptance reports
-third_party/SokuMods/    community source/build dependency
-th123_jp/                local game runtime; protected original files
+scripts/bootstrap_sokumods.ps1  pinned SokuMods/SkipIntro checkout bootstrap
+scripts/verify_sokumods.ps1     source, patch, output-hash, and x86 verifier
+third_party/SokuMods/    generated by bootstrap; local community source/build dependency, ignored by Git
+th123_jp/                user-provided local game runtime, ignored by Git
 ```
 
-Detailed local structures and milestone history are maintained in
-`STRUCTURES.md`, `PROGRESS.md`, and `HISTORY.md`. These files and runtime
-validation JSON are currently excluded from Git by the repository ignore rules.
-
-## Development Install
+## Optional Development Dependencies
 
 ```powershell
-.\.venv\python.exe -m pip install -e .
+.\.venv\python.exe -m pip install -e ".[dev]"
 ```

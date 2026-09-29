@@ -26,6 +26,7 @@ from scenario_runner import compile_steps, token_input
 
 class BridgeProtocolTests(unittest.TestCase):
     def test_cpp_python_layout_agreement(self) -> None:
+        self.assertEqual(bridge_shared.CONTROL_VERSION, 8)
         self.assertEqual(ctypes.sizeof(bridge_shared.LogicalInput), 32)
         self.assertEqual(ctypes.sizeof(bridge_shared.PlayerState), 140)
         self.assertEqual(ctypes.sizeof(bridge_shared.ObjectState), 80)
@@ -47,6 +48,44 @@ class BridgeProtocolTests(unittest.TestCase):
             "offsetof(ControlBlock, currentFrame) == 144",
         ):
             self.assertIn(assertion, header)
+        launcher = (ROOT / "tools" / "sokurl.py").read_text(encoding="utf-8")
+        self.assertIn("version in (4, 5, 6, 7, 8)", launcher)
+
+    def test_spirit_uses_signed_game_semantics(self) -> None:
+        player_fields = dict(bridge_shared.PlayerState._fields_)
+        simple_fields = dict(bridge_shared.SimplePlayerState._fields_)
+        self.assertIs(player_fields["spirit"], ctypes.c_int32)
+        self.assertIs(player_fields["maxSpirit"], ctypes.c_int32)
+        self.assertIs(simple_fields["spirit"], ctypes.c_int32)
+        for raw, expected in ((0, 0), (32767, 32767), (0x8000, -32768), (0xFFA8, -88)):
+            state = bridge_shared.PlayerState()
+            state.spirit = ctypes.c_int16(raw).value
+            self.assertEqual(state.spirit, expected)
+
+    def test_control_rejects_conflicting_legacy_version(self) -> None:
+        mapping = bridge_shared.BridgeMapping()
+        block = mapping.control
+        block.magic = bridge_shared.CONTROL_MAGIC
+        block.version = 7
+        block.structSize = bridge_shared.CONTROL_BLOCK_SIZE
+        block.mappingSize = bridge_shared.MAPPING_SIZE
+        client = bridge_shared.BridgeClient.__new__(bridge_shared.BridgeClient)
+        client._mapping_pointer = ctypes.pointer(mapping)
+        with self.assertRaisesRegex(bridge_shared.BridgeUnavailable, "ABI mismatch"):
+            client._validate_abi()
+        block.version = bridge_shared.CONTROL_VERSION
+        client._validate_abi()
+
+    def test_simple_patch_rejects_spirit_outside_game_storage(self) -> None:
+        patch = bridge_shared.SimpleStatePatch()
+        for value in (-32768, 32767):
+            patch.p1.spirit = value
+            patch.p1.maxSpirit = value
+            bridge_shared.validate_simple_patch(patch)
+        for value in (-32769, 32768):
+            patch.p1.spirit = value
+            with self.assertRaises(ValueError):
+                bridge_shared.validate_simple_patch(patch)
 
     def test_command_protocol_values(self) -> None:
         self.assertEqual(bridge_shared.COMMAND_RUN, 3)
