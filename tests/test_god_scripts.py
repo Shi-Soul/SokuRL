@@ -63,7 +63,7 @@ def test_canonical_selection_and_the_only_declared_source_repair():
     package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
     assert package.character_script(0) == "00_reimu_main.ai"
     assert len({package.character_script(i) for i in range(20)}) == 20
-    assert package.repairs == {"01_marisa_main_新版厨远A.ai": b"wait_frame = 1;\n"}
+    assert set(package.repairs) == {"01_marisa_main_新版厨远A.ai"}
     for name in NAMES:
         original = (SCRIPTS / name).read_bytes()
         if name in package.repairs:
@@ -71,6 +71,22 @@ def test_canonical_selection_and_the_only_declared_source_repair():
         else:
             assert package.source(name) == original
     assert package.original_fingerprint != package.fingerprint
+
+
+@pytest.mark.skipif(not NAMES, reason="external original community package is not installed")
+def test_repaired_distance_tables_match_the_standard_script_conditions():
+    from lupa.lua51 import LuaRuntime
+    package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
+    lua = LuaRuntime(encoding=None)
+    lua.execute(package.repairs["01_marisa_main_新版厨远A.ai"])
+    limits = lua.eval(b"function(a,d) return nega_line[a]<=d and d<=pogi_line[a] end")
+    for distance in range(1281):
+        assert (limits(300, distance) or limits(301, distance)) == (distance <= 160)
+        assert limits(305, distance) == (200 <= distance <= 300)
+        assert limits(402, distance) == (150 <= distance <= 300)
+        assert limits(400, distance) == (300 < distance <= 500)
+        assert limits(411, distance) == (distance > 600)
+        assert limits(410, distance) == (distance > 400)
 
 
 @pytest.mark.skipif(not NAMES, reason="external original api.ai is not installed")

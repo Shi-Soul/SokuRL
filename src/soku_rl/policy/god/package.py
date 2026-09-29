@@ -8,12 +8,17 @@ CHARACTERS = (
     "yukari", "suica", "udonge", "aya", "komachi", "iku", "tenshi", "sanae", "chirno",
     "meirin", "utsuho", "suwako",
 )
-# The published variant reads this variable without assigning it. The user
-# approved completing the missing definition; the source archive stays intact.
+# Complete missing definitions only for the exact published variant. Distance
+# bounds reproduce the six corresponding branches in 01_marisa_main.ai lines
+# 2231-2265. Both A entries have the same interval because the variant ORs them.
+# dis is an integer, so >300, >600, >400 become >=301, >=601, >=401.
+# These are documented repairs, not recovered definitions from the variant.
 REPAIRS = {
     "01_marisa_main_新版厨远A.ai": (
         "33bd3d0faf57a2a96f2b3806dbf9f4abf69e1748445cdf629991899f2fa9ec4c",
-        b"wait_frame = 1;\n",
+        b"wait_frame = 1;\n"
+        b"pogi_line = {[300]=160,[301]=160,[305]=300,[402]=300,[400]=500,[411]=math.huge,[410]=math.huge};\n"
+        b"nega_line = {[300]=0,[301]=0,[305]=200,[402]=150,[400]=301,[411]=601,[410]=401};\n",
     ),
 }
 
