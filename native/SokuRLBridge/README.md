@@ -12,9 +12,9 @@ input while the local character-select scene is active; it does not synthesize
 an OS key event or write a scene ID.
 
 `SokuRLBridge.dll` is a Win32/x86 SWRSToys module for local Practice/VS Player logical
-input injection, raw frame capture, simulation pause/step, and validated
-checkpoint reconstruction. It does not synthesize Windows keyboard events or
-write scene IDs or partial battle-manager objects.
+input injection, raw frame capture, simulation pause/step, and episode reset.
+It does not synthesize Windows keyboard events or copy a battle-manager memory
+snapshot. The native `GotoFrame` command is disabled.
 
 ## Simulation boundary
 
@@ -35,10 +35,10 @@ Normal bridge actions still control only P1.
 fixes the requested match seed after `Select::onProcess`, captures frame zero
 before the first battle-manager simulation update, switches the documented
 Practice dummy setting to `DUMMY_STATE_2P_CONTROL`, and freezes there. This
-makes both logical input streams controllable without OS input injection. GOTO is
-implemented by `tools/frame_validation.py` as a fresh SkipIntro Practice
-process followed by recorded P1/P2 logical-input replay. The proven-crashing
-active-battle `SCENE_LOADING` route remains disabled.
+makes both logical input streams controllable without OS input injection.
+`ResetEpisode` returns through the title and loading scene lifecycle. It waits
+for the old battle scene to finish destruction before creating the new battle.
+The process stays alive; arbitrary state restoration is not supported.
 
 The opt-in VS launcher uses a separate Title-context bootstrap. After the
 original `Title::onProcess` runs, it selects fallback local input ownership,
@@ -46,12 +46,13 @@ calls `setBattleMode(BATTLE_MODE_VSPLAYER, BATTLE_SUBMODE_PLAYING1)`, initialize
 both profiles and effective decks, and returns `SCENE_LOADING`. It is armed only
 by the `SOKURL_VS_BOOTSTRAP` process environment variable from `tools/sokurl.py vs`.
 
-Reconstruction is hybrid. Action machines and projectile/object lists are
-rebuilt only through simulation. After every replayed frame, `ApplySimpleState`
-may restore only documented scalar state: timer, weather, player position and
-speed, facing, HP, spirit, and card counters. It cannot write actions,
-animation state, hitstop, flags, hands, or objects. The validator compares a
-canonical FNV-1a-64 hash and a field-by-field diff after each frame.
+Action replay starts at frame zero and rebuilds action machines and object
+lists through simulation. The diagnostic `ApplySimpleState` command can write
+timer, weather, player position, speed, facing, HP, spirit, and card counters.
+It cannot restore actions, animation state, hitstop, flags, hands, or objects.
+The RL reset and action replay do not use this command to restore snapshots.
+Historical reconstruction scripts and results are separate from the current
+episode-reset contract.
 
 ## Shared memory ABI
 

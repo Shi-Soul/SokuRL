@@ -42,6 +42,19 @@ function Get-Sha256 {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
+function Get-SourceSha256 {
+    param([string]$Path)
+
+    $source = [System.IO.File]::ReadAllText($Path).Replace("`r`n", "`n")
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($source)
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return [BitConverter]::ToString($algorithm.ComputeHash($bytes)).Replace("-", "")
+    } finally {
+        $algorithm.Dispose()
+    }
+}
+
 Assert-Equal "SokuMods commit" `
     (Get-GitValue $SokuModsDir "HEAD") $Lock.sokumods.commit
 Assert-Equal "SokuMods tree" `
@@ -68,10 +81,12 @@ if ($changedFileDiff.Count -ne 0) {
 foreach ($file in $Lock.skipintro.patched_files) {
     $sourceFile = Join-Path $SkipIntroDir $file.path
     Assert-Equal "Patched SkipIntro file $($file.path) SHA-256" `
-        (Get-Sha256 $sourceFile) $file.sha256
+        (Get-SourceSha256 $sourceFile) $file.sha256
 }
 
 if ($BuildDirectory) {
+    Assert-Equal "Reference build source patch SHA-256" `
+        $Lock.verified_build.source_patch_sha256 $Lock.skipintro.patch_sha256
     $resolvedBuildDirectory = (Resolve-Path -LiteralPath $BuildDirectory).Path
     foreach ($output in $Lock.verified_build.outputs) {
         $outputFile = Join-Path $resolvedBuildDirectory $output.path

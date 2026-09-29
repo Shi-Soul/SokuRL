@@ -6,19 +6,20 @@
     "tree_sha1": "1dcbebecbdd4a774c39a1f0d015385fe227858c2"
   },
   "skipintro": {
+    "source_hash_format": "UTF-8 with LF line endings and no BOM",
     "repository": "https://github.com/SokuDev/SkipIntro.git",
     "upstream_commit": "fd945ff5c1c5b7de0ff7d03b988e9219a3674213",
     "upstream_tree_sha1": "d1b300e9d89029bb02f3feeaff9bc3b50ddde95b",
     "patch": "patches/skipintro-replaydnd-command-line.patch",
-    "patch_sha256": "C69800049A88DB9BBB998F7AD474F12E2BE87A7A7D5DE0D741C0036118F5DA5F",
+    "patch_sha256": "EA0F3400F3E01CE5E9890F080BFC4670B4BF3E00C8F43CA7BA7390C4B82D0E75",
     "patched_files": [
       {
         "path": "dllmain.cpp",
-        "sha256": "42472659848C7A296B866506B2800E39F04D47B831E3809197202D5EC5CFE165"
+        "sha256": "F6295330FF714EA748AEB6EFE5868490B6C35CCB2BE10B6C67D7E5EAF2276DA7"
       },
       {
         "path": "Soku.hpp",
-        "sha256": "E439AD3702479FB2DA23C9091492C8459530C37DE0F21B05663978DBE2228C0C"
+        "sha256": "40F3AF93BD91967D44778CD5C92664F427EE414BC2437EC1713DBCC365A4C267"
       }
     ]
   },
@@ -47,6 +48,7 @@
         "path": "ReplayDnD.dll",
         "sha256": "17B875763C3642398AE5DF4B4FBEC6874FFAAA71998C3EFCFC558B648657022A"
       }
-    ]
+    ],
+    "source_patch_sha256": "C69800049A88DB9BBB998F7AD474F12E2BE87A7A7D5DE0D741C0036118F5DA5F"
   }
 }

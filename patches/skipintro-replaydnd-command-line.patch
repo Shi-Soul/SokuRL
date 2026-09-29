@@ -1,18 +1,3 @@
-diff --git a/dllmain.cpp b/dllmain.cpp
-index 3a34109..17bc7c6 100644
---- a/dllmain.cpp
-+++ b/dllmain.cpp
-@@ -69,6 +69,10 @@ extern "C" __declspec(dllexport) bool CheckVersion(const BYTE hash[16]) {
- 
- extern "C" __declspec(dllexport) void Initialize(HMODULE hMyModule, HMODULE hParentModule)
- {
-+    // ReplayDnD owns command-line file/directory launches and needs Logo to run.
-+    if (__argc == 2)
-+        return;
-+
-     GetModuleFileNameA(hMyModule, ConfigPath, 1024);
-     PathRemoveFileSpecA(ConfigPath);
-     PathAppendA(ConfigPath, "SkipIntro.ini");
 diff --git a/Soku.hpp b/Soku.hpp
 index e302fa2..aee836b 100644
 --- a/Soku.hpp
@@ -21,6 +6,34 @@ index e302fa2..aee836b 100644
      inline void* CreateScene(SceneEnum id) {
          return Scenes[id].Init(New(Scenes[id].Size));
      }
+-}
+\ No newline at end of file
++}
+diff --git a/dllmain.cpp b/dllmain.cpp
+index 3a34109..9e4979c 100644
+--- a/dllmain.cpp
++++ b/dllmain.cpp
+@@ -67,15 +67,20 @@ extern "C" __declspec(dllexport) bool CheckVersion(const BYTE hash[16]) {
+     return TRUE;
+ }
+ 
+-extern "C" __declspec(dllexport) void Initialize(HMODULE hMyModule, HMODULE hParentModule)
++extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hParentModule)
+ {
++    // ReplayDnD owns command-line file/directory launches and needs Logo to run.
++    if (__argc == 2)
++        return true;
++
+     GetModuleFileNameA(hMyModule, ConfigPath, 1024);
+     PathRemoveFileSpecA(ConfigPath);
+     PathAppendA(ConfigPath, "SkipIntro.ini");
+ 
+     CLogoInit = (Init_fun)HookNear(CLOGO_INIT_CALL_ADDR, (DWORD)Setup);
++    return CLogoInit != nullptr;
+ }
+ 
+ extern "C" int APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved) {
+     return TRUE;
 -}
 \ No newline at end of file
 +}

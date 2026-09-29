@@ -11,6 +11,7 @@ from pathlib import Path
 import psutil
 
 import sokurl
+from startup_dialogs import blocking_dialogs
 from bridge_shared import BridgeClient, BridgeUnavailable, RawFrameState
 from frame_validation import (
     InputPair,
@@ -53,6 +54,9 @@ def launch_replay_checkpoint(replay: Path, timeout: float = 35.0) -> PracticeIns
 
         while time.monotonic() < deadline:
             snapshot = client.snapshot()
+            dialogs = blocking_dialogs({process.pid})
+            if dialogs:
+                raise RuntimeError(f"replay startup was blocked: {dialogs}")
             if snapshot.in_gameplay and snapshot.latest.sceneId == SCENE_BATTLE:
                 if snapshot.latest.battleMode != BATTLE_MODE_VSPLAYER:
                     raise RuntimeError(
@@ -72,7 +76,9 @@ def launch_replay_checkpoint(replay: Path, timeout: float = 35.0) -> PracticeIns
                 client.drain_frames()
                 return PracticeInstance(process, client, 0)
             time.sleep(0.01)
-        raise RuntimeError(f"replay battle timeout for PID {process.pid}")
+        values = sokurl._read_process_values(process.pid)
+        raise RuntimeError(f"replay battle timeout for PID {process.pid}: "
+                           f"scene={values[0]}, mode={values[1]}, characters={values[2:4]}")
     except Exception:
         if client is not None:
             client.close()
