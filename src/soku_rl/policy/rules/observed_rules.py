@@ -12,6 +12,7 @@ from soku_rl.env.encoding import FRAME_FEATURES, FIGHTER_SCALES, encode_action
 from soku_rl.policy.rules.strategies import strategy_from_config
 from soku_rl.policy.rules.tactical_observation import screen_view
 from soku_rl.env.observation.visible_state import STATE_FEATURES
+from soku_rl.policy.base import RulePolicy as RulePolicyBase
 
 
 def decode_diagnostic(values, horizon):
@@ -31,7 +32,7 @@ def decode_diagnostic(values, horizon):
 
 
 @dataclass(frozen=True)
-class RulePolicy:
+class RulePolicy(RulePolicyBase):
     name: str
     rules: dict
     episode: object

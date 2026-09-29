@@ -6,7 +6,7 @@ from pathlib import Path
 from open_spiel.python.algorithms.psro_v2.psro_v2 import PSROSolver
 
 from soku_rl.policy.population import PopulationEvaluator, UniformPolicy, PPOPolicy
-from soku_rl.rl.response import PPOResponseOracle
+from soku_rl.marl.response import PPOResponseOracle
 from soku_rl.policy.recurrent import RecurrentPPOPolicy
 from soku_rl.env.encoding import AGENTS
 

@@ -25,13 +25,13 @@ def main(cfg: DictConfig):
     algorithm = config["algorithm"]["name"]
     if algorithm == "nfsp":
         from soku_rl.marl.nfsp import train_nfsp as train
-        dependencies = ["open-spiel", "dm-tree"]
+        dependencies = ["stable-baselines3"]
     elif algorithm == "psro":
         from soku_rl.marl.psro import train_psro as train
         dependencies = ["open-spiel", "stable-baselines3", "cvxpy"]
     elif algorithm == "ippo":
-        from soku_rl.marl.benchmarl_training import train_benchmarl as train
-        dependencies = ["torchrl", "tensordict", "benchmarl"]
+        from soku_rl.marl.ippo import train_ippo as train
+        dependencies = ["stable-baselines3"]
     elif algorithm == "ppo":
         from soku_rl.rl.training import train_ppo as train
         dependencies = ["stable-baselines3"]
@@ -55,9 +55,7 @@ def main(cfg: DictConfig):
         raise ValueError("fixed-rule PPO requires state observations; image self-play uses IPPO or PSRO")
     if learning.health_potential_scale:
         parameters = config["algorithm"]
-        discount = (parameters["agent"]["discount_factor"] if algorithm == "nfsp" else
-                    parameters["experiment"]["gamma"] if algorithm == "ippo" else
-                    parameters["response"]["ppo"]["gamma"] if algorithm == "psro" else
+        discount = (parameters["response"]["ppo"]["gamma"] if algorithm == "psro" else
                     parameters["ppo"]["gamma"])
         if discount != 1.:
             raise ValueError("the finite-horizon health potential requires gamma=1")
@@ -86,15 +84,12 @@ def main(cfg: DictConfig):
     started = time.perf_counter()
     report = {"success": False, "algorithm": algorithm}
     try:
-        if algorithm == "ippo":
-            report["result"] = train(config, device, destination)
-        else:
-            with closing(WorkerBackend(log_path=destination / "worker.log", **config["runtime"])) as backend:
-                backend.configure_observation(episode.backend_observation())
-                identity["runtime"] = backend.identity
-                (destination / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
-                env = LearningVectorEnv(TwoPlayerVectorEnv(backend, config["num_envs"], episode), learning)
-                report["result"] = train(env, config["algorithm"], device, config["seed"], destination)
+        with closing(WorkerBackend(log_path=destination / "worker.log", **config["runtime"])) as backend:
+            backend.configure_observation(episode.backend_observation())
+            identity["runtime"] = backend.identity
+            (destination / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
+            env = LearningVectorEnv(TwoPlayerVectorEnv(backend, config["num_envs"], episode), learning)
+            report["result"] = train(env, config["algorithm"], device, config["seed"], destination)
         report["success"] = True
     except BaseException as error:
         report["error"] = repr(error)

@@ -1,4 +1,5 @@
 defaults:
+  - rl: ppo
   - algorithm: nfsp
   - rules: default
   - wrappers: raw

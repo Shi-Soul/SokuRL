@@ -18,7 +18,8 @@ def completed_policies(directory):
     candidate = {"name": directory.name}
     for seat in ("player_0", "player_1"):
         spec = {"training_config": str(config_path)}
-        if algorithm["name"] == "ppo":
+        shared = report["result"].get("format") == "sokurl-shared-ppo-v1"
+        if algorithm["name"] == "ppo" or shared:
             kinds = {"mlp": "sb3", "lstm": "sb3_recurrent"}
             spec.update(kind=kinds[algorithm["policy_type"]], path=str(directory / seat / "final.zip"))
         elif algorithm["name"] == "nfsp":

@@ -9,10 +9,11 @@ import torch
 from torch import nn
 
 from soku_rl.policy.contract import read_training_contract
+from soku_rl.policy.base import RLPolicy
 from soku_rl.policy.population import PPOPolicy, UniformPolicy, MixturePolicy
 
 
-class NetworkPolicy:
+class NetworkPolicy(RLPolicy):
     def __init__(self, name, network, shape, num_actions, identity, device):
         self.name, self.shape, self.device = name, tuple(shape), device
         self.network = network.to(device).eval()

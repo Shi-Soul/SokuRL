@@ -6,9 +6,10 @@ from pathlib import Path
 import numpy as np
 
 from soku_rl.policy.contract import read_training_contract
+from soku_rl.policy.base import RLPolicy
 
 
-class OnnxPolicy:
+class OnnxPolicy(RLPolicy):
     def __init__(self, name, manifest_path, interface):
         import onnxruntime as ort
 

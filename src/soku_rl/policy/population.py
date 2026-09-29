@@ -6,10 +6,11 @@ import numpy as np
 import torch
 
 from soku_rl.env.encoding import AGENTS
+from soku_rl.policy.base import Policy, RLPolicy, RulePolicy
 
 
 @dataclass(frozen=True)
-class UniformPolicy:
+class UniformPolicy(RulePolicy):
     name: str
     num_actions: int
 
@@ -30,7 +31,7 @@ class UniformEpisode:
         return int(self.rng.integers(self.num_actions))
 
 
-class PPOPolicy:
+class PPOPolicy(RLPolicy):
     def __init__(self, name, model, path):
         self.name, self.model, self.path = name, model, path
         self.model.policy.set_training_mode(False)
@@ -54,7 +55,7 @@ class PPOEpisode:
         return int(self.rng.choice(len(probabilities), p=probabilities))
 
 
-class MixturePolicy:
+class MixturePolicy(Policy):
     """Select one frozen population member for the whole episode."""
     def __init__(self, name, members, probabilities, identity):
         weights = np.asarray(probabilities, dtype=np.float64)

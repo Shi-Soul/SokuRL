@@ -102,7 +102,7 @@ def test_sb3_image_view_keeps_terminal_observation_before_reset(tmp_path):
     pytest.importorskip("stable_baselines3")
     from stable_baselines3 import PPO
     from soku_rl.policy.population import UniformPolicy
-    from soku_rl.rl.response import OpponentMixtureVecEnv
+    from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
     from soku_rl.policy.checkpoint import load_policy
     from test_policy_artifacts import training_config
     env = LearningVectorEnv(TwoPlayerVectorEnv(ImageBackend(), 1, episode()), learning())

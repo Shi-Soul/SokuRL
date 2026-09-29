@@ -11,42 +11,11 @@ from stable_baselines3.common.logger import configure
 from soku_rl.policy.rules.observed_rules import RulePolicy
 from soku_rl.policy.rules.strategies import rule_implementation
 from soku_rl.env.wrappers.learning import LearningRulePolicy
-from soku_rl.rl.response import OpponentMixtureVecEnv
+from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
 from soku_rl.policy.contract import read_training_contract
 
 
-def parameter_hash(policy):
-    digest = hashlib.sha256()
-    for name, parameter in sorted(policy.named_parameters()):
-        digest.update(name.encode())
-        digest.update(parameter.detach().cpu().contiguous().numpy().tobytes())
-    return digest.hexdigest()
-
-
-def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
-    if source == {"kind": "fresh"}:
-        return algorithm(policy_type, env, seed=seed, device=device, **config["ppo"]), source
-    if set(source) != {"kind", "path", "training_config"} or source["kind"] not in {"checkpoint", "weights"}:
-        raise ValueError("initial policy must be fresh, a training checkpoint, or policy weights")
-    previous = read_training_contract(source["training_config"], interface)["algorithm"]
-    if any(previous[key] != config[key] for key in ("name", "policy_type", "timeout_payoff")):
-        raise ValueError("PPO initialization requires the same policy type and payoff")
-    if source["kind"] == "checkpoint" and previous["ppo"] != config["ppo"]:
-        raise ValueError("continued PPO must retain its algorithm and optimizer configuration")
-    path = Path(source["path"]).resolve(strict=True)
-    if source["kind"] == "weights":
-        if previous["ppo"]["policy_kwargs"] != config["ppo"]["policy_kwargs"]:
-            raise ValueError("policy weights require the same network architecture")
-        initial = algorithm.load(path, device=device)
-        source_steps = initial.num_timesteps
-        model = algorithm(policy_type, env, seed=seed, device=device, **config["ppo"])
-        model.policy.load_state_dict(initial.policy.state_dict(), strict=True)
-    else:
-        model = algorithm.load(path, env=env, device=device)
-        model.set_random_seed(seed)
-        source_steps = model.num_timesteps
-    return model, source | {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-                            "source_steps": source_steps}
+from soku_rl.rl.ppo import initialize_ppo, parameter_hash, create_ppo
 
 
 class EpisodeRecords(BaseCallback):
@@ -68,13 +37,6 @@ class EpisodeRecords(BaseCallback):
 
 
 def train_ppo(env, config, device, seed, directory):
-    if config["policy_type"] == "lstm":
-        from sb3_contrib import RecurrentPPO
-        algorithm, policy_type = RecurrentPPO, "MlpLstmPolicy"
-    elif config["policy_type"] == "mlp":
-        algorithm, policy_type = PPO, "MlpPolicy"
-    else:
-        raise ValueError("PPO policy_type must be mlp or lstm")
     if config["timeout_payoff"] != "zero_at_horizon":
         raise ValueError("PPO requires the declared finite-horizon payoff")
     if config["players"] != [0, 1]:
@@ -94,7 +56,7 @@ def train_ppo(env, config, device, seed, directory):
         destination.mkdir()
         view = OpponentMixtureVecEnv(env, player, opponents, weights, seed + player)
         try:
-            model, source = initialize_ppo(algorithm, policy_type, view, env.interface, config,
+            model, source = create_ppo(view, env.interface, config,
                 config["initial_policies"][f"player_{player}"], device, seed + player)
             model.set_logger(configure(str(destination / "scalars"), ["csv", "stdout"]))
             initial = parameter_hash(model.policy)
