@@ -9,6 +9,10 @@ from omegaconf import OmegaConf
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="benchmark")
 def main(cfg):
+    run(cfg)
+
+
+def run(cfg):
     import torch
     from soku_rl.checkpoint_policy import SeatPolicies, load_policy
     from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
