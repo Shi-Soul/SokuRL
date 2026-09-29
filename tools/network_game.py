@@ -141,6 +141,13 @@ class NetworkGame:
                 "scores": snapshot.scores, "phase": self.lifecycle.phase,
                 "events": tuple(asdict(event) for event in events)}
             if snapshot.in_battle:
+                record["characters"] = (snapshot.raw.p1.characterId, snapshot.raw.p2.characterId)
+                if self.settings["automate_menu"]:
+                    seat = ("host", "join").index(self.settings["role"])
+                    expected = (1, 0)[seat]
+                    if record["characters"][seat] != expected:
+                        raise RuntimeError(f"AI character differs from training: seat={seat}, "
+                                           f"expected={expected}, actual={record['characters'][seat]}")
                 record["battle_mode"] = snapshot.raw.battleMode
                 record["battle_submode"] = snapshot.raw.battleSubMode
                 record["engine_inputs"] = tuple(
