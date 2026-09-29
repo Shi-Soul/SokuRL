@@ -1,0 +1,7 @@
+# @package _global_
+play_rule: rush
+candidate:
+  name: ${play_rule}
+  policy:
+    kind: rule
+    name: ${play_rule}

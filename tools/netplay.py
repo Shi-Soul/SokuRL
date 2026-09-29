@@ -1,5 +1,5 @@
 """Run a local policy while its worker owns one real network game."""
-from contextlib import ExitStack, closing
+from contextlib import ExitStack
 from dataclasses import asdict
 import gzip
 import json
@@ -14,6 +14,8 @@ from soku_rl.env import EpisodeConfig
 from soku_rl.learning_wrappers import LearningConfig, LearningInterface
 from soku_rl.network_session import run_session
 from soku_rl.worker_pipe import WorkerConnection
+from soku_rl.play_policy import load_play_policy
+from network_launch import start_games
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="netplay")
@@ -24,24 +26,20 @@ def main(cfg):
         raise ValueError("the network bridge requires public state, decision_frames=3 and latency_frames=5")
     if config["network"]["role"] not in ("host", "join"):
         raise ValueError("network role must be host or join")
-    if config["human"]["enabled"] and config["network"]["role"] != "host":
-        raise ValueError("local human play requires the AI to host")
-    seat = ("host", "join").index(config["network"]["role"])
+    if config["human"]["enabled"]:
+        if type(config["human"]["seat"]) is not int or config["human"]["seat"] not in (1, 2):
+            raise ValueError("human.seat must be 1 or 2")
+        seat = 2-config["human"]["seat"]
+        config["network"]["role"] = ("host", "join")[seat]
+        cfg.network.role = config["network"]["role"]
+    else:
+        seat = ("host", "join").index(config["network"]["role"])
     interface = LearningInterface(episode, LearningConfig(**config["wrappers"]))
     if (type(config["session"]["matches"]) is not int or config["session"]["matches"] < 1
             or config["session"]["timeout"] <= 0):
         raise ValueError("positive match count and session timeout are required")
     spec = config["candidate"]["policy"]
-    if spec["kind"] == "onnx_recurrent":
-        from soku_rl.onnx_policy import OnnxPolicy
-        if config["device"] != "cpu":
-            raise ValueError("the deployment model requires device=cpu")
-        policy = OnnxPolicy(config["candidate"]["name"], spec["path"], interface)
-    else:
-        import torch
-        from soku_rl.checkpoint_policy import load_policy
-        torch.set_num_threads(1)
-        policy = load_policy(config["candidate"]["name"], spec, interface, torch.device(config["device"]))
+    policy = load_play_policy(config["candidate"], interface, config["rules"], config["device"], seat)
     # Initialize model kernels before the original engine starts its frame clock.
     warm = policy.spawn(config["seed"])
     for _ in range(8):
@@ -56,26 +54,15 @@ def main(cfg):
     started = time.monotonic()
     try:
         with ExitStack() as stack:
-            connection = stack.enter_context(closing(WorkerConnection(log_path=directory / "worker.log", **config["runtime"])))
-            if connection.identity["kind"] != "network":
-                raise ValueError("netplay requires the dedicated network worker")
+            connection, games = start_games(stack, config, asdict(episode.visibility), directory, WorkerConnection)
+            report.update(games)
             (directory / "runtime.json").write_text(json.dumps(connection.identity, indent=2), encoding="utf-8")
-            report["game"] = connection.request("start", {"network": config["network"],
-                                                        "visibility": asdict(episode.visibility)})
-            (directory / "game.json").write_text(json.dumps(report["game"], indent=2), encoding="utf-8")
+            for key, game in games.items():
+                (directory / f"{key.replace('_', '-')}.json").write_text(json.dumps(game, indent=2), encoding="utf-8")
             if config["human"]["enabled"]:
-                connection.request("set_caption", {"caption": "SokuRL - AI"})
-                connection.request("wait_host", {})
-                human_runtime = config["runtime"] | {"mute_audio": config["human"]["mute_audio"]}
-                human = stack.enter_context(closing(WorkerConnection(log_path=directory / "human-worker.log", **human_runtime)))
-                human_settings = config["network"] | {"role": "join", "address": "127.0.0.1",
-                                                     "automate_menu": config["human"]["automate_menu"]}
-                report["human_game"] = human.request("start", {"network": human_settings,
-                                                               "visibility": asdict(episode.visibility)})
-                (directory / "human-game.json").write_text(json.dumps(report["human_game"], indent=2), encoding="utf-8")
-                connection.request("watch_local_peer", {"pid": report["human_game"]["pid"]})
-                human.request("set_caption", {"caption": "SokuRL - Player"})
-                print(f"玩家窗口 SokuRL - Player 已启动。请在该窗口中选人并操作；推理设备：{config['device']}。", flush=True)
+                character = "魔理沙" if seat == 0 else "灵梦"
+                print(f"玩家：{config['human']['seat']}P，窗口 SokuRL - Player；"
+                      f"AI：{seat+1}P {character}，策略 {policy.name}；推理设备：{config['device']}。", flush=True)
             with gzip.open(directory / "events.jsonl.gz", "wt", encoding="utf-8") as events:
                 def record(value):
                     events.write(json.dumps({"seconds": time.monotonic()-started, **value})+"\n")

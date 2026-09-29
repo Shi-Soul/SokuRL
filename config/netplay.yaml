@@ -8,6 +8,7 @@ candidate:
 device: cpu
 human:
   enabled: false
+  seat: 2
   automate_menu: false
   mute_audio: false
 network:
