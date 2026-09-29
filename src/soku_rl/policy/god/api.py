@@ -240,6 +240,8 @@ class ScriptAPI:
         distance, centre = 10000, 10000
         for obj in enemy["objects"]:
             centre = min(centre, int(abs(float_difference(own["x"], obj["x"]))))
+            if len(obj["attackarea"]) >= 16:
+                continue
             for left, _, right, _ in obj["attackarea"]:
                 # is_bullethit assigns 1 directly for an enclosing box. A
                 # preceding zero distance must not survive that assignment.

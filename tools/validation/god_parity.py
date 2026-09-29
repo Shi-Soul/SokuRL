@@ -105,7 +105,10 @@ def main(config):
     report = {"package": package.fingerprint, "original_package": package.original_fingerprint,
               "repairs": {name: value.decode("ascii") for name, value in package.repairs.items()},
               "reader_repairs": ["Initialize new object floats to zero before the original read filter.",
-                                 "Use packaged 0.93 collision conversion order and hit-box flags."],
+                                 "Use packaged 0.93 collision conversion order and hit-box flags.",
+                                 "Use packaged 0.93 Patchouli image 0x1B4 and lifetime 601.",
+                                 "Use packaged 0.93 zero-extended 16-bit special fields 22 and 23.",
+                                 "Skip attack boxes for projectile distance when their count is 16."],
               "reference_sha256": hashlib.sha256(Path(config.validation.reference_library).read_bytes()).hexdigest(),
               "bridge_sha256": hashlib.sha256((sokurl.GAME_DIR / "modules/SokuRLBridge/SokuRLBridge.dll").read_bytes()).hexdigest(),
               "results": []}

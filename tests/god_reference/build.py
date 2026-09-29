@@ -45,6 +45,11 @@ def generate(upstream, output):
                 b"box.left = x + static_cast<double>(box.left); box.right = x + static_cast<double>(box.right);"
                 b"box.top = -y + static_cast<double>(box.top); box.bottom = -y + static_cast<double>(box.bottom); }\n")
         if name == "character.cpp":
+            source = source.replace(b"object[i].img_no!=0x1B3", b"object[i].img_no!=0x1B4")
+            source = source.replace(b"361 - object[i].frame", b"601 - object[i].frame")
+            for field in (b"DROPWATERTIMEOFS", b"RYUUSEIOFS"):
+                marker = b"ReadProcessMemory(ph, base_addr+ADDR_" + field + b", mini);\n\t\t\tdata = mini;"
+                source = source.replace(marker, marker.replace(b"data = mini;", b"data = static_cast<unsigned short>(mini);"))
             # MSVC accepts false as a null pointer constant; GCC requires 0.
             signature = b"const Obj *Character::GetOptionObject("
             before, after = source.split(signature)
@@ -54,7 +59,11 @@ def generate(upstream, output):
     for signature in (b"int GetPlayerAddr(", b"int is_CardUse(", b"short GetCardId(", b"int GetCardCost(", b"int GetCardCost2(",
                       b"char GetSkillLv(", b"int GetSpecialData(", b"int get_correction(",
                       b"void is_bullethit("):
-        parts.append(function(main, signature))
+        body = function(main, signature)
+        if signature == b"void is_bullethit(":
+            body = body.replace(b"BOOST_FOREACH(const Box &box, obj.attackarea)",
+                                b"if(obj.attackarea.size() >= 16) continue;\nBOOST_FOREACH(const Box &box, obj.attackarea)")
+        parts.append(body)
     keys = (upstream / "key_manager.cpp").read_bytes()
     parts.append((upstream / "keybd_event.h").read_bytes())
     parts.append(b"KeybdEvent keyboard; int key[10]={0,1,2,3,4,5,6,7,8,9}; char on[10]={};")

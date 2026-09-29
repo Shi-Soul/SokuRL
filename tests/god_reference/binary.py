@@ -38,6 +38,7 @@ class BinaryReference:
         self.cpu.mem_write(0x610000, b"\xc2\x04\x00")
         self.write(0x600000, "2I", 0x610000, 0x610000)
         self.write(0x44E084, "I", 0x610100)  # ReadProcessMemory import slot.
+        self.write(0x466334, "2B", 1, 0)  # is_soku=true, is_swr=false.
         header = Path(address_header).read_bytes()
         names = re.search(rb"enum\s*\{(.*?)ADDR_MAX", header, re.S).group(1)
         names = re.findall(rb"\b[A-Z][A-Z0-9_]+\b", names)
@@ -45,8 +46,7 @@ class BinaryReference:
         self.addresses = {i: int(values[name], 16) for i, name in enumerate(names) if name in values}
         self.callbacks = {0x42A790: self.address, 0x610100: self.read_memory,
                           0x401240: self.lua_count, 0x401770: self.lua_is_number,
-                          0x401A20: self.lua_integer, 0x401DC0: self.lua_push,
-                          0x4269C0: self.object_pointer}
+                          0x401A20: self.lua_integer, 0x401DC0: self.lua_push}
         for address in self.callbacks:
             self.cpu.hook_add(UC_HOOK_CODE, self.dispatch, begin=address, end=address)
 
@@ -96,12 +96,9 @@ class BinaryReference:
         self.lua_results.append(self.read(stack + 8, "d")[0])
         self.return_value(0, 0)
 
-    def object_pointer(self):
-        index, = self.arguments(1)
-        self.return_value(0x602000 if index == 0 else 0, 4)
-
     def object_values(self, game_address):
         self.entity(game_address)
+        self.write(0x4667C0 + 0x280, "2I", 0x602000, 0x602238)
         self.lua_arguments, self.lua_results = (0, 0), []
         count = self.call(0x425590, 0, (0,))
         if count != len(self.lua_results):
@@ -109,8 +106,14 @@ class BinaryReference:
         return tuple(self.lua_results)
 
     def option_xy(self, character, objects, index):
-        player, start, stride = 0x603000, 0x604000, 0x238
+        player = 0x603000
         self.write(player + 0x254, "I", character)
+        self.set_objects(player, objects)
+        result = self.call(0x426A00, player, (index & 0xFFFFFFFF,))
+        return self.read(result + 8, "2f") if result else ()
+
+    def set_objects(self, player, objects):
+        start, stride = 0x604000, 0x238
         self.write(player + 0x280, "2I", start, start + stride * len(objects))
         for i, obj in enumerate(objects):
             target = start + i * stride
@@ -119,8 +122,27 @@ class BinaryReference:
             self.write(target + 26, "h", obj["act"])
             self.write(target + 32, "i", obj["img"])
             self.write(target + 42, "b", obj["attackarea_n"])
-        result = self.call(0x426A00, player, (index & 0xFFFFFFFF,))
-        return self.read(result + 8, "2f") if result else ()
+            self.write(target + 28, "i", obj["frame"])
+            self.write(target + 36, "i", obj["hp"])
+            for index, box in enumerate(obj["attackarea"]):
+                self.write(target + 300 + index * 16, "4i", *box)
+
+    def special(self, game_address, character, objects):
+        player = 0x603000
+        self.write(player + 4, "I", game_address)
+        self.write(player + 0x254, "I", character)
+        self.set_objects(player, objects)
+        result = []
+        for index in range(28):
+            value = self.call(0x42C530, player, (index,))
+            result.append((value + 2**31) % 2**32 - 2**31)
+        return tuple(result)
+
+    def projectile_distance(self, x, objects):
+        self.write(0x4667C0 + 8, "f", x)
+        self.set_objects(0x466468, objects)
+        self.call(0x429FA0, 0, ())
+        return self.read(0x46645C, "2i")
 
     def call(self, function, this, arguments):
         self.write(0x708000, "I" * (len(arguments) + 1), 0x611000, *arguments)
