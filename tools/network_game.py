@@ -107,6 +107,20 @@ class NetworkGame:
                 raise RuntimeError(f"network game blocked by dialogs: {dialogs}")
             self.next_dialog_check = now+2
 
+    def wait_host(self):
+        if self.settings["role"] != "host":
+            raise ValueError("only a host can wait for its listening socket")
+        deadline = time.monotonic()+self.timeout
+        while time.monotonic() < deadline:
+            if self.process.poll() is not None:
+                raise EOFError("network host exited before listening")
+            if any(connection.laddr.port == self.settings["port"]
+                   for connection in self.process.net_connections(kind="udp")):
+                return {"pid": self.process.pid, "port": self.settings["port"]}
+            self._check_dialogs()
+            time.sleep(.05)
+        raise TimeoutError("network host did not open its UDP socket")
+
     def poll(self):
         if self.process.poll() is not None:
             raise EOFError("owned network game exited")

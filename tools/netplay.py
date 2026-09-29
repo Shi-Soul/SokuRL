@@ -1,5 +1,5 @@
 """Run a local policy while its worker owns one real network game."""
-from contextlib import closing
+from contextlib import ExitStack, closing
 from dataclasses import asdict
 import gzip
 import json
@@ -24,6 +24,8 @@ def main(cfg):
         raise ValueError("the network bridge requires public state, decision_frames=3 and latency_frames=5")
     if config["network"]["role"] not in ("host", "join"):
         raise ValueError("network role must be host or join")
+    if config["human"]["enabled"] and config["network"]["role"] != "host":
+        raise ValueError("local human play requires the AI to host")
     seat = ("host", "join").index(config["network"]["role"])
     interface = LearningInterface(episode, LearningConfig(**config["wrappers"]))
     if (type(config["session"]["matches"]) is not int or config["session"]["matches"] < 1
@@ -52,20 +54,35 @@ def main(cfg):
               "seat": seat, "wins_required": 2}
     started = time.monotonic()
     try:
-        with closing(WorkerConnection(log_path=directory / "worker.log", **config["runtime"])) as connection:
+        with ExitStack() as stack:
+            connection = stack.enter_context(closing(WorkerConnection(log_path=directory / "worker.log", **config["runtime"])))
             if connection.identity["kind"] != "network":
                 raise ValueError("netplay requires the dedicated network worker")
             (directory / "runtime.json").write_text(json.dumps(connection.identity, indent=2), encoding="utf-8")
             report["game"] = connection.request("start", {"network": config["network"],
                                                         "visibility": asdict(episode.visibility)})
             (directory / "game.json").write_text(json.dumps(report["game"], indent=2), encoding="utf-8")
+            if config["human"]["enabled"]:
+                connection.request("wait_host", {})
+                human_runtime = config["runtime"] | {"mute_audio": config["human"]["mute_audio"]}
+                human = stack.enter_context(closing(WorkerConnection(log_path=directory / "human-worker.log", **human_runtime)))
+                human_settings = config["network"] | {"role": "join", "address": "127.0.0.1",
+                                                     "automate_menu": config["human"]["automate_menu"]}
+                report["human_game"] = human.request("start", {"network": human_settings,
+                                                               "visibility": asdict(episode.visibility)})
+                (directory / "human-game.json").write_text(json.dumps(report["human_game"], indent=2), encoding="utf-8")
+                print("人类玩家窗口已启动。请在后打开的窗口中选人并操作；AI 使用本机 CPU。", flush=True)
             with gzip.open(directory / "events.jsonl.gz", "wt", encoding="utf-8") as events:
                 def record(value):
                     events.write(json.dumps({"seconds": time.monotonic()-started, **value})+"\n")
                     if value["kind"] != "frame" or value["events"]:
                         events.flush()
                     if value["kind"] == "frame" and value["events"]:
-                        print(json.dumps(value), flush=True)
+                        for event in value["events"]:
+                            if event["kind"] == "round_started":
+                                print(f"第 {event['match']} 场，第 {event['round']+1} 局开始。", flush=True)
+                            elif event["kind"] == "match_finished":
+                                print(f"本场结束，比分 {event['scores'][0]}:{event['scores'][1]}。", flush=True)
                 report["result"] = run_session(connection, policy, interface, seat, config["seed"],
                     config["session"]["matches"], config["session"]["timeout"], record)
         report["success"] = True

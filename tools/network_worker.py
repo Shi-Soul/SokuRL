@@ -28,6 +28,8 @@ def main():
                     value = {"pid": game.process.pid}
                 elif operation == "poll" and game is not None:
                     value = game.poll()
+                elif operation == "wait_host" and game is not None:
+                    value = game.wait_host()
                 elif operation == "submit" and game is not None:
                     value = game.submit(**payload)
                 elif operation == "close":

@@ -6,6 +6,10 @@ candidate:
   name: learned
   policy: ???
 device: cpu
+human:
+  enabled: false
+  automate_menu: false
+  mute_audio: false
 network:
   role: host
   address: 127.0.0.1

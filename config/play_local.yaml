@@ -1,0 +1,17 @@
+defaults:
+  - netplay
+  - override wrappers: learning
+  - _self_
+
+device: cpu
+human:
+  enabled: true
+network:
+  role: host
+  address: 127.0.0.1
+  automate_menu: true
+runtime:
+  mute_audio: true
+session:
+  matches: 100
+  timeout: 7200.0
