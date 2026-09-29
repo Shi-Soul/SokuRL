@@ -46,10 +46,13 @@ def parameter_hash(policy):
 
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
     parameters = dict(config["ppo"])
-    architecture = dict(parameters.get("policy_kwargs", {}))
+    architecture = dict(parameters["policy_kwargs"])
     if "features_extractor_class" in architecture:
         architecture["features_extractor_class"] = get_class(architecture["features_extractor_class"])
     parameters["policy_kwargs"] = architecture
+    if algorithm is PPO and interface.episode.observation_mode == "privileged_state":
+        from soku_rl.rl.buffers import PackedRolloutBuffer
+        parameters["rollout_buffer_class"] = PackedRolloutBuffer
     if source == {"kind": "fresh"}:
         return algorithm(policy_type, env, seed=seed, device=device, **parameters), source
     if set(source) != {"kind", "path", "training_config"} or source["kind"] not in {"checkpoint", "weights"}:

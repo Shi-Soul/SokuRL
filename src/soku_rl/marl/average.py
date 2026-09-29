@@ -2,6 +2,7 @@
 import numpy as np
 import torch
 from stable_baselines3.common.callbacks import BaseCallback
+from soku_rl.rl.storage import PackedObservation
 
 
 class AveragePolicy:
@@ -17,7 +18,7 @@ class AveragePolicy:
     def add(self, observations, actions):
         for observation, action in zip(observations, actions, strict=True):
             self.seen += 1
-            sample = (observation.copy(), int(action))
+            sample = (PackedObservation.pack(observation), int(action))
             if len(self.samples) < self.config["capacity"]:
                 self.samples.append(sample)
             else:
@@ -34,7 +35,7 @@ class AveragePolicy:
         for _ in range(self.config["updates"]):
             indices = self.rng.choice(len(self.samples), self.config["batch_size"], replace=False)
             samples = [self.samples[index] for index in indices]
-            observations, _ = policy.obs_to_tensor(np.stack([sample[0] for sample in samples]))
+            observations, _ = policy.obs_to_tensor(np.stack([sample[0].unpack() for sample in samples]))
             actions = torch.as_tensor([sample[1] for sample in samples], device=self.model.device)
             _, log_probs, _ = policy.evaluate_actions(observations, actions)
             loss = -log_probs.mean()
@@ -55,6 +56,10 @@ class AveragePolicy:
 
     def restore(self, state):
         self.samples, self.seen, self.updates = state["samples"], state["seen"], state["updates"]
+        # Version 1 checkpoints stored raw NumPy arrays. Migrate their storage
+        # once, keeping the sample order and reservoir random state unchanged.
+        self.samples = [(PackedObservation.pack(value) if isinstance(value, np.ndarray) else value, action)
+                        for value, action in self.samples]
         if len(self.samples) > self.config["capacity"] or self.seen < len(self.samples):
             raise ValueError("invalid NFSP reservoir checkpoint")
         self.rng.bit_generator.state = state["rng"]
