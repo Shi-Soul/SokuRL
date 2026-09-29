@@ -3,7 +3,7 @@
 #include <cmath>
 
 namespace SokuRLBridge {
-constexpr unsigned RENDER_OBJECTS_PER_PLAYER = 64;
+constexpr unsigned RENDER_OBJECTS_PER_PLAYER = 1024;
 #pragma pack(push, 4)
 struct RenderEntity {
     float x;

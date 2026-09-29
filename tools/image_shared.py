@@ -49,7 +49,7 @@ class ImageClient:
                 last = ctypes.c_int32.from_address(self.view + 8).value
                 magic, version, sequence, result, captured, width, height, _, _ = HEADER.unpack_from(data)
                 if first == last == sequence:
-                    if magic != 0x474D4953 or version != 2 or (width, height) != (WIDTH, HEIGHT):
+                    if magic != 0x474D4953 or version != 3 or (width, height) != (WIDTH, HEIGHT):
                         raise RuntimeError("unsupported native image mapping")
                     pending_reset = captured == 2**64 - 1 and result == -2147483638  # E_PENDING
                     if captured > frame and not pending_reset:

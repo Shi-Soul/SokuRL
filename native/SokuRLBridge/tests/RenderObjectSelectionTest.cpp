@@ -21,7 +21,10 @@ int main() {
     }
     require(state.counts[1] == 27 && !state.overflow, "transparent or undrawable objects consumed capacity");
     for (unsigned i = 27; i < 65; ++i) captureRenderObject(state, {float(i), 100, 1, 1, 1}, 1);
-    require(state.overflow && state.counts[1] == 64, "real visible overflow was hidden");
+    require(!state.overflow && state.counts[1] == 65, "private metadata was limited by model slots");
+    for (unsigned i = 65; i <= RENDER_OBJECTS_PER_PLAYER; ++i)
+        captureRenderObject(state, {32, 100, 1, 1, 1}, 1);
+    require(state.overflow && state.counts[1] == RENDER_OBJECTS_PER_PLAYER, "real capture overflow was hidden");
     captureRenderObject(state, {std::numeric_limits<float>::quiet_NaN(), 100, 1, 1, 1}, 0);
     require(state.counts[0] == 1 && std::isnan(state.objects[0][0].x), "invalid geometry was silently dropped");
 }

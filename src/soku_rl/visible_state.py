@@ -1,11 +1,11 @@
 """Encode public screen positions and quantized gauges without engine action IDs."""
 from dataclasses import dataclass
 
-from .render_state import MAX_OBJECTS
 from .visibility import visible_entities, quantize_gauge, quantize_spirit
 
 
-STATE_FEATURES = 2 * 8 + 2 * MAX_OBJECTS * 3
+OBJECT_SLOTS = 64
+STATE_FEATURES = 2 * 8 + 2 * OBJECT_SLOTS * 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,8 +41,10 @@ def _encode(raw, poses, objects, player, config):
         values.extend((float(pose.visible), pose.x / 640, pose.y / 480, float(pose.facing),
                        1., hp, spirit, fighter.characterId / 19))
     for index in (player, 1 - player):
-        visible = objects[index]
+        # Visibility uses every captured contour before limiting public slots.
+        # Keep the existing screen-coordinate ordering and model input shape.
+        visible = objects[index][:OBJECT_SLOTS]
         for entity in visible:
             values.extend((1., entity.x / 640, entity.y / 480))
-        values.extend([0.] * ((MAX_OBJECTS - len(visible)) * 3))
+        values.extend([0.] * ((OBJECT_SLOTS - len(visible)) * 3))
     return StateObservation(int(raw.frameId), tuple(values))

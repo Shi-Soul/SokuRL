@@ -21,6 +21,7 @@ def decode_input_event(data):
 
 
 class NetworkInputEventsClient(NetworkHistoryReader):
+    version = 1
     mapping = "NetworkInputEvents"
     magic = 0x454E4B53
     entry_size = EVENT.size

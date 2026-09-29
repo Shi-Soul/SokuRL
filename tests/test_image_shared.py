@@ -15,7 +15,7 @@ def test_reset_pending_image_is_not_a_future_frame(monkeypatch):
     client.view = ctypes.addressof(buffer)
 
     def publish(sequence, result, frame):
-        data = HEADER.pack(0x474D4953, 2, sequence, result, frame, 320, 240, 640, 480)
+        data = HEADER.pack(0x474D4953, 3, sequence, result, frame, 320, 240, 640, 480)
         ctypes.memmove(client.view, data, len(data))
 
     publish(2, -2147483638, 2**64 - 1)

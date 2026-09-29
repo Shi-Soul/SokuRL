@@ -80,7 +80,7 @@ bool initializeImageCapture(bool pixels)
     }
     std::memset(image, 0, sizeof(*image));
     image->magic = 0x474D4953;
-    image->version = 2;
+    image->version = 3;
     image->result = E_PENDING;
     image->frame = UINT64_MAX;
     image->width = IMAGE_WIDTH;

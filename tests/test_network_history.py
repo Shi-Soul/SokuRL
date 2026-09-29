@@ -24,7 +24,7 @@ def test_history_wrap_and_overrun():
 
 def test_reads_round_and_match_records_in_order():
     memory = ctypes.create_string_buffer(SIZE)
-    HEADER.pack_into(memory, 0, MAGIC, 1, SIZE, CAPACITY, 4, 1, 258)
+    HEADER.pack_into(memory, 0, MAGIC, 2, SIZE, CAPACITY, 4, 1, 258)
     states = [snapshot(13, 1, 1000, 0, (1, 0)), snapshot(13, 1, 1100, 1, (1, 0)),
               snapshot(8, 1, 1200, 1, (2, 0)), snapshot(13, 2, 1, 0, (0, 0))]
     for index, state in zip((254, 255, 0, 1), states):

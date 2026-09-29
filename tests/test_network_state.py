@@ -15,14 +15,14 @@ def snapshot(scene, match, frame, round_id, scores):
     raw = RawFrameState()
     raw.frameId, raw.segmentId, raw.sceneId, raw.roundId = frame, match, scene, round_id
     raw.stateHash = calculate_state_hash(raw)
-    header = HEADER.pack(MAGIC, 1, MAPPING_SIZE, 2, 1, scene, match, 0, frame, *scores)
+    header = HEADER.pack(MAGIC, 2, MAPPING_SIZE, 2, 1, scene, match, 0, frame, *scores)
     return header + bytes(raw) + bytes(RENDER_STATE_SIZE)
 
 
 def test_network_mapping_layout():
     assert HEADER.size == 48
     assert ctypes.sizeof(RawFrameState) == 10596
-    assert MAPPING_SIZE == 13272
+    assert MAPPING_SIZE == 51672
 
 
 def test_round_result_does_not_end_network_match():

@@ -34,7 +34,7 @@ def decode_network_state(data):
     if len(data) != MAPPING_SIZE:
         raise ValueError("invalid network mapping length")
     magic, version, size, sequence, connected, scene, match, seat, updates, left, right = HEADER.unpack_from(data)
-    if (magic, version, size) != (MAGIC, 1, MAPPING_SIZE):
+    if (magic, version, size) != (MAGIC, 2, MAPPING_SIZE):
         raise ValueError("unsupported network mapping ABI")
     if sequence & 1 or connected not in (0, 1) or seat not in (0, 1, 0xFFFFFFFF):
         raise ValueError("invalid network mapping header")

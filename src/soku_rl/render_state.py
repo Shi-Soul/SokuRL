@@ -5,7 +5,7 @@ import struct
 from .pixels import RGBFrame
 
 
-MAX_OBJECTS = 64
+MAX_OBJECTS = 1024
 CAMERA = struct.Struct("<fffI")
 ENTITY = struct.Struct("<fffiI")
 COUNTS = struct.Struct("<III")

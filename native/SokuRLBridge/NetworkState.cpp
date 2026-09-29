@@ -49,7 +49,7 @@ bool initializeNetworkState()
     }
     *g_state = {};
     g_state->magic = 0x54454E53;
-    g_state->version = 1;
+    g_state->version = 2;
     g_state->size = sizeof(NetworkState);
     g_state->connected = 1;
     g_state->localSeat = UINT32_MAX;
@@ -65,7 +65,7 @@ bool initializeNetworkState()
     }
     // A newly created page-file mapping is already zero-filled.
     g_history->magic = 0x484E4B53;
-    g_history->version = 1;
+    g_history->version = 2;
     g_history->size = sizeof(NetworkHistory);
     g_history->capacity = HISTORY_CAPACITY;
     g_history->alive = 1;

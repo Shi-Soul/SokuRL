@@ -15,7 +15,7 @@ struct NetworkState {
 };
 #pragma pack(pop)
 static_assert(offsetof(NetworkState, raw) == 48, "network header layout");
-static_assert(sizeof(NetworkState) == 13272, "network state layout");
+static_assert(sizeof(NetworkState) == 51672, "network state layout");
 
 bool initializeNetworkState();
 void closeNetworkState();

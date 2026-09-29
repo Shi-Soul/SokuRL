@@ -38,7 +38,7 @@ class NetworkHistoryReader:
             kernel.CloseHandle(self.handle)
             self.handle = None
             raise OSError(error, "cannot map network history")
-        if struct.unpack("<4I", ctypes.string_at(self.view, 16)) != (self.magic, 1, size, CAPACITY):
+        if struct.unpack("<4I", ctypes.string_at(self.view, 16)) != (self.magic, self.version, size, CAPACITY):
             self.close()
             raise ValueError("unsupported network history ABI")
 
@@ -86,6 +86,7 @@ class NetworkHistoryClient(NetworkHistoryReader):
     The reader cannot pause the game or advance the writer's position.
     """
     mapping = "NetworkHistory"
+    version = 2
     magic = MAGIC
     entry_size = MAPPING_SIZE
     decode = staticmethod(decode_network_state)
