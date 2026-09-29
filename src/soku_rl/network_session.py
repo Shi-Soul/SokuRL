@@ -56,12 +56,16 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
                         record({"kind": "decision_skipped", "match": frame["match"], "round": frame["round"],
                                 "frame": frame["frame"], "reason": "newer_observation_available"})
                         continue
+                    inference_started = time.perf_counter_ns()
                     command = live.act()
+                    inference_ms = (time.perf_counter_ns()-inference_started)/1e6
+                    submit_started = time.perf_counter_ns()
                     response = connection.request("submit", {"match": frame["match"],
                         "frame": frame["frame"], "keys": decode_action(command).inputs,
                         "duration": interface.episode.decision_frames})
                     record({"kind": "command", "match": frame["match"], "round": frame["round"],
-                            "command": command, **response})
+                            "command": command, "inference_ms": inference_ms,
+                            "submit_ms": (time.perf_counter_ns()-submit_started)/1e6, **response})
                     decisions += 1
                     if response["reply"] in dropped:
                         dropped[response["reply"]] += 1

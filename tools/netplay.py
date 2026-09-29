@@ -51,6 +51,7 @@ def main(cfg):
     directory.mkdir(parents=True, exist_ok=False)
     (directory / "config.yaml").write_text(OmegaConf.to_yaml(cfg, resolve=True), encoding="utf-8")
     report = {"success": False, "policy_fingerprint": policy.fingerprint,
+              "policy_kind": spec["kind"], "device": config["device"],
               "seat": seat, "wins_required": 2}
     started = time.monotonic()
     try:
@@ -71,7 +72,7 @@ def main(cfg):
                 report["human_game"] = human.request("start", {"network": human_settings,
                                                                "visibility": asdict(episode.visibility)})
                 (directory / "human-game.json").write_text(json.dumps(report["human_game"], indent=2), encoding="utf-8")
-                print("人类玩家窗口已启动。请在后打开的窗口中选人并操作；AI 使用本机 CPU。", flush=True)
+                print(f"人类玩家窗口已启动。请在后打开的窗口中选人并操作；推理设备：{config['device']}。", flush=True)
             with gzip.open(directory / "events.jsonl.gz", "wt", encoding="utf-8") as events:
                 def record(value):
                     events.write(json.dumps({"seconds": time.monotonic()-started, **value})+"\n")
