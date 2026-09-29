@@ -3,6 +3,21 @@ import hashlib
 from pathlib import Path
 
 
+CHARACTERS = (
+    "reimu", "marisa", "sakuya", "alice", "patchouli", "youmu", "remilia", "yuyuko",
+    "yukari", "suica", "udonge", "aya", "komachi", "iku", "tenshi", "sanae", "chirno",
+    "meirin", "utsuho", "suwako",
+)
+# The published variant reads this variable without assigning it. The user
+# approved completing the missing definition; the source archive stays intact.
+REPAIRS = {
+    "01_marisa_main_新版厨远A.ai": (
+        "33bd3d0faf57a2a96f2b3806dbf9f4abf69e1748445cdf629991899f2fa9ec4c",
+        b"wait_frame = 1;\n",
+    ),
+}
+
+
 class ScriptPackage:
     def __init__(self, directory, api_source):
         self.root = Path(directory).resolve(strict=True)
@@ -26,6 +41,12 @@ class ScriptPackage:
         digest = hashlib.sha256(self.api)
         for name, data in self.files.items():
             digest.update(name.encode("utf-8") + b"\0" + data)
+        self.original_fingerprint = digest.hexdigest()
+        self.repairs = {}
+        for name, (expected, definition) in REPAIRS.items():
+            if name in self.files and hashlib.sha256(self.files[name]).hexdigest() == expected:
+                self.repairs[name] = definition
+                digest.update(name.encode("utf-8") + b"\0" + definition)
         self.fingerprint = digest.hexdigest()
 
     def source(self, name):
@@ -34,11 +55,14 @@ class ScriptPackage:
         name = name.replace(b"\\", b"/")
         if name not in self.aliases:
             raise FileNotFoundError(f"script is absent from the source package: {name!r}")
-        return self.files[self.aliases[name]]
+        relative = self.aliases[name]
+        if relative in self.repairs:
+            return self.repairs[relative] + self.files[relative]
+        return self.files[relative]
 
     def character_script(self, character):
-        names = [name for name in self.files if name.startswith(f"{character:02}_")
-                 and name.endswith("_main.ai")]
-        if len(names) != 1:
-            raise ValueError("each character must have exactly one canonical main script")
-        return names[0]
+        if type(character) is not int or not 0 <= character < len(CHARACTERS):
+            raise ValueError("character must be an integer from zero to nineteen")
+        name = f"{character:02}_{CHARACTERS[character]}_main.ai"
+        self.source(name)
+        return name

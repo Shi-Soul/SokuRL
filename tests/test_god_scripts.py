@@ -42,29 +42,35 @@ def test_flag_and_address_low_bits_survive_the_learning_observation():
 
 @pytest.mark.skipif(not NAMES, reason="external original community package is not installed")
 @pytest.mark.parametrize("name", NAMES)
-def test_every_published_character_strategy_executes_without_rewriting(name):
+def test_every_published_character_strategy_executes_with_declared_repairs(name):
     package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
     episode = EpisodeConfig(7200, 1, 1, 0, "privileged_state", VISIBILITY, LEGACY_MATCH)
     policy = GodPolicy(name, package, name, episode)
     first, second = policy.spawn(37), policy.spawn(37)
     current = observation(int(name[:2]))
     encoded = encode_privileged(current)
-    if name == "01_marisa_main_新版厨远A.ai":
-        # The supplied variant uses undefined wait_frame. Preserve its source,
-        # surface the failure, and never replace the absent value with a guess.
-        from lupa.lua51 import LuaError
-        with pytest.raises(LuaError, match="script stopped"):
-            for frame in range(12):
-                encoded[1], encoded[3] = frame / 65536., frame / 65536.
-                first.act(encoded)
-        assert first.failures
-        return
     for frame in range(12):
         # Update only the two clock fields; the source sees an unchanged stance.
         encoded[1], encoded[3] = frame / 65536., frame / 65536.
         assert first.act(encoded) == second.act(encoded)
     assert first.lua is not second.lua
     assert first.api.requested is not second.api.requested
+    assert not first.failures and not second.failures
+
+
+@pytest.mark.skipif(not NAMES, reason="external original community package is not installed")
+def test_canonical_selection_and_the_only_declared_source_repair():
+    package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
+    assert package.character_script(0) == "00_reimu_main.ai"
+    assert len({package.character_script(i) for i in range(20)}) == 20
+    assert package.repairs == {"01_marisa_main_新版厨远A.ai": b"wait_frame = 1;\n"}
+    for name in NAMES:
+        original = (SCRIPTS / name).read_bytes()
+        if name in package.repairs:
+            assert package.source(name) == package.repairs[name] + original
+        else:
+            assert package.source(name) == original
+    assert package.original_fingerprint != package.fingerprint
 
 
 @pytest.mark.skipif(not NAMES, reason="external original api.ai is not installed")
@@ -94,7 +100,7 @@ def test_frame_boundary_scheduler_matches_the_unmodified_original_api():
         def boundary():
             output.put(api.inputs())
             if requests.get(timeout=10) == "stop":
-                raise RuntimeError("reference stopped")
+                lua.globals()[b"thread_num"] = 0
         lua.globals()[b"_yield"] = boundary
         lua.execute(original)
         lua.execute(program)
