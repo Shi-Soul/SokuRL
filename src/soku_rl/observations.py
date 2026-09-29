@@ -1,5 +1,6 @@
 """Convert exported game frames to immutable, player-relative observations."""
 from .baselines import Fighter, Observation, Projectile
+from .gauges import spirit_fraction
 
 
 def observe(state, player_index):
@@ -10,9 +11,7 @@ def observe(state, player_index):
     players = (state.p1, state.p2)
 
     def fighter(raw):
-        if raw.maxSpirit == 0:
-            raise RuntimeError("player maxSpirit is zero")
-        return Fighter(raw.x, raw.y, raw.hp, raw.spirit / raw.maxSpirit,
+        return Fighter(raw.x, raw.y, raw.hp, spirit_fraction(raw.spirit, raw.maxSpirit),
                        raw.actionId, bool(raw.airborne), raw.hitstop, raw.characterId, raw.facing)
 
     objects, count = ((state.p2Objects, state.p2ObjectCount) if player_index == 0

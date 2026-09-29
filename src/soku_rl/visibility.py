@@ -5,6 +5,7 @@ Contours and mutual overlap are approximations, not pixel segmentation.
 from dataclasses import dataclass
 from math import floor, isfinite
 from .contours import Contour, visible_fraction
+from .gauges import spirit_fraction
 
 
 @dataclass(frozen=True)
@@ -105,9 +106,4 @@ def quantize_gauge(value, maximum, quantum):
 
 def quantize_spirit(value, maximum, quantum):
     """Decode the bridge's 16-bit spirit word and project its visible gauge."""
-    if type(value) is not int or not 0 <= value <= 0xFFFF:
-        raise ValueError(f"invalid exported spirit word: {value}")
-    # SokuLib v2::Player declares currentSpirit as signed short. ABI 7 uses
-    # the older unsigned declaration, so guard-break debt arrives above 32767.
-    signed = value - 0x10000 if value & 0x8000 else value
-    return quantize_gauge(max(0, signed), maximum, quantum)
+    return quantize_gauge(spirit_fraction(value, maximum), 1, quantum)
