@@ -21,6 +21,7 @@ add_library(SokuRLBridge MODULE
     SceneReset.cpp
     NetworkStart.hpp
     NetworkStart.cpp
+    NetworkSelection.hpp
     NetworkState.hpp
     NetworkState.cpp
     NetworkInput.hpp
@@ -45,6 +46,8 @@ endif()
 set_target_properties(SokuRLBridge PROPERTIES PREFIX "" OUTPUT_NAME "SokuRLBridge")
 set_property(SOURCE NetworkInput.cpp APPEND PROPERTY OBJECT_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/NetworkInputSchedule.hpp")
+set_property(SOURCE SokuRLBridge.cpp tests/NetworkSelectionTest.cpp APPEND PROPERTY OBJECT_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/NetworkSelection.hpp")
 set_property(SOURCE RenderState.cpp ImageCapture.cpp NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp
     APPEND PROPERTY OBJECT_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/RenderState.hpp")

@@ -1,5 +1,4 @@
 #include "../NetworkSelection.hpp"
-#include <cassert>
 
 int main() {
     using namespace SokuRLBridge;
@@ -18,8 +17,8 @@ int main() {
                 cursor = (cursor + 21 + selectionDirection(cursor, target)) % 21;
                 ++steps;
             }
-            assert(cursor == target && steps <= 10);
-            assert(selectionDirection(cursor, target) == 0);
+            if (cursor != target || steps > 10 || selectionDirection(cursor, target) != 0)
+                return 1;
         }
     }
 }
