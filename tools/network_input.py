@@ -73,17 +73,25 @@ class NetworkInputClient:
         return self._send(result_confirm_payload(snapshot))
 
     def wait_for_reply(self, sequence, timeout):
-        if not self.view or type(sequence) is not int or sequence < 1 or timeout <= 0:
-            raise ValueError("reply requires an open mapping, sequence and positive timeout")
+        if timeout <= 0:
+            raise ValueError("reply requires a positive timeout")
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            ack, result = struct.unpack("<2I", ctypes.string_at(self.view + 16, 8))
-            if ack == sequence:
-                if result not in RESULTS:
-                    raise RuntimeError("unknown network input result")
-                return RESULTS[result]
+            result = self.read_reply(sequence)
+            if result != "pending":
+                return result
             time.sleep(.001)
         raise TimeoutError("network input acknowledgment timed out")
+
+    def read_reply(self, sequence):
+        if not self.view or type(sequence) is not int or sequence < 1:
+            raise ValueError("reply requires an open mapping and a positive sequence")
+        ack, result = struct.unpack("<2I", ctypes.string_at(self.view + 16, 8))
+        if ack != sequence:
+            return "pending"
+        if result not in RESULTS:
+            raise RuntimeError("unknown network input result")
+        return RESULTS[result]
 
     def latest_injection(self, timeout):
         if not self.view or timeout <= 0:

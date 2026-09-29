@@ -41,6 +41,7 @@ class NetworkGame:
         self.cursor = 0
         self.input_cursor = 0
         self.next_confirm = 0.
+        self.result_confirmation = 0
         self.next_dialog_check = 0.
         try:
             self._launch()
@@ -158,7 +159,11 @@ class NetworkGame:
         latest = self.clients["state"].read(2.)
         menu_reply = "not_requested"
         now = time.monotonic()
-        if self.settings["automate_menu"] and now >= self.next_confirm:
+        if self.result_confirmation:
+            menu_reply = self.clients["input"].read_reply(self.result_confirmation)
+            if menu_reply != "pending":
+                self.result_confirmation = 0
+        if self.settings["automate_menu"] and not self.result_confirmation and now >= self.next_confirm:
             if latest.scene in (8, 9):
                 menu = self.clients["menu"]
                 if menu.block.commandSeq == menu.block.ackSeq:
@@ -167,8 +172,8 @@ class NetworkGame:
                     self.next_confirm = now+1
             elif latest.in_battle and max(latest.scores) >= 2:
                 controller = self.clients["input"]
-                sequence = controller.confirm_result(latest)
-                menu_reply = controller.wait_for_reply(sequence, 2.)
+                self.result_confirmation = controller.confirm_result(latest)
+                menu_reply = "result_requested"
                 self.next_confirm = now+1
         if not latest.in_battle:
             self._check_dialogs()
@@ -216,13 +221,8 @@ class NetworkGame:
 
     def close(self):
         try:
-            if "input" in self.clients and self.process.poll() is None:
-                controller = self.clients["input"]
-                controller.wait_for_reply(controller.release(), 2.)
-        finally:
-            for client in self.clients.values():
-                client.close()
-            self.clients.clear()
+            # Closing the owned engine releases all held input. A separate input
+            # acknowledgment can never be required while it waits for its peer.
             if self.process is not None and self.process.poll() is None:
                 sokurl._post_close(self.process.pid)
                 try:
@@ -230,3 +230,7 @@ class NetworkGame:
                 except psutil.TimeoutExpired:
                     self.process.terminate()
                     self.process.wait(timeout=10)
+        finally:
+            for client in self.clients.values():
+                client.close()
+            self.clients.clear()

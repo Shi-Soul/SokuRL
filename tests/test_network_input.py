@@ -51,3 +51,20 @@ def test_mailbox_does_not_overwrite_unacknowledged_command():
         client.release()
     ctypes.c_uint32.from_address(client.view + 16).value = 1
     assert client.release() == 2
+
+
+def test_human_result_confirmation_can_remain_pending_without_blocking():
+    memory = ctypes.create_string_buffer(SIZE)
+    client = NetworkInputClient.__new__(NetworkInputClient)
+    client.view = ctypes.addressof(memory)
+    sequence = client.release()
+    for _ in range(100):
+        assert client.read_reply(sequence) == "pending"
+    with pytest.raises(RuntimeError, match="previous request"):
+        client.release()
+    struct.pack_into("<2I", memory, 16, sequence, 2)
+    assert client.read_reply(sequence) == "released"
+    assert client.wait_for_reply(sequence, 1.) == "released"
+    struct.pack_into("<2I", memory, 16, sequence, 999)
+    with pytest.raises(RuntimeError, match="unknown"):
+        client.read_reply(sequence)
