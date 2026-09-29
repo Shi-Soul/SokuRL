@@ -23,6 +23,9 @@ function Assert-Equal {
 function Get-GitValue {
     param([string]$Directory, [string]$Expression)
 
+    if (-not (Test-Path -LiteralPath (Join-Path $Directory ".git"))) {
+        throw "$Directory must be its own Git checkout."
+    }
     $value = (& git -C $Directory rev-parse $Expression).Trim()
     if ($LASTEXITCODE -ne 0) {
         throw "git rev-parse $Expression failed in $Directory"
