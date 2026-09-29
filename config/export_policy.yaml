@@ -1,0 +1,6 @@
+defaults:
+  - netplay
+  - _self_
+
+verification_steps: 2048
+output: logs/deployment/${candidate.name}-${now:%Y%m%d-%H%M%S}

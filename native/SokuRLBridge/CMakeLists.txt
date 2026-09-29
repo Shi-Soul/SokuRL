@@ -24,6 +24,7 @@ add_library(SokuRLBridge MODULE
     NetworkState.hpp
     NetworkState.cpp
     NetworkInput.hpp
+    NetworkInputSchedule.hpp
     NetworkInput.cpp
     NetworkInputEvents.hpp
     NetworkInputEvents.cpp
@@ -42,6 +43,8 @@ if(MSVC)
     target_compile_options(SokuRLBridge PRIVATE /W4)
 endif()
 set_target_properties(SokuRLBridge PROPERTIES PREFIX "" OUTPUT_NAME "SokuRLBridge")
+set_property(SOURCE NetworkInput.cpp APPEND PROPERTY OBJECT_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/NetworkInputSchedule.hpp")
 
 include(CTest)
 if(BUILD_TESTING)
