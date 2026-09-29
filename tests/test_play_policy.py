@@ -29,3 +29,23 @@ def test_all_fifteen_rules_run_without_a_checkpoint():
         with pytest.raises(ValueError, match="seat"):
             load_play_policy({"name": kind, "policy": {"kind": kind, "player": "player_0"}},
                              interface, config, "cpu", 1)
+
+
+@pytest.mark.parametrize("enemy_character", range(20))
+def test_rules_can_face_every_playable_human_character(enemy_character):
+    root = Path(__file__).resolve().parents[1]
+    rules = OmegaConf.to_container(OmegaConf.load(root / "config/rules/default.yaml"))
+    training = OmegaConf.to_container(OmegaConf.load(root / "config/train.yaml"))
+    episode = training["episode"] | {"decision_frames": 3, "latency_frames": 5, "observation_mode": "state"}
+    interface = LearningInterface(EpisodeConfig(**episode), LearningConfig("combat", True, 8, 1.))
+    for seat, own_character in ((0, 1), (1, 0)):
+        observation = np.zeros(interface.observation_space.shape, np.float32)
+        history = observation[:1600].reshape(4, 400)
+        history[:, :8] = [1, .3, .7, 1, 1, 1, 1, own_character / 19]
+        history[:, 8:16] = [1, .5, .7, -1, 1, 1, 1, enemy_character / 19]
+        for name in rules["roster"]:
+            policy = load_play_policy({"name": name, "policy": {"kind": "rule", "name": name}},
+                                      interface, rules, "cpu", seat)
+            actor = policy.spawn(1732)
+            for _ in range(8):
+                assert interface.action_space.contains(actor.act(observation))
