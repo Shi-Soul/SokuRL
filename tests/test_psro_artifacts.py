@@ -11,7 +11,7 @@ import gymnasium as gym
 
 from soku_rl.checkpoint_policy import load_policy
 from soku_rl.population import MixturePolicy, PPOPolicy, UniformPolicy
-from soku_rl.psro import policy_artifact
+from soku_rl.psro import initial_policies, policy_artifact
 from test_policy_artifacts import interface, training_config
 
 
@@ -63,3 +63,46 @@ def test_mixture_selects_once_per_episode_with_independent_reproducible_rng():
         MixturePolicy("bad", members, [1., 1.], "invalid")
     with pytest.raises(ValueError, match="probability distribution"):
         MixturePolicy("bad", members, [-.1, 1.1], "invalid")
+
+
+@pytest.mark.parametrize("kind", ["sb3", "sb3_recurrent"])
+def test_initial_population_remains_loadable_after_source_checkpoint_is_removed(tmp_path, kind):
+    contract = interface()
+    env = gym.Env()
+    env.observation_space, env.action_space = contract.observation_space, contract.action_space
+    if kind == "sb3_recurrent":
+        Algorithm = pytest.importorskip("sb3_contrib").RecurrentPPO
+        model = Algorithm("MlpLstmPolicy", env, device="cpu", n_steps=2, batch_size=2,
+                          policy_kwargs={"net_arch": [16], "lstm_hidden_size": 16})
+    else:
+        model = PPO("MlpPolicy", env, device="cpu", n_steps=2, batch_size=2,
+                    policy_kwargs={"net_arch": [16]})
+    source = tmp_path / "external.zip"
+    model.save(source)
+    spec = {"kind": kind, "path": str(source), "training_config": training_config(tmp_path, contract)}
+    output = tmp_path / "population"
+    output.mkdir()
+    policies = initial_policies({seat: spec for seat in ("player_0", "player_1")},
+                                contract, "cpu", output)
+    assert policies[0].model is not policies[1].model
+    assert policies[0].path.read_bytes() == policies[1].path.read_bytes() == source.read_bytes()
+    entries = [[policy_artifact(policy, output)] for policy in policies]
+    assert all(entry[0]["kind"] == kind for entry in entries)
+    source.unlink()
+    path = output / "population.json"
+    path.write_text(json.dumps({"format": "sokurl-psro-population-v1", "populations": entries,
+                               "meta_strategies": [[1.], [1.]]}))
+    loaded = load_policy("mixture", {"kind": "psro_mixture", "path": str(path),
+        "player": "player_0", "training_config": training_config(output, contract)}, contract, "cpu")
+    observation = np.full(contract.observation_space.shape, .2, dtype=np.float32)
+    actual = loaded.spawn(17)
+    rng = np.random.default_rng(17)
+    rng.choice(1, p=[1.])
+    expected = policies[0].spawn(int(rng.integers(0, 0xFFFFFFFF)))
+    assert [actual.act(observation) for _ in range(12)] == [expected.act(observation) for _ in range(12)]
+
+
+def test_initial_population_rejects_missing_role_before_writing_artifacts(tmp_path):
+    with pytest.raises(ValueError, match="both player roles"):
+        initial_policies({"player_0": {"kind": "uniform"}}, interface(), "cpu", tmp_path)
+    assert not list(tmp_path.iterdir())

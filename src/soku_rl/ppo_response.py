@@ -129,6 +129,8 @@ class OpponentMixtureVecEnv(VecEnv):
 
 class PPOResponseOracle:
     def __init__(self, env, config, device, seed, directory):
+        if config["initialization"] not in {"fresh", "parent_weights"}:
+            raise ValueError("PPO response initialization must be fresh or parent_weights")
         self.env, self.config, self.device = env, config, device
         self.rng = np.random.default_rng(seed)
         self.directory = Path(directory)
@@ -154,7 +156,7 @@ class PPOResponseOracle:
                     # Copy only policy parameters. New optimizer and schedule belong
                     # to this response; old population snapshots remain unchanged.
                     parent = request["policy"]
-                    if isinstance(parent, PPOPolicy):
+                    if self.config["initialization"] == "parent_weights" and isinstance(parent, PPOPolicy):
                         model.policy.load_state_dict(parent.model.policy.state_dict())
                     model.learn(total_timesteps=self.config["timesteps_per_response"])
                     self.responses += 1

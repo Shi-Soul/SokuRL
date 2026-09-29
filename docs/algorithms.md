@@ -54,7 +54,7 @@ G'_{i,t}\in[-1-\alpha,1+\alpha].
 
 ## 扩展策略种群：PSRO
 
-`SampledPSROSolver` 复用 OpenSpiel 的种群和混合策略求解，用真实游戏对局替代上游游戏树递归。每个座位从均匀随机策略开始，每轮：
+`SampledPSROSolver` 复用 OpenSpiel 的种群和混合策略求解，用真实游戏对局替代上游游戏树递归。每个座位默认从均匀随机策略开始，每轮：
 
 1. 按对手当前混合分布抽样，使用 PPO 训练新的近似响应。
 2. 保留旧成员，将新策略加入对应座位的种群。
@@ -64,6 +64,10 @@ G'_{i,t}\in[-1-\alpha,1+\alpha].
 每局固定抽取的对手，不能中途切换。游戏不提供任意状态克隆；收益矩阵由有限次采样估计，因此不能把当前产物称为精确均衡。
 
 `population.json` 记录两方成员、模型相对路径、文件指纹、收益矩阵和混合权重。交付时一并保留该文件、训练 `config.yaml` 和所有响应模型。该包支持加载与评测，不包含精确恢复全部 PSRO 训练状态的信息。
+
+`algorithm.initial_population.player_0` 和 `player_1` 可分别配置初始成员。`kind: uniform` 使用均匀随机策略；`kind: sb3` 或 `sb3_recurrent` 需同时提供 `path` 和 `training_config`，加载已训练的 PPO 策略。加载前核对观测、延迟和动作配置，两个座位的模型随后分别复制为运行目录中的 `initial-p0.zip`、`initial-p1.zip`。种群包不依赖外部模型文件继续存在，循环策略的记忆仍按每局隔离。
+
+`algorithm.response.initialization` 显式选择响应网络的初始化方式：`parent_weights` 延续原先从前馈 PPO 父策略复制权重的行为；`fresh` 为每个响应建立新网络和优化器。当前响应训练器使用前馈 PPO，因此用循环 PPO 初始化种群时必须选择 `fresh`，不能把循环网络参数装入前馈网络。这项功能只指定初始种群，不恢复旧 PSRO 的收益矩阵、样本或随机数状态。
 
 ## 配置组合和时间上限
 

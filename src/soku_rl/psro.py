@@ -1,11 +1,14 @@
 """Use OpenSpiel PSROSolver with live vector rollouts instead of tree traversal."""
 import json
+import hashlib
 from pathlib import Path
 
 from open_spiel.python.algorithms.psro_v2.psro_v2 import PSROSolver
 
 from .population import PopulationEvaluator, UniformPolicy, PPOPolicy
 from .ppo_response import PPOResponseOracle
+from .recurrent_policy import RecurrentPPOPolicy
+from .env.encoding import AGENTS
 
 
 class PlayerRoles:
@@ -19,16 +22,47 @@ def policy_artifact(policy, directory):
     if isinstance(policy, UniformPolicy):
         return metadata | {"kind": "uniform", "num_actions": int(policy.num_actions)}
     if isinstance(policy, PPOPolicy):
-        return metadata | {"kind": "sb3", "path": str(policy.path.relative_to(directory))}
+        kind = "sb3_recurrent" if isinstance(policy, RecurrentPPOPolicy) else "sb3"
+        return metadata | {"kind": kind, "path": str(policy.path.relative_to(directory))}
     raise TypeError("unsupported PSRO population member")
 
 
+def initial_policies(config, interface, device, directory):
+    """Validate both seat contracts, then retain independent checkpoint copies."""
+    from .checkpoint_policy import load_policy
+
+    if set(config) != set(AGENTS):
+        raise ValueError("PSRO initial population requires both player roles")
+    policies = []
+    for index, seat in enumerate(AGENTS):
+        spec = config[seat]
+        if spec == {"kind": "uniform"}:
+            policy = UniformPolicy(f"uniform-p{index}", interface.action_space.n)
+        elif spec["kind"] in {"sb3", "sb3_recurrent"}:
+            policy = load_policy(f"initial-p{index}", spec, interface, device)
+        else:
+            raise ValueError("initial policies must be uniform, sb3, or sb3_recurrent")
+        policies.append(policy)
+    saved = []
+    for policy in policies:
+        if isinstance(policy, PPOPolicy):
+            data = policy.path.read_bytes()
+            if hashlib.sha256(data).hexdigest() != policy.fingerprint:
+                raise ValueError("initial checkpoint changed while loading")
+            path = Path(directory) / (policy.name + ".zip")
+            with path.open("xb") as stream:
+                stream.write(data)
+            policy = type(policy)(policy.name, policy.model, path)
+        saved.append(policy)
+    return saved
+
+
 class SampledPSROSolver(PSROSolver):
-    def __init__(self, evaluator, oracle, simulations, prd_iterations):
+    def __init__(self, evaluator, oracle, simulations, prd_iterations, policies):
         self.evaluator = evaluator
         super().__init__(
             PlayerRoles(), oracle, simulations,
-            initial_policies=[UniformPolicy(f"uniform-p{p}", evaluator.env.single_action_space.n) for p in (0, 1)],
+            initial_policies=policies,
             rectifier="", training_strategy_selector="probabilistic",
             meta_strategy_method="prd", sample_from_marginals=True,
             number_policies_selected=1, symmetric_game=False,
@@ -47,7 +81,11 @@ def train_psro(env, config, device, seed, directory):
         raise ValueError("PSRO iteration and sampling budgets must be positive")
     evaluator = PopulationEvaluator(env, seed, config["timeout_payoff"])
     oracle = PPOResponseOracle(env, config["response"], device, seed + 1, directory)
-    solver = SampledPSROSolver(evaluator, oracle, config["simulations_per_entry"], config["prd_iterations"])
+    if (config["response"]["initialization"] == "parent_weights" and
+            any(spec["kind"] == "sb3_recurrent" for spec in config["initial_population"].values())):
+        raise ValueError("recurrent initial policies require response.initialization=fresh for MLP responses")
+    policies = initial_policies(config["initial_population"], env.interface, device, directory)
+    solver = SampledPSROSolver(evaluator, oracle, config["simulations_per_entry"], config["prd_iterations"], policies)
     report = {}
     for iteration in range(config["iterations"] + 1):
         if iteration:

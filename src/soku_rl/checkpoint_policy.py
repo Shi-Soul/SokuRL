@@ -90,9 +90,9 @@ def load_population(name, spec, interface, device, path, identity):
             if entry["num_actions"] != interface.action_space.n:
                 raise ValueError("PSRO member action space differs")
             member = UniformPolicy(entry["name"], entry["num_actions"])
-        elif entry["kind"] == "sb3":
+        elif entry["kind"] in {"sb3", "sb3_recurrent"}:
             member = load_policy(entry["name"], {
-                "kind": "sb3", "path": str(path.parent / entry["path"]),
+                "kind": entry["kind"], "path": str(path.parent / entry["path"]),
                 "training_config": spec["training_config"]}, interface, device)
         else:
             raise ValueError("unsupported PSRO population member")
