@@ -108,6 +108,20 @@ def test_disconnect_is_an_interruption_and_not_a_match_result():
         run_session(connection, RecordingPolicy(), interface(), 0, 1, 1, 10., [].append)
 
 
+def test_returning_to_selection_abandons_the_match_and_allows_a_new_one():
+    connection = Connection([
+        frame(1, 0, 1, "battle", ("round_started",), (0, 0)),
+        frame(1, 0, 2, "menu", ("match_interrupted",), (0, 0)),
+        frame(2, 0, 1, "battle", ("round_started",), (0, 0)),
+        frame(2, 0, 2, "match_finished", ("match_finished",), (2, 0)),
+    ], "accepted")
+    policy = RecordingPolicy()
+    result = run_session(connection, policy, interface(), 0, 11, 1, 10., [].append)
+    assert result["matches"] == 1 and result["interrupted_matches"] == 1
+    assert result["last_scores"] == (2, 0)
+    assert [seed for seed, _ in policy.episodes] == [11, 12]
+
+
 def test_accepted_input_that_later_expires_stops_inference():
     class ExpiredConnection:
         def request(self, operation, payload):

@@ -11,6 +11,7 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
         raise ValueError("positive match count, timeout and supported uint32 seed are required")
     live = LivePolicy(policy, interface, seat)
     completed, rounds, decisions, skipped, accepted = 0, 0, 0, 0, 0
+    interrupted = 0
     dropped = {"late": 0, "wrong_round": 0}
     started = time.monotonic()
     scores = (0, 0)
@@ -19,6 +20,7 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
         return {"matches": completed, "rounds": rounds, "decisions": decisions,
                 "accepted_commands": accepted, "dropped_commands": dropped,
                 "skipped_decisions": skipped, "termination": termination,
+                "interrupted_matches": interrupted,
                 "seconds": time.monotonic()-started, "last_scores": scores}
 
     try:
@@ -41,7 +43,9 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
                 record({"kind": "frame", **metadata})
                 events = {event["kind"] for event in frame["events"]}
                 if "match_interrupted" in events:
-                    raise ConnectionError(f"network match {frame['match']} was interrupted")
+                    if frame["phase"] != "menu":
+                        raise ConnectionError(f"network match {frame['match']} was interrupted")
+                    interrupted += 1
                 if "match_finished" in events:
                     completed += 1
                     if completed == matches:
