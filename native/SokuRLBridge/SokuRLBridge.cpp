@@ -733,7 +733,14 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
     (self->*g_originalSetInputs)();
     if (!g_control)
         return;
-    if (*reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID) == 3) {
+    const auto scene = *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID);
+    const bool networkSelection = scene == SokuLib::SCENE_SELECTSV ||
+        scene == SokuLib::SCENE_SELECTCL;
+    // Network startup selects the local keyboard. Inject before the original
+    // input routine packs its bits; never write the network peer's key manager.
+    const bool localNetworkKeyboard = networkSelection &&
+        self == reinterpret_cast<SokuLib::KeymapManager *>(FALLBACK_KEY_MANAGER);
+    if (scene == SokuLib::SCENE_SELECT || localNetworkKeyboard) {
         const auto sequence = load32(&g_control->commandSeq);
         if (sequence != g_lastCommandSeq) {
             MemoryBarrier();
@@ -743,7 +750,7 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
                 g_lastCommandSeq = sequence;
                 publishResult(SokuRLBridge::ResultCode::Complete);
                 acknowledge(sequence);
-            } else if (type == SokuRLBridge::CommandType::EstablishCheckpoint) {
+            } else if (!networkSelection && type == SokuRLBridge::CommandType::EstablishCheckpoint) {
                 const auto seed = g_control->commandArgument;
                 if (SokuLib::practiceSettings)
                     SokuLib::practiceSettings->state = SokuLib::DUMMY_STATE_2P_CONTROL;
