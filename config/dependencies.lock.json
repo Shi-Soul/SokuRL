@@ -14,7 +14,7 @@
     "patched_files": [
       {
         "path": "dllmain.cpp",
-        "sha256": "FE3F95AD8E2B20D5DBBDF526D4C59358155B4A380DA1D2D6151723F3131875C9"
+        "sha256": "42472659848C7A296B866506B2800E39F04D47B831E3809197202D5EC5CFE165"
       },
       {
         "path": "Soku.hpp",

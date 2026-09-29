@@ -29,9 +29,9 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 
 if (-not (Test-Path -LiteralPath $SokuModsDir)) {
-    Invoke-Git clone --no-checkout $SokuModsUrl $SokuModsDir
+    Invoke-Git clone --config core.autocrlf=false --no-checkout $SokuModsUrl $SokuModsDir
     Invoke-Git -C $SokuModsDir checkout --detach $SokuModsCommit
-    Invoke-Git -C $SokuModsDir submodule update --init --recursive
+    Invoke-Git -C $SokuModsDir -c core.autocrlf=false submodule update --init --recursive
 } else {
     if (-not (Test-Path -LiteralPath (Join-Path $SokuModsDir ".git"))) {
         throw "$SokuModsDir exists but is not a Git checkout."
@@ -43,7 +43,7 @@ if (-not (Test-Path -LiteralPath $SokuModsDir)) {
     }
 
     if (-not (Test-Path -LiteralPath (Join-Path $SkipIntroDir ".git"))) {
-        Invoke-Git -C $SokuModsDir submodule update --init --recursive
+        Invoke-Git -C $SokuModsDir -c core.autocrlf=false submodule update --init --recursive
     }
 }
 
