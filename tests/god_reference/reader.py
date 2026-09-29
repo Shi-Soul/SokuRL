@@ -19,6 +19,7 @@ class Reference:
             "key": ([C.c_int] * 2, C.c_int),
             "delayed_action": ([C.c_int] * 4, None),
             "projectiles": ([C.c_float, C.c_int, C.POINTER(C.c_float), C.POINTER(C.c_int)], None),
+            "positions": ([C.c_float] * 4, None),
         }
         for name, (arguments, result) in signatures.items():
             target = getattr(self.dll, "reference_" + name)

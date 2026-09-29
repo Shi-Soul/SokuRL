@@ -67,3 +67,7 @@ EXPORT void reference_projectiles(float x, int count, const float *centres, cons
     is_bullethit();
     storage.values["obj_dis"]=obj_dis; storage.values["obj_dis2"]=obj_dis2;
 }
+EXPORT void reference_positions(float x, float y, float ex, float ey) {
+    my_data.x=x; my_data.y=y; enemy_data.x=ex; enemy_data.y=ey;
+    reference_distance();
+}

@@ -14,7 +14,6 @@ from god_reference.build import generate
 from god_reference.memory import game_memory
 from god_reference.reader import Reference
 from god_reference.compare import players_equal
-from soku_rl.env.observation.memory_schema import OBJECT_NAMES, FIGHTER_FIELDS
 from soku_rl.policy.god.api import ScriptAPI
 from test_god_scripts import observation
 
@@ -85,6 +84,20 @@ def test_projectile_distance_preserves_upstream_traversal_order(reference):
         api.observe(value)
         for name in ("obj_dis", "obj_dis2"):
             assert api.globals[name.encode()] == reference.value(name)
+
+
+def test_distance_thresholds_use_the_same_float_precision(reference):
+    api = ScriptAPI(LuaRuntime(encoding=None, unpack_returned_tuples=True), 1)
+    for x, y, ex, ey in ((1e-5, 0, 1000, 0), (100.0001, 0, 1100, 30),
+                         (400.5, 200.2, 600.5, 30.6)):
+        x,y,ex,ey = (C.c_float(v).value for v in (x,y,ex,ey))
+        value = observation(1)
+        value.players[0].update(x=x,y=y)
+        value.players[1].update(x=ex,y=ey)
+        api.observe(value)
+        reference.dll.reference_positions(x,y,ex,ey)
+        for name in ("dis", "dis_y", "dis2"):
+            assert api.globals[name.encode()] == reference.value(name), name
 
 
 @pytest.mark.parametrize("character", range(20))

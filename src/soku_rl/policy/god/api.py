@@ -1,5 +1,11 @@
 """Implement the original script's read and key functions over one common observation."""
 import math
+import struct
+
+
+def float_difference(left, right):
+    """The original operands and their subtraction use C++ float precision."""
+    return struct.unpack("<f", struct.pack("<f", left - right))[0]
 
 
 class ScriptAPI:
@@ -225,17 +231,19 @@ class ScriptAPI:
             "is_dir_front": own["dir"] == (1 if right else -1),
             "is_card_use": bool(own["is_card_use"]), "is_th105": False, "is_th123": True}.items():
             self.globals[name.encode()] = value
-        dx, dy = int(abs(own["x"] - enemy["x"])), int(abs(own["y"] - enemy["y"]))
+        dx = int(abs(float_difference(own["x"], enemy["x"])))
+        dy = int(abs(float_difference(own["y"], enemy["y"])))
         for name, value in (("dis", dx), ("dis_x", dx), ("dis_y", dy), ("dis2", int(math.hypot(dx, dy)))):
             self.globals[name.encode()] = value
         distance, centre = 10000, 10000
         for obj in enemy["objects"]:
-            centre = min(centre, int(abs(own["x"] - obj["x"])))
+            centre = min(centre, int(abs(float_difference(own["x"], obj["x"]))))
             for left, _, right, _ in obj["attackarea"]:
                 # is_bullethit assigns 1 directly for an enclosing box. A
                 # preceding zero distance must not survive that assignment.
                 distance = (1 if left < own["x"] < right else
-                            min(distance, int(min(abs(left - own["x"]), abs(right - own["x"])))))
+                            min(distance, int(min(abs(float_difference(left, own["x"])),
+                                                  abs(float_difference(right, own["x"]))))))
         self.globals[b"obj_dis"], self.globals[b"obj_dis2"] = distance, centre
         if world["weather2"] == 19 and 1000 - self.delays[b"weather_delay"] < world["weather_time"]:
             self.globals[b"weather"] = world["weather2"]

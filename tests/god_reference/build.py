@@ -58,6 +58,11 @@ def generate(upstream, output):
     start = main.index(b'\tif(delay == 0)', end)
     end = main.index(b'\n\tengine->setScriptValueBool("is_th105"', start)
     parts.append(main[start:end] + b"\n}\n")
+    start = main.index(b"\t\t\tdis = abs(my_data.x-enemy_data.x);")
+    end = main.index(b"\n\t\t\tbreak;", start)
+    parts.append(b"void reference_distance(){ int dis, dis_y, dis2;\n" + main[start:end]
+                 + b'\nengine->setScriptValue("dis",dis); engine->setScriptValue("dis_y",dis_y);'
+                   b'engine->setScriptValue("dis2",dis2); }\n')
     parts.append((Path(__file__).parent / "exports.cpp").read_bytes())
     (output / "reference.cpp").write_bytes(b"\n".join(parts))
     (output / "shim.hpp").write_bytes((Path(__file__).parent / "shim.hpp").read_bytes())
