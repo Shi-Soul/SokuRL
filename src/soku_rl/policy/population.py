@@ -1,9 +1,9 @@
 """Immutable policies and mixtures that select one policy per episode."""
 from dataclasses import dataclass
 import hashlib
+import json
 
 import numpy as np
-import torch
 
 from soku_rl.policy.base import Policy, RLPolicy, RulePolicy
 
@@ -46,6 +46,7 @@ class PPOEpisode:
     rng: object
 
     def act(self, observation):
+        import torch
         with torch.no_grad():
             tensor, _ = self.model.policy.obs_to_tensor(observation)
             distribution = self.model.policy.get_distribution(tensor).distribution
@@ -69,3 +70,17 @@ class MixturePolicy(Policy):
         rng = np.random.default_rng(seed)
         member = self.members[int(rng.choice(len(self.members), p=self.probabilities))]
         return member.spawn(int(rng.integers(0, 0xFFFFFFFF)))
+
+
+@dataclass(frozen=True)
+class SeatPolicies:
+    name: str
+    roles: tuple
+
+    def __post_init__(self):
+        if len(self.roles) != 2:
+            raise ValueError("two seat policies are required")
+
+    @property
+    def fingerprint(self):
+        return hashlib.sha256(json.dumps([p.fingerprint for p in self.roles]).encode()).hexdigest()

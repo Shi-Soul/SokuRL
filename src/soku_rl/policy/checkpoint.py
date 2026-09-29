@@ -11,6 +11,7 @@ from torch import nn
 from soku_rl.policy.contract import read_training_contract
 from soku_rl.policy.base import RLPolicy
 from soku_rl.policy.population import PPOPolicy, UniformPolicy, MixturePolicy
+from soku_rl.policy.loader import load_policy
 
 
 class NetworkPolicy(RLPolicy):
@@ -39,20 +40,6 @@ class NetworkEpisode:
             raise RuntimeError("policy produced invalid probabilities")
         probabilities /= probabilities.sum()
         return int(self.rng.choice(self.policy.num_actions, p=probabilities))
-
-
-@dataclass(frozen=True)
-class SeatPolicies:
-    name: str
-    roles: tuple
-
-    def __post_init__(self):
-        if len(self.roles) != 2:
-            raise ValueError("two seat policies are required")
-
-    @property
-    def fingerprint(self):
-        return hashlib.sha256(json.dumps([p.fingerprint for p in self.roles]).encode()).hexdigest()
 
 
 def _mlp(widths, activation):
@@ -90,7 +77,7 @@ def load_population(name, spec, interface, device, path, identity):
     return MixturePolicy(name, members, saved["meta_strategies"][player], identity)
 
 
-def load_policy(name, spec, interface, device):
+def load_checkpoint(name, spec, interface, device):
     read_training_contract(spec["training_config"], interface)
     path = Path(spec["path"]).resolve(strict=True)
     identity = hashlib.sha256(path.read_bytes()).hexdigest()

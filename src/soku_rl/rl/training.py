@@ -8,10 +8,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback
 from stable_baselines3.common.logger import configure
 
-from soku_rl.policy.rules.observed_rules import RulePolicy
-from soku_rl.policy.rules.strategies import rule_implementation
-from soku_rl.policy.rules.observed_rules import LearningRulePolicy
 from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
+from soku_rl.policy.loader import load_policy
 from soku_rl.policy.contract import read_training_contract
 
 
@@ -45,10 +43,8 @@ def train_ppo(env, config, device, seed, directory):
         raise ValueError("invalid PPO training or checkpoint interval")
     if not config["opponents"] or len(set(config["opponents"])) != len(config["opponents"]):
         raise ValueError("fixed opponent roster must be nonempty and distinct")
-    episode = env.episodes[0].config
-    source = rule_implementation()
-    opponents = [LearningRulePolicy(RulePolicy(name, config["rules"], episode, source), env.interface)
-                 for name in config["opponents"]]
+    opponents = [load_policy(name, {"kind": "rule", "name": name, "rules": config["rules"]},
+                             env.interface, device) for name in config["opponents"]]
     weights = np.full(len(opponents), 1 / len(opponents))
     results = {}
     for player in config["players"]:

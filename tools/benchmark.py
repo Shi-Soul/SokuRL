@@ -14,12 +14,10 @@ def main(cfg):
 
 def run(cfg):
     import torch
-    from soku_rl.policy.checkpoint import SeatPolicies, load_policy
+    from soku_rl.policy.population import SeatPolicies
+    from soku_rl.policy.loader import load_policy
     from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
-    from soku_rl.policy.rules.observed_rules import RulePolicy
-    from soku_rl.policy.rules.strategies import rule_implementation
     from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
-    from soku_rl.policy.rules.observed_rules import LearningRulePolicy
     from soku_rl.evaluation.benchmark import benchmark
     from soku_rl.env.worker_pipe import WorkerBackend
 
@@ -29,8 +27,8 @@ def run(cfg):
     interface = LearningInterface(episode, learning)
     if config["track"] == "human" and episode.observation_mode != "state":
         raise ValueError("this rule benchmark requires the human state observation")
-    if config["track"] == "superhuman" and episode.observation_mode != "diagnostic_state":
-        raise ValueError("the superhuman benchmark requires diagnostic state")
+    if config["track"] == "superhuman" and episode.observation_mode != "privileged_state":
+        raise ValueError("the superhuman benchmark requires complete privileged state")
     opponents = config["benchmark"]["opponents"]
     if len(opponents) != len(set(opponents)) or "idle" in opponents:
         raise ValueError("the benchmark roster must contain distinct non-idle rules")
@@ -38,12 +36,11 @@ def run(cfg):
     if candidate["name"] in opponents:
         raise ValueError("candidate name collides with an opponent")
     device = torch.device(config["device"])
-    roles = tuple(load_policy(candidate["name"], candidate[a], interface, device)
+    roles = tuple(load_policy(candidate["name"], (candidate[a] | {"rules": config["rules"]} if candidate[a]["kind"] == "rule" else candidate[a]), interface, device)
                   for a in ("player_0", "player_1"))
     strategies = {candidate["name"]: SeatPolicies(candidate["name"], roles)}
-    implementation = rule_implementation()
     for name in opponents:
-        rule = LearningRulePolicy(RulePolicy(name, config["rules"], episode, implementation), interface)
+        rule = load_policy(name, {"kind": "rule", "name": name, "rules": config["rules"]}, interface, device)
         strategies[name] = SeatPolicies(name, (rule, rule))
     directory = Path(config["output"]).resolve()
     directory.mkdir(parents=True, exist_ok=False)

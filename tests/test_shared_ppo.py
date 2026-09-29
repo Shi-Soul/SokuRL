@@ -15,7 +15,7 @@ from soku_rl.env.wrappers.learning import LearningConfig, LearningVectorEnv
 from soku_rl.marl.ippo import train_ippo
 from soku_rl.marl.nfsp import train_nfsp
 from soku_rl.policy.base import RLPolicy
-from soku_rl.policy.checkpoint import load_policy
+from soku_rl.policy.loader import load_policy
 from test_env_timing import RecordingBackend, VISIBILITY
 
 

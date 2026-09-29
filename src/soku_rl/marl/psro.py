@@ -30,7 +30,7 @@ def policy_artifact(policy, directory):
 
 def initial_policies(config, interface, device, directory):
     """Validate both seat contracts, then retain independent checkpoint copies."""
-    from soku_rl.policy.checkpoint import load_policy
+    from soku_rl.policy.loader import load_policy
 
     if set(config) != set(AGENTS):
         raise ValueError("PSRO initial population requires both player roles")
