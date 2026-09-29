@@ -10,6 +10,10 @@ from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 
 
+RESET_METHODS = {"image": "process_restart", "state": "native_scene_reload",
+                 "diagnostic_state": "native_scene_reload"}
+
+
 def _time_step(raw, dropped_frames, observations, pid):
     if raw.sceneId != sokurl.SCENE_BATTLE or raw.battleMode != sokurl.BATTLE_MODE_VSPLAYER:
         raise RuntimeError("game left VS battle")
@@ -48,7 +52,7 @@ class SokuGameBatch:
 
     def configure_observation(self, configuration):
         mode = configuration["mode"]
-        if self.processes or mode not in {"image", "state", "diagnostic_state"}:
+        if self.processes or mode not in RESET_METHODS:
             raise ValueError("set a supported observation mode before launching games")
         self.observation_mode = mode
         self.visibility = VisibilityConfig(**configuration["visibility"])
@@ -74,6 +78,11 @@ class SokuGameBatch:
             raise ValueError("nonempty nonnegative slot IDs are required")
         if any(type(s) is not int or not 0 <= s < 0xFFFFFFFF for s in seeds.values()):
             raise ValueError("native seed 0xFFFFFFFF is reserved; use a smaller uint32")
+        if RESET_METHODS[self.observation_mode] == "process_restart":
+            # Scene reload preserves renderer state that changes pixels across
+            # episodes. Recreate only the selected image slots; state-only
+            # observations have passed native scene-reload determinism checks.
+            self._close_slots(set(seeds) & set(self.processes))
         existing = set(seeds) & set(self.processes)
         fresh = {slot: seed for slot, seed in seeds.items() if slot not in existing}
         self.active.difference_update(seeds)

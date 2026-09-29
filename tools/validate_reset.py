@@ -135,8 +135,15 @@ def main(cfg):
                     actual = record(worker, seed, actions, capture_frames, output / f"cycle-{cycle}-{seed}")
                     save(f"cycle-{cycle}-{seed}", actual)
                     compare(reference[seed], actual)
-                    if pid is not None and (actual["pid"] != pid or actual["segment"] != segment + 1):
-                        raise RuntimeError("reset changed PID or failed to advance episode segment")
+                    method = worker.identity["reset_methods"][episode.observation_mode]
+                    if method == "native_scene_reload":
+                        if pid is not None and (actual["pid"] != pid or actual["segment"] != segment + 1):
+                            raise RuntimeError("scene reset changed PID or failed to advance episode segment")
+                    elif method == "process_restart":
+                        if actual["segment"] != 0:
+                            raise RuntimeError("new game process did not start at episode segment zero")
+                    else:
+                        raise ValueError(f"unsupported reset method: {method}")
                     pid, segment = actual["pid"], actual["segment"]
                     time.sleep(pause)
                     if not peer.ended and peer_frames < len(actions):
