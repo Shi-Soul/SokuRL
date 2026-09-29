@@ -1,5 +1,4 @@
 """PettingZoo simultaneous two-player episodes over an owned game backend."""
-from collections import deque
 from dataclasses import dataclass, asdict
 import numpy as np
 from gymnasium import spaces
@@ -10,6 +9,7 @@ from soku_rl.visibility import VisibilityConfig
 from soku_rl.visible_state import StateObservation, STATE_FEATURES
 from .encoding import AGENTS, NUM_ACTIONS, decode_action, encode_observation, observation_space
 from .control import ControlConfig, DelayedControls
+from .observation_history import ObservationHistory
 
 
 @dataclass(frozen=True)
@@ -62,7 +62,7 @@ class Episode:
     """Own episode counters and observation history, never a policy."""
     def __init__(self, config):
         self.config = config
-        self.history = [deque(maxlen=config.history_frames) for _ in AGENTS]
+        self.observation_history = ObservationHistory(config)
         self.ready = False
         self.ended = True
         self.frame = 0
@@ -77,13 +77,8 @@ class Episode:
         self.frame = 0
         self.controls.reset()
         self.ready, self.ended = True, False
-        for history, observation in zip(self.history, time_step.observations, strict=True):
-            history.clear()
-            if isinstance(observation, (RGBFrame, StateObservation)) and observation.frame != time_step.frame:
-                raise RuntimeError("image and simulation frame do not match")
-            encoded = self.config.encode(observation)
-            history.extend(encoded.copy() for _ in range(self.config.history_frames))
-        return self._observations(), self._infos(time_step, "ongoing")
+        self.observation_history.reset(time_step.frame, time_step.observations)
+        return self.observation_history.observations(), self._infos(time_step, "ongoing")
 
     def actions(self, actions):
         if not self.ready or self.ended:
@@ -101,33 +96,20 @@ class Episode:
 
     def invalidate(self):
         self.ready, self.ended = False, True
-        for history in self.history:
-            history.clear()
+        self.observation_history.clear()
 
     def step(self, time_step):
         if time_step.frame != self.frame + 1:
             raise RuntimeError("backend must advance exactly one frame")
         self.frame = time_step.frame
-        for history, observation in zip(self.history, time_step.observations, strict=True):
-            if isinstance(observation, (RGBFrame, StateObservation)) and observation.frame != time_step.frame:
-                raise RuntimeError("image and simulation frame do not match")
-            history.append(self.config.encode(observation))
+        self.observation_history.append(time_step.frame, time_step.observations)
         terminated = time_step.terminated
         truncated = not terminated and (time_step.truncated or self.frame >= self.config.max_frames)
         self.ended = terminated or truncated
         outcome = "time_limit" if truncated else time_step.outcome.value
-        return (self._observations(), dict(zip(AGENTS, time_step.rewards, strict=True)),
+        return (self.observation_history.observations(), dict(zip(AGENTS, time_step.rewards, strict=True)),
                 dict.fromkeys(AGENTS, terminated), dict.fromkeys(AGENTS, truncated),
                 self._infos(time_step, outcome))
-
-    def _observations(self):
-        result = {agent: np.concatenate(self.history[index]) for index, agent in enumerate(AGENTS)}
-        if self.config.observation_mode == "image":
-            for index, agent in enumerate(AGENTS):
-                # Public seat identity allows parameter sharing between the two roles.
-                role = np.full((1, 240, 320), index * 255, dtype=np.uint8)
-                result[agent] = np.concatenate((result[agent], role))
-        return result
 
     def _infos(self, time_step, outcome):
         return {agent: {"frame": time_step.frame, "episode": self.number,
@@ -205,7 +187,7 @@ class HisoutenParallelEnv(ParallelEnv):
     def render(self):
         if self.episode.config.observation_mode != "image" or not self.episode.ready:
             raise RuntimeError("render requires a reset image environment")
-        return self.episode.history[0][-1].transpose(1, 2, 0).copy()
+        return self.episode.observation_history.image(0)
 
     def state(self):
         raise NotImplementedError("the bridge does not expose the full engine state")
