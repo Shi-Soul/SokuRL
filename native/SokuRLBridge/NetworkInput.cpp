@@ -127,7 +127,15 @@ void applyNetworkInput(SokuLib::KeymapManager *keyboard) {
     // (0x43F045/0x43F08A). The sender reads this object's +0x62 packed keys at
     // 0x454CA9/0x454CCB; the peer receive objects at +0xF8/+0x174 are separate.
     const auto network = *reinterpret_cast<unsigned char **>(0x008986A0);
-    if (!network || keyboard != *reinterpret_cast<SokuLib::KeymapManager **>(network + 0x208))
+    if (!network)
+        return;
+    // Victory dialogue reads its local input cluster (0x89A248) at 0x4610CD,
+    // not the battle sender. Its update completes at the call at 0x43E55F.
+    // Only command 3 can be queued after a match result; no peer input is changed.
+    const bool finished = state.scores[0] >= 2 || state.scores[1] >= 2;
+    const auto target = finished ? reinterpret_cast<SokuLib::KeymapManager *>(0x0089A248) :
+        *reinterpret_cast<SokuLib::KeymapManager **>(network + 0x208);
+    if (keyboard != target)
         return;
     if (state.updates >= g_expires) g_held = {};
     while (!g_pending.empty() && g_pending.front().target <= state.updates) {

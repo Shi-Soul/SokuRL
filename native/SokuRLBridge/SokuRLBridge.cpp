@@ -39,6 +39,7 @@ using ProfileInitializeMethod = void (__thiscall *)(SokuLib::Profile *, char);
 using WaitForSingleObjectFunction = DWORD (WINAPI *)(HANDLE, DWORD);
 
 constexpr DWORD KEYMAP_SET_INPUTS_HOOK = 0x0040A45D;
+constexpr DWORD INPUT_CLUSTER_UPDATE_HOOK = 0x0043E55F;
 constexpr DWORD P1_KEYMAP_MANAGER_PTR = 0x008989A0;
 constexpr DWORD P2_KEYMAP_MANAGER_PTR = 0x0089918C;
 constexpr DWORD P1_INPUT_MANAGER_PTR = 0x00898680;
@@ -60,6 +61,7 @@ HANDLE g_fileMapping = nullptr;
 SokuRLBridge::BridgeMapping *g_mapping = nullptr;
 SokuRLBridge::ControlBlock *g_control = nullptr;
 SetInputsMethod g_originalSetInputs = nullptr;
+SetInputsMethod g_originalClusterInputs = nullptr;
 BattleProcessMethod g_originalBattleProcess = nullptr;
 BattleRenderMethod g_originalBattleRender = nullptr;
 bool g_captureImages = false;
@@ -730,6 +732,13 @@ int playerIndexFor(SokuLib::KeymapManager *self)
     return -1;
 }
 
+void __fastcall inputClusterUpdate(SokuLib::KeymapManager *self)
+{
+    (self->*g_originalClusterInputs)();
+    if (g_control)
+        SokuRLBridge::applyNetworkInput(self);
+}
+
 void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
 {
     (self->*g_originalSetInputs)();
@@ -1197,6 +1206,8 @@ bool installHooks()
         return false;
     g_originalSetInputs = SokuLib::union_cast<SetInputsMethod>(
         SokuLib::TamperNearJmpOpr(KEYMAP_SET_INPUTS_HOOK, keymapManagerSetInputs));
+    g_originalClusterInputs = SokuLib::union_cast<SetInputsMethod>(
+        SokuLib::TamperNearJmpOpr(INPUT_CLUSTER_UPDATE_HOOK, inputClusterUpdate));
     const bool headlessHookInstalled = installHeadlessRenderHook();
     const bool unlimitedHookInstalled = installUnlimitedPacingHook();
     DWORD ignored = 0;
@@ -1222,7 +1233,7 @@ bool installHooks()
     VirtualProtect(reinterpret_cast<void *>(RDATA_SECTION_OFFSET), RDATA_SECTION_SIZE,
         rdataProtection, &ignored);
     FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
-    return g_originalSetInputs && headlessHookInstalled && unlimitedHookInstalled &&
+    return g_originalSetInputs && g_originalClusterInputs && headlessHookInstalled && unlimitedHookInstalled &&
         g_originalBattleManagerProcess && g_originalSelectProcess && g_originalTitleProcess &&
         (!g_captureImages || g_originalBattleRender) &&
         g_originalBattleProcess && resetBarrierInstalled;
