@@ -30,6 +30,8 @@ def main():
                     value = game.poll()
                 elif operation == "wait_host" and game is not None:
                     value = game.wait_host()
+                elif operation == "watch_local_peer" and game is not None:
+                    value = game.watch_local_peer(**payload)
                 elif operation == "submit" and game is not None:
                     value = game.submit(**payload)
                 elif operation == "close":

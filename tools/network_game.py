@@ -34,6 +34,7 @@ class NetworkGame:
         self.visibility = VisibilityConfig(**visibility)
         self.lifecycle = NetworkMatch(2)
         self.process = None
+        self.peer = None
         self.clients = {}
         self.frames = OrderedDict()
         self.cursor = 0
@@ -124,6 +125,8 @@ class NetworkGame:
     def poll(self):
         if self.process.poll() is not None:
             raise EOFError("owned network game exited")
+        if self.peer is not None and not self.peer.is_running():
+            raise EOFError("local human player closed their game")
         cursor, snapshots = self.clients["history"].read_after(self.cursor, 2.)
         records = []
         for snapshot in snapshots:
@@ -171,6 +174,12 @@ class NetworkGame:
         self.input_cursor, input_events = self.clients["input_events"].read_after(self.input_cursor, 2.)
         return {"records": records, "cursor": cursor, "input_events": input_events, "menu_reply": menu_reply,
                 "pid": self.process.pid}
+
+    def watch_local_peer(self, pid):
+        if type(pid) is not int or pid <= 0 or pid == self.process.pid:
+            raise ValueError("a distinct local peer process is required")
+        self.peer = psutil.Process(pid)
+        return {"pid": self.peer.pid}
 
     def submit(self, match, frame, keys, duration):
         snapshot = self.frames[match, frame]

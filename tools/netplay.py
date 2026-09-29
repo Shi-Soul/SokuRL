@@ -72,6 +72,7 @@ def main(cfg):
                 report["human_game"] = human.request("start", {"network": human_settings,
                                                                "visibility": asdict(episode.visibility)})
                 (directory / "human-game.json").write_text(json.dumps(report["human_game"], indent=2), encoding="utf-8")
+                connection.request("watch_local_peer", {"pid": report["human_game"]["pid"]})
                 print(f"人类玩家窗口已启动。请在后打开的窗口中选人并操作；推理设备：{config['device']}。", flush=True)
             with gzip.open(directory / "events.jsonl.gz", "wt", encoding="utf-8") as events:
                 def record(value):
