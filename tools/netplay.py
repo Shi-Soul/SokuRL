@@ -1,4 +1,4 @@
-"""Run a saved policy on GPU while its worker owns one real network game."""
+"""Run a local policy while its worker owns one real network game."""
 from contextlib import closing
 from dataclasses import asdict
 import gzip
@@ -9,9 +9,7 @@ import time
 import hydra
 import numpy as np
 from omegaconf import OmegaConf
-import torch
 
-from soku_rl.checkpoint_policy import load_policy
 from soku_rl.env import EpisodeConfig
 from soku_rl.learning_wrappers import LearningConfig, LearningInterface
 from soku_rl.network_session import run_session
@@ -28,19 +26,24 @@ def main(cfg):
         raise ValueError("network role must be host or join")
     seat = ("host", "join").index(config["network"]["role"])
     interface = LearningInterface(episode, LearningConfig(**config["wrappers"]))
-    device = torch.device(config["device"])
-    if device.type != "cuda" or not torch.cuda.is_available():
-        raise ValueError("formal network policy inference requires CUDA")
     if (type(config["session"]["matches"]) is not int or config["session"]["matches"] < 1
             or config["session"]["timeout"] <= 0):
         raise ValueError("positive match count and session timeout are required")
-    torch.set_num_threads(1)
-    policy = load_policy(config["candidate"]["name"], config["candidate"]["policy"], interface, device)
+    spec = config["candidate"]["policy"]
+    if spec["kind"] == "onnx_recurrent":
+        from soku_rl.onnx_policy import OnnxPolicy
+        if config["device"] != "cpu":
+            raise ValueError("the deployment model requires device=cpu")
+        policy = OnnxPolicy(config["candidate"]["name"], spec["path"], interface)
+    else:
+        import torch
+        from soku_rl.checkpoint_policy import load_policy
+        torch.set_num_threads(1)
+        policy = load_policy(config["candidate"]["name"], spec, interface, torch.device(config["device"]))
     # Initialize model kernels before the original engine starts its frame clock.
     warm = policy.spawn(config["seed"])
     for _ in range(8):
         warm.act(np.zeros(interface.observation_space.shape, np.float32))
-    torch.cuda.synchronize(device)
     del warm
     directory = Path(config["output"]).resolve()
     directory.mkdir(parents=True, exist_ok=False)

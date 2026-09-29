@@ -5,6 +5,7 @@ defaults:
 candidate:
   name: learned
   policy: ???
+device: cpu
 network:
   role: host
   address: 127.0.0.1

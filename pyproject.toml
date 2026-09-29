@@ -17,6 +17,8 @@ nfsp = ["open-spiel==2.0.2", "dm-tree>=0.1.9", "torch==2.9.1"]
 ppo = ["stable-baselines3==2.9.0", "sb3-contrib==2.9.0", "torch==2.9.1"]
 psro = ["open-spiel==2.0.2", "stable-baselines3==2.9.0", "cvxpy>=1.4", "matplotlib>=3.7"]
 marl = ["torch==2.9.1", "torchrl==0.10.1", "tensordict==0.10.0", "benchmarl==1.5.1", "open-spiel==2.0.2", "dm-tree>=0.1.9"]
+play = ["onnxruntime==1.23.2"]
+export = ["onnx==1.19.1", "onnxruntime==1.23.2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
