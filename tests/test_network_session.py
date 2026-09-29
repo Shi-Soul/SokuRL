@@ -55,7 +55,7 @@ def test_three_rounds_and_a_rematch_reset_model_memory_without_offline_commands(
         (1, 1, 3), (1, 200, 3), (1, 400, 3), (2, 1, 3), (2, 200, 3)]
 
 
-@pytest.mark.parametrize("reply", ("late", "queue_full", "wrong_round"))
+@pytest.mark.parametrize("reply", ("invalid", "queue_full", "too_frequent"))
 def test_rejected_command_is_logged_and_stops_before_another_decision(reply):
     connection = Connection([frame(1, 0, 1, "battle", ("round_started",), (0, 0))], reply)
     log = []
@@ -63,6 +63,40 @@ def test_rejected_command_is_logged_and_stops_before_another_decision(reply):
         run_session(connection, RecordingPolicy(), interface(), 0, 1, 1, 10., log.append)
     assert log[-1]["kind"] == "command" and log[-1]["reply"] == reply
     assert len(connection.commands) == 1
+
+
+@pytest.mark.parametrize("reply", ("late", "wrong_round"))
+def test_game_advancing_during_inference_is_logged_without_ending_the_match(reply):
+    connection = Connection([
+        frame(1, 0, 1, "battle", ("round_started",), (0, 0)),
+        frame(1, 0, 2, "battle", (), (0, 0)),
+        frame(1, 0, 3, "battle", (), (0, 0)),
+        frame(1, 0, 4, "battle", (), (0, 0)),
+        frame(1, 0, 5, "match_finished", ("match_finished",), (2, 0)),
+    ], reply)
+    log = []
+    result = run_session(connection, RecordingPolicy(), interface(), 0, 1, 1, 10., log.append)
+    assert result["matches"] == 1 and result["dropped_commands"][reply] == 2
+    assert result["accepted_commands"] == 0 and result["decisions"] == 2
+    assert len([x for x in log if x["kind"] == "command" and x["reply"] == reply]) == 2
+
+
+def test_backlog_keeps_observation_history_but_skips_obsolete_decisions():
+    class BatchedConnection(Connection):
+        def request(self, operation, payload):
+            if operation == "poll":
+                return {"menu_reply": "not_requested", "input_events": (), "records": next(self.frames)}
+            return super().request(operation, payload)
+
+    batch = [frame(1, 0, index, "battle", ("round_started",) if index == 1 else (), (0, 0))
+             for index in range(1, 11)]
+    connection = BatchedConnection([batch, [frame(1, 0, 11, "match_finished", ("match_finished",), (2, 0))]], "accepted")
+    policy, log = RecordingPolicy(), []
+    result = run_session(connection, policy, interface(), 0, 1, 1, 10., log.append)
+    assert result["skipped_decisions"] == 3 and result["accepted_commands"] == 1
+    assert len(policy.episodes[0][1]) == 1
+    assert [x["frame"] for x in connection.commands] == [10]
+    assert [x["frame"] for x in log if x["kind"] == "frame"] == list(range(1, 12))
 
 
 def test_disconnect_is_an_interruption_and_not_a_match_result():

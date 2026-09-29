@@ -8,8 +8,9 @@ class LivePolicy:
     """Keep model memory, public history and own commands local to one round.
 
     The caller supplies visibility-filtered observations and submits returned
-    commands through the local input transport. A rejected command must stop
-    this session; the caller must not silently continue with a different history.
+    commands through the local input transport. Command history records issued
+    intents, not proof of engine execution; the caller logs transport outcomes.
+    Skipped decision windows do not invent actions or advance model memory.
     The training time-limit feature saturates, but the original match continues.
     """
 
@@ -54,6 +55,11 @@ class LivePolicy:
         self.features.record_command(self.agent, command)
         self.next_decision += self.interface.episode.decision_frames
         return command
+
+    def skip_decision(self):
+        if not self.decision_due:
+            raise RuntimeError("skip only an unconsumed decision boundary")
+        self.next_decision += self.interface.episode.decision_frames
 
     def stop(self):
         self.active = False
