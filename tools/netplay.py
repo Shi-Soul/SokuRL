@@ -55,6 +55,7 @@ def main(cfg):
             (directory / "runtime.json").write_text(json.dumps(connection.identity, indent=2), encoding="utf-8")
             report["game"] = connection.request("start", {"network": config["network"],
                                                         "visibility": asdict(episode.visibility)})
+            (directory / "game.json").write_text(json.dumps(report["game"], indent=2), encoding="utf-8")
             with gzip.open(directory / "events.jsonl.gz", "wt", encoding="utf-8") as events:
                 def record(value):
                     events.write(json.dumps({"seconds": time.monotonic()-started, **value})+"\n")
