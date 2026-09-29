@@ -2,6 +2,7 @@
 from collections import OrderedDict
 from dataclasses import asdict
 import ctypes
+from ctypes import wintypes
 import ipaddress
 import os
 import re
@@ -180,6 +181,30 @@ class NetworkGame:
             raise ValueError("a distinct local peer process is required")
         self.peer = psutil.Process(pid)
         return {"pid": self.peer.pid}
+
+    def set_caption(self, caption):
+        if not isinstance(caption, str) or not caption.strip():
+            raise ValueError("a nonempty game caption is required")
+        user32 = sokurl.user32
+        user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.SetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPCWSTR]
+        user32.SetWindowTextW.restype = wintypes.BOOL
+        changed = []
+
+        @sokurl.WNDENUMPROC
+        def window(hwnd, _):
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value == self.process.pid:
+                kind = ctypes.create_unicode_buffer(128)
+                user32.GetClassNameW(hwnd, kind, len(kind))
+                if kind.value != "#32770":
+                    changed.append(bool(user32.SetWindowTextW(hwnd, caption)))
+            return True
+
+        if not user32.EnumWindows(window, 0) or not changed or not all(changed):
+            raise RuntimeError("could not label the owned game window")
+        return {"pid": self.process.pid, "caption": caption}
 
     def submit(self, match, frame, keys, duration):
         snapshot = self.frames[match, frame]

@@ -64,6 +64,7 @@ def main(cfg):
                                                         "visibility": asdict(episode.visibility)})
             (directory / "game.json").write_text(json.dumps(report["game"], indent=2), encoding="utf-8")
             if config["human"]["enabled"]:
+                connection.request("set_caption", {"caption": "SokuRL - AI"})
                 connection.request("wait_host", {})
                 human_runtime = config["runtime"] | {"mute_audio": config["human"]["mute_audio"]}
                 human = stack.enter_context(closing(WorkerConnection(log_path=directory / "human-worker.log", **human_runtime)))
@@ -73,7 +74,8 @@ def main(cfg):
                                                                "visibility": asdict(episode.visibility)})
                 (directory / "human-game.json").write_text(json.dumps(report["human_game"], indent=2), encoding="utf-8")
                 connection.request("watch_local_peer", {"pid": report["human_game"]["pid"]})
-                print(f"人类玩家窗口已启动。请在后打开的窗口中选人并操作；推理设备：{config['device']}。", flush=True)
+                human.request("set_caption", {"caption": "SokuRL - Player"})
+                print(f"玩家窗口 SokuRL - Player 已启动。请在该窗口中选人并操作；推理设备：{config['device']}。", flush=True)
             with gzip.open(directory / "events.jsonl.gz", "wt", encoding="utf-8") as events:
                 def record(value):
                     events.write(json.dumps({"seconds": time.monotonic()-started, **value})+"\n")
