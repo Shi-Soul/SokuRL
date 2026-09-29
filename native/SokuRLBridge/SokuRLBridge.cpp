@@ -7,6 +7,7 @@
 #include "NetworkInput.hpp"
 #include "NetworkSelection.hpp"
 #include "ProfileDeck.hpp"
+#include "HeldInput.hpp"
 
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
@@ -91,6 +92,7 @@ std::uint64_t g_reconstructionTarget = 0;
 std::uint64_t g_replayInputFrame = 0;
 
 SokuRLBridge::LogicalInput g_effectiveInputs[2]{};
+SokuRLBridge::LogicalInput g_simulatedInputs[2]{};
 SokuLib::KeyInput g_activeInputs[2]{};
 std::uint32_t g_activeInputMask = 0;
 std::uint32_t g_activeInputFrames = 0;
@@ -819,21 +821,13 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
     if (player < 0)
         return;
 
-    const auto pendingSequence = load32(&g_control->commandSeq);
-    if (pendingSequence != g_lastCommandSeq) {
-        MemoryBarrier();
-        const auto pendingType = static_cast<SokuRLBridge::CommandType>(
-            load32(&g_control->commandType));
-        if (pendingType == SokuRLBridge::CommandType::StepWithInputs) {
-            const auto pending = player == 0 ? g_control->commandInput :
-                g_control->commandInputP2;
-            self->input = toKeyInput(pending);
-            g_effectiveInputs[player] = pending;
-            return;
-        }
-    }
-    if (!g_inSimulationUpdate)
+    if (!g_inSimulationUpdate) {
+        // Physical polling continues while paused. It must not consume a new
+        // policy action or overwrite the last simulated held-key counters.
+        if (g_battleActive && g_paused)
+            self->input = toKeyInput(g_simulatedInputs[player]);
         return;
+    }
 
     if (g_reconstructing && g_replayInputFrame < g_history.size()) {
         const auto replayIndex = static_cast<std::size_t>(g_replayInputFrame);
@@ -842,7 +836,7 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
         self->input = toKeyInput(recorded);
     } else if (g_activeInputEnabled && (g_activeInputMask & (1U << player)) &&
         g_activeInputFrames) {
-        self->input = g_activeInputs[player];
+        self->input = toKeyInput(g_simulatedInputs[player]);
     } else if (player == 0) {
         if (g_neutralPending) {
             self->input = {};
@@ -862,9 +856,11 @@ void applySimulationInputs(SokuLib::BattleManager *manager)
         inputs[1] = toKeyInput(recorded.p2.input);
         mask = 3;
     } else if (g_activeInputEnabled && g_activeInputFrames) {
-        inputs[0] = g_activeInputs[0];
-        inputs[1] = g_activeInputs[1];
         mask = g_activeInputMask;
+        for (int player = 0; player < 2; ++player)
+            if (mask & (1U << player))
+                inputs[player] = toKeyInput(SokuRLBridge::advanceHeldInput(
+                    g_simulatedInputs[player], toLogicalInput(g_activeInputs[player])));
     }
     if (!mask)
         return;
@@ -879,6 +875,7 @@ void applySimulationInputs(SokuLib::BattleManager *manager)
         if (character->keyManager && character->keyManager->keymapManager)
             character->keyManager->keymapManager->input = inputs[player];
         g_effectiveInputs[player] = toLogicalInput(inputs[player]);
+        g_simulatedInputs[player] = g_effectiveInputs[player];
     }
 }
 
@@ -892,6 +889,10 @@ int callSimulationUpdate(SokuLib::BattleManager *manager)
     g_inSimulationUpdate = true;
     const auto result = (manager->*g_originalBattleManagerProcess)();
     g_inSimulationUpdate = false;
+    g_effectiveInputs[0] = toLogicalInput(manager->leftCharacterManager.keyMap);
+    g_effectiveInputs[1] = toLogicalInput(manager->rightCharacterManager.keyMap);
+    g_simulatedInputs[0] = g_effectiveInputs[0];
+    g_simulatedInputs[1] = g_effectiveInputs[1];
     if (!g_reconstructing && g_activeInputEnabled && g_activeInputFrames) {
         --g_activeInputFrames;
         store32(&g_control->inputFramesRemaining, g_activeInputFrames);
@@ -916,6 +917,8 @@ bool initializeRestartedBattle(SokuLib::BattleManager *manager)
     g_paused = true;
     g_effectiveInputs[0] = {};
     g_effectiveInputs[1] = {};
+    g_simulatedInputs[0] = {};
+    g_simulatedInputs[1] = {};
     auto initial = captureState(manager, 0);
 
     if (g_establishAfterRestart) {
@@ -1014,6 +1017,8 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         g_stepsRemaining = 0;
         g_effectiveInputs[0] = {};
         g_effectiveInputs[1] = {};
+        g_simulatedInputs[0] = {};
+        g_simulatedInputs[1] = {};
         if (g_checkpointArmed && isPracticeGameplay() && SokuLib::practiceSettings)
             SokuLib::practiceSettings->state = SokuLib::DUMMY_STATE_2P_CONTROL;
         if (g_checkpointArmed && g_checkpointSeedRequested)
