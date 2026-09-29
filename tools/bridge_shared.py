@@ -517,8 +517,8 @@ class BridgeClient:
         return self._send(COMMAND_MENU_CONFIRM)
 
     def menu_choose_character(self, character: int) -> int:
-        if type(character) is not int or character not in (0, 1):
-            raise ValueError("network character must be Reimu (0) or Marisa (1)")
+        if type(character) is not int or not 0 <= character < 20:
+            raise ValueError("network character must be a playable character ID from 0 to 19")
         return self._send(COMMAND_MENU_CHOOSE_CHARACTER, argument=character)
 
     def step_back(self) -> int:

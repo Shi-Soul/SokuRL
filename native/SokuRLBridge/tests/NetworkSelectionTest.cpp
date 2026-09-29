@@ -8,7 +8,8 @@ int main() {
     static_assert(selectionDirection(8, 9) == 1);
     static_assert(selectionDirection(20, 8) == 1);
     static_assert(selectionDirection(0, 9) == 1);
-    for (unsigned character = 0; character < 2; ++character) {
+    static_assert(characterCursor(6) == 3);
+    for (unsigned character = 0; character < 20; ++character) {
         const auto target = characterCursor(character);
         for (unsigned initial = 0; initial <= 20; ++initial) {
             auto cursor = initial;

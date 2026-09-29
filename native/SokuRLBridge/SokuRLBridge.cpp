@@ -767,7 +767,7 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
             } else if (networkSelection && type == SokuRLBridge::CommandType::MenuChooseCharacter) {
                 const auto seat = SokuRLBridge::currentNetworkState().localSeat;
                 const auto character = g_control->commandArgument;
-                if (seat > 1 || character > 1 || !SokuLib::currentScene) {
+                if (seat > 1 || character > 19 || !SokuLib::currentScene) {
                     publishResult(SokuRLBridge::ResultCode::InvalidCommand);
                 } else {
                     const auto &select = SokuLib::currentScene->to<SokuLib::Select>();
