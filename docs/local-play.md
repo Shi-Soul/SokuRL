@@ -8,6 +8,8 @@
 
 玩家选 1P 时，玩家窗口先建房，AI 加入成为 2P 并选择灵梦；玩家选 2P 时，AI 先建房成为 1P 并选择魔理沙。AI 用原游戏菜单按键选择角色；战斗开始时再次校验角色，选错就报错。人类玩家自行选人、确认赛后对话，AI 自动确认自己的菜单。
 
+人类玩家可以选择原版全部 20 个可玩角色。规则策略对自身角色的限制只检查 AI，不限制人类对手。AI 选人每隔 0.1 秒发送一次菜单按键，并沿角色列表的较短方向移动；这不改变战斗中的决策间隔和动作延迟。
+
 也可以直接运行 `scripts/play-local.cmd -PlayerSeat 2 -Opponent ppo`，或 `scripts/play-local.cmd -PlayerSeat 1 -Opponent community_combo`。Python 入口使用同一套 Hydra 配置：`human.seat=1` 指定玩家 1P；`+play_opponent=rule play_rule=rush` 指定规则对手。
 
 当前模型、逐个规则的独立测试成绩和可加载策略范围见[当前试玩策略](current-play-policy.md)。
