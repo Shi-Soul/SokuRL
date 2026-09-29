@@ -10,6 +10,8 @@ user32.EnumChildWindows.argtypes = [wintypes.HWND, WINDOW_CALLBACK, wintypes.LPA
 user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
 user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
 user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+user32.IsWindowVisible.argtypes = [wintypes.HWND]
+user32.IsWindowVisible.restype = wintypes.BOOL
 
 
 def blocking_dialogs(pids):
@@ -21,7 +23,7 @@ def blocking_dialogs(pids):
     def window(hwnd, _):
         pid = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        if pid.value not in pids:
+        if pid.value not in pids or not user32.IsWindowVisible(hwnd):
             return True
         kind = ctypes.create_unicode_buffer(128)
         user32.GetClassNameW(hwnd, kind, len(kind))
