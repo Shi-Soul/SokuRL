@@ -13,10 +13,22 @@ from omegaconf import OmegaConf
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.encoding import AGENTS, NUM_ACTIONS
 from soku_rl.env.control import ControlConfig, DelayedControls
+from soku_rl.pixels import RGBFrame
 from soku_rl.worker_pipe import WorkerBackend
 
 
-def record(backend, seed, actions):
+def save_images(state, directory):
+    if any(not isinstance(value, RGBFrame) for value in state.observations):
+        raise TypeError("reset pixel capture requires RGB observations for both players")
+    if any(image.frame != state.frame for image in state.observations):
+        raise ValueError("image and simulation frame differ")
+    directory.mkdir(parents=True, exist_ok=True)
+    for player, image in enumerate(state.observations):
+        header = f"P6\n{image.width} {image.height}\n255\n".encode("ascii")
+        (directory / f"frame-{state.frame}-player-{player}.ppm").write_bytes(header + image.pixels)
+
+
+def record(backend, seed, actions, capture_frames, capture_directory):
     start = time.perf_counter()
     state = backend.reset_slots({0: seed})[0]
     reset_seconds = time.perf_counter() - start
@@ -25,6 +37,8 @@ def record(backend, seed, actions):
     for index in range(len(actions) + 1):
         hashes.append(state.diagnostics["hash"])
         observations.append(hashlib.sha256(pickle.dumps(state.observations, protocol=5)).hexdigest())
+        if state.frame in capture_frames:
+            save_images(state, capture_directory)
         if state.ended or index == len(actions):
             break
         state = backend.step({0: actions[index]})[0]
@@ -56,6 +70,12 @@ def main(cfg):
     pause = validation["pause_after_episode_seconds"]
     if not 0 <= pause <= 60:
         raise ValueError("episode pause must be between zero and sixty seconds")
+    capture_frames = validation["capture_frames"]
+    if (any(type(frame) is not int or not 0 <= frame <= episode.max_frames for frame in capture_frames)
+            or len(set(capture_frames)) != len(capture_frames)):
+        raise ValueError("capture frames must be distinct integer frames within the episode horizon")
+    if capture_frames and episode.observation_mode != "image":
+        raise ValueError("pixel capture requires episode.observation_mode=image")
     rng = random.Random(validation["action_seed"])
     controls = DelayedControls(ControlConfig(episode.decision_frames, episode.latency_frames))
     controls.reset()
@@ -91,7 +111,7 @@ def main(cfg):
         reference = {}
         for seed in seeds:
             with closing(backend(f"fresh-{seed}")) as worker:
-                reference[seed] = record(worker, seed, actions)
+                reference[seed] = record(worker, seed, actions, capture_frames, output / f"fresh-{seed}")
                 report["runtime"] = worker.identity
                 save(f"fresh-{seed}", reference[seed])
         with closing(backend("persistent")) as worker:
@@ -112,7 +132,7 @@ def main(cfg):
             check_peer(peer)
             for cycle in range(validation["cycles"]):
                 for seed in seeds:
-                    actual = record(worker, seed, actions)
+                    actual = record(worker, seed, actions, capture_frames, output / f"cycle-{cycle}-{seed}")
                     save(f"cycle-{cycle}-{seed}", actual)
                     compare(reference[seed], actual)
                     if pid is not None and (actual["pid"] != pid or actual["segment"] != segment + 1):
