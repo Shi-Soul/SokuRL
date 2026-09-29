@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -30,13 +31,16 @@ BATTLE_MODE_VSPLAYER = 3
 BATTLE_SUBMODE_REPLAY = 2
 
 
-def launch_replay_checkpoint(replay: Path, timeout: float = 35.0) -> PracticeInstance:
+def launch_replay_checkpoint(replay: Path, timeout: float, unlimited: bool) -> PracticeInstance:
+    if timeout <= 0 or type(unlimited) is not bool:
+        raise ValueError("replay launch requires a positive timeout and an explicit pacing mode")
     replay = replay.resolve()
     if not replay.is_file() or replay.suffix.casefold() != ".rep":
         raise ValueError(f"not a replay file: {replay}")
     sokurl._validate_game()
     process = psutil.Process(
-        subprocess.Popen([str(sokurl.GAME_EXE), str(replay)], cwd=sokurl.GAME_DIR).pid
+        subprocess.Popen([str(sokurl.GAME_EXE), str(replay)], cwd=sokurl.GAME_DIR,
+                         env=os.environ | {"SOKURL_UNLIMITED_PACING": str(int(unlimited))}).pid
     )
     client: BridgeClient | None = None
     deadline = time.monotonic() + timeout
@@ -87,8 +91,10 @@ def launch_replay_checkpoint(replay: Path, timeout: float = 35.0) -> PracticeIns
         raise
 
 
-def play_full_replay(replay: Path, timeout: float = 900.0) -> tuple[list[RawFrameState], dict[str, object]]:
-    instance = launch_replay_checkpoint(replay)
+def play_full_replay(replay: Path, launch_timeout: float, timeout: float) -> tuple[list[RawFrameState], dict[str, object]]:
+    if timeout <= 0:
+        raise ValueError("replay playback timeout must be positive")
+    instance = launch_replay_checkpoint(replay, launch_timeout, False)
     states = [instance.state]
     pid = instance.pid
     started = time.monotonic()
@@ -168,8 +174,11 @@ def replay_to_target(
     recorded: list[RawFrameState],
     inputs: list[InputPair],
     target: int,
+    launch_timeout: float,
 ) -> tuple[RawFrameState, int | None, list[dict[str, object]]]:
-    instance = launch_replay_checkpoint(replay)
+    # A paused replay advances only on an acknowledged one-frame command.
+    # It cannot overflow the frame ring, so this process needs no wall-clock cap.
+    instance = launch_replay_checkpoint(replay, launch_timeout, True)
     try:
         initial_raw = instance.state
         differences = complex_state_diff(recorded[0], initial_raw)
@@ -223,8 +232,8 @@ def summarize_frame(state: RawFrameState) -> dict[str, object]:
     }
 
 
-def run_validation(replay: Path) -> dict[str, object]:
-    states, playback = play_full_replay(replay)
+def run_validation(replay: Path, launch_timeout: float, playback_timeout: float) -> dict[str, object]:
+    states, playback = play_full_replay(replay, launch_timeout, playback_timeout)
     inputs = [
         InputPair(input_tuple(state.p1.input), input_tuple(state.p2.input))
         for state in states[1:]
@@ -251,7 +260,7 @@ def run_validation(replay: Path) -> dict[str, object]:
         "target_results": [],
     }
     for target in targets:
-        reconstructed, divergence, differences = replay_to_target(replay, states, inputs, target)
+        reconstructed, divergence, differences = replay_to_target(replay, states, inputs, target, launch_timeout)
         result = {
             "target": target,
             "expected_hash": f"{states[target].stateHash:016X}",
@@ -277,7 +286,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     try:
-        report = run_validation(args.replay)
+        report = run_validation(args.replay, 35.0, 900.0)
     except (BridgeUnavailable, OSError, psutil.Error, RuntimeError, ValueError) as error:
         report = {"success": False, "error": str(error), "replay": str(args.replay)}
     path = args.report

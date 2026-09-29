@@ -158,13 +158,14 @@ def require_lossless_contiguous(states, playback: dict[str, object]) -> None:
             )
 
 
-def run(replay: Path, reconstruction_limit: int) -> dict[str, Any]:
+def run(replay: Path, reconstruction_limit: int, launch_timeout: float,
+        playback_timeout: float) -> dict[str, Any]:
     previous_headless = os.environ.get("SOKURL_HEADLESS_RENDER")
     previous_unlimited = os.environ.get("SOKURL_UNLIMITED_PACING")
     os.environ["SOKURL_HEADLESS_RENDER"] = "1"
     os.environ.pop("SOKURL_UNLIMITED_PACING", None)
     try:
-        states, playback = play_full_replay(replay)
+        states, playback = play_full_replay(replay, launch_timeout, playback_timeout)
         require_lossless_contiguous(states, playback)
         inputs = [
             InputPair(input_tuple(state.p1.input), input_tuple(state.p2.input))
@@ -198,7 +199,7 @@ def run(replay: Path, reconstruction_limit: int) -> dict[str, Any]:
         unique_targets = list(dict.fromkeys(int(target) for target in targets))[:reconstruction_limit]
         reconstruction = []
         for target in unique_targets:
-            actual, divergence, differences = replay_to_target(replay, states, inputs, target)
+            actual, divergence, differences = replay_to_target(replay, states, inputs, target, launch_timeout)
             reconstruction.append({
                 "target": target,
                 "expected_hash": f"{states[target].stateHash:016X}",
@@ -244,7 +245,7 @@ def main() -> int:
         parser.error("--reconstruction-limit must not be negative")
 
     try:
-        report = run(args.replay.resolve(), args.reconstruction_limit)
+        report = run(args.replay.resolve(), args.reconstruction_limit, 35.0, 900.0)
     except Exception as error:
         report = {"success": False, "error": str(error)}
     path = args.report
