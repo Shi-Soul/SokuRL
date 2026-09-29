@@ -1,0 +1,168 @@
+"""Own one real netplay process and expose public frames and local inputs."""
+from collections import OrderedDict
+from dataclasses import asdict
+import ctypes
+import ipaddress
+import os
+import re
+import sys
+import time
+
+import psutil
+
+import sokurl
+from network_history import NetworkHistoryClient
+from network_input import NetworkInputClient
+from network_match import NetworkMatch
+from network_state import NetworkStateClient
+from startup_dialogs import blocking_dialogs
+from soku_rl.visibility import VisibilityConfig
+from soku_rl.visible_state import observe_visible_states
+
+
+class NetworkGame:
+    def __init__(self, settings, visibility, timeout):
+        if set(settings) != {"role", "address", "port", "automate_menu"}:
+            raise ValueError("network settings must specify role, address, port and automate_menu")
+        if settings["role"] not in ("host", "join") or type(settings["automate_menu"]) is not bool:
+            raise ValueError("invalid network role or menu setting")
+        ipaddress.IPv4Address(settings["address"])
+        if type(settings["port"]) is not int or not 1 <= settings["port"] <= 65535 or timeout <= 0:
+            raise ValueError("a valid port and positive launch timeout are required")
+        self.settings, self.timeout = settings, timeout
+        self.visibility = VisibilityConfig(**visibility)
+        self.lifecycle = NetworkMatch(2)
+        self.process = None
+        self.clients = {}
+        self.frames = OrderedDict()
+        self.cursor = 0
+        self.next_confirm = 0.
+        self.next_dialog_check = 0.
+        try:
+            self._launch()
+        except BaseException as error:
+            try:
+                self.close()
+            except Exception as cleanup_error:
+                error.add_note(f"network cleanup failed: {cleanup_error!r}")
+            raise
+
+    def _launch(self):
+        mutex = sokurl.kernel32.CreateMutexW(None, False, r"Local\SokuRLVsLaunchConfig")
+        if not mutex:
+            raise OSError(ctypes.get_last_error(), "cannot lock game launch configuration")
+        acquired = False
+        original = None
+        try:
+            acquired = sokurl.kernel32.WaitForSingleObject(mutex, int(self.timeout*1000)) == sokurl.WAIT_OBJECT_0
+            if not acquired:
+                raise TimeoutError("network launch configuration lock timed out")
+            original = sokurl.SKIPINTRO_INI.read_bytes()
+            title, count = re.subn(rb"(?m)^(\s*scene_id\s*=\s*)\d+(\s*)$", rb"\g<1>2\g<2>", original, count=1)
+            if count != 1:
+                raise ValueError("SkipIntro scene_id setting is missing")
+            sokurl.SKIPINTRO_INI.write_bytes(title)
+            env = os.environ.copy()
+            env.update(SOKURL_VS_BOOTSTRAP="0", SOKURL_UNLIMITED_PACING="0",
+                SOKURL_HEADLESS_RENDER="0", SOKURL_CAPTURE_IMAGES="0",
+                SOKURL_NETWORK_ROLE=self.settings["role"],
+                SOKURL_NETWORK_PORT=str(self.settings["port"]),
+                SOKURL_NETWORK_ADDRESS=self.settings["address"])
+            self.process = psutil.Popen([str(sokurl.GAME_EXE)], cwd=sokurl.GAME_DIR,
+                                        env=env, stdout=sys.stderr, stderr=sys.stderr)
+            deadline = time.monotonic()+self.timeout
+            while time.monotonic() < deadline:
+                if self.process.poll() is not None:
+                    raise RuntimeError("network game exited during startup")
+                try:
+                    scene = sokurl._read_process_values(self.process.pid)[0]
+                except OSError:
+                    self._check_dialogs()
+                    time.sleep(.01)
+                    continue
+                if scene in (2, 8, 9, 10, 11, 13, 14):
+                    self.clients["state"] = NetworkStateClient(self.process.pid)
+                    self.clients["history"] = NetworkHistoryClient(self.process.pid)
+                    self.clients["input"] = NetworkInputClient(self.process.pid)
+                    self.clients["menu"] = sokurl.BridgeClient(self.process.pid)
+                    return
+                self._check_dialogs()
+                time.sleep(.01)
+            raise TimeoutError("network game did not reach the title scene")
+        finally:
+            if original is not None:
+                sokurl.SKIPINTRO_INI.write_bytes(original)
+            if acquired:
+                sokurl.kernel32.ReleaseMutex(mutex)
+            sokurl.kernel32.CloseHandle(mutex)
+
+    def _check_dialogs(self):
+        now = time.monotonic()
+        if now >= self.next_dialog_check:
+            dialogs = blocking_dialogs({self.process.pid})
+            if dialogs:
+                raise RuntimeError(f"network game blocked by dialogs: {dialogs}")
+            self.next_dialog_check = now+2
+
+    def poll(self):
+        if self.process.poll() is not None:
+            raise EOFError("owned network game exited")
+        cursor, snapshots = self.clients["history"].read_after(self.cursor, 2.)
+        records = []
+        for snapshot in snapshots:
+            events = self.lifecycle.update(snapshot)
+            record = {"match": snapshot.match, "round": snapshot.raw.roundId,
+                "frame": snapshot.updates, "scene": snapshot.scene, "seat": snapshot.local_seat,
+                "scores": snapshot.scores, "phase": self.lifecycle.phase,
+                "events": tuple(asdict(event) for event in events)}
+            if self.lifecycle.can_act:
+                record["observations"] = observe_visible_states(snapshot.raw, snapshot.render, self.visibility)
+                self.frames[snapshot.match, snapshot.updates] = snapshot
+                while len(self.frames) > 256:
+                    self.frames.popitem(last=False)
+            records.append(record)
+        self.cursor = cursor
+        latest = self.clients["state"].read(2.)
+        menu_reply = "not_requested"
+        now = time.monotonic()
+        if self.settings["automate_menu"] and now >= self.next_confirm:
+            if latest.scene in (8, 9):
+                menu = self.clients["menu"]
+                if menu.block.commandSeq == menu.block.ackSeq:
+                    menu.menu_confirm()
+                    menu_reply = "selection_requested"
+                    self.next_confirm = now+1
+            elif latest.in_battle and max(latest.scores) >= 2:
+                controller = self.clients["input"]
+                sequence = controller.confirm_result(latest)
+                menu_reply = controller.wait_for_reply(sequence, 2.)
+                self.next_confirm = now+1
+        if not latest.in_battle:
+            self._check_dialogs()
+        return {"records": records, "cursor": cursor, "menu_reply": menu_reply,
+                "pid": self.process.pid}
+
+    def submit(self, match, frame, keys, duration):
+        snapshot = self.frames[match, frame]
+        controller = self.clients["input"]
+        sequence = controller.submit(snapshot, keys, duration)
+        return {"request": sequence, "reply": controller.wait_for_reply(sequence, 2.),
+                "observed": frame, "target": frame+5,
+                "latest_injection": controller.latest_injection(2.)}
+
+    def close(self):
+        try:
+            if "input" in self.clients and self.process.poll() is None:
+                controller = self.clients["input"]
+                controller.wait_for_reply(controller.release(), 2.)
+        finally:
+            for client in self.clients.values():
+                client.close()
+            self.clients.clear()
+            if self.process is not None and self.process.poll() is None:
+                sokurl._post_close(self.process.pid)
+                try:
+                    self.process.wait(timeout=10)
+                except psutil.TimeoutExpired:
+                    self.process.terminate()
+                    self.process.wait(timeout=10)
