@@ -125,7 +125,11 @@ class NetworkGame:
                 record["render"] = asdict(snapshot.render)
                 record["state_hash"] = snapshot.raw.stateHash
             if self.lifecycle.can_act:
-                record["observations"] = observe_visible_states(snapshot.raw, snapshot.render, self.visibility)
+                try:
+                    record["observations"] = observe_visible_states(snapshot.raw, snapshot.render, self.visibility)
+                except Exception as error:
+                    raise RuntimeError(f"network visibility failed: metadata={record!r}, "
+                                       f"raw_hex={bytes(snapshot.raw).hex()}") from error
                 self.frames[snapshot.match, snapshot.updates] = snapshot
                 while len(self.frames) > 256:
                     self.frames.popitem(last=False)
