@@ -45,9 +45,13 @@ endif()
 set_target_properties(SokuRLBridge PROPERTIES PREFIX "" OUTPUT_NAME "SokuRLBridge")
 set_property(SOURCE NetworkInput.cpp APPEND PROPERTY OBJECT_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/NetworkInputSchedule.hpp")
+set_property(SOURCE RenderState.cpp APPEND PROPERTY OBJECT_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/RenderState.hpp")
 
 include(CTest)
 if(BUILD_TESTING)
     add_executable(NetworkInputScheduleTest tests/NetworkInputScheduleTest.cpp)
     add_test(NAME NetworkInputSchedule COMMAND NetworkInputScheduleTest)
+    add_executable(RenderObjectSelectionTest tests/RenderObjectSelectionTest.cpp)
+    add_test(NAME RenderObjectSelection COMMAND RenderObjectSelectionTest)
 endif()

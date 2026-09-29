@@ -19,20 +19,22 @@ void entity(const SokuLib::ObjectManager &object, RenderEntity &state)
 void objects(const SokuLib::CharacterManager &player, RenderState &state, unsigned owner)
 {
     const auto &list = player.objects.list;
-    if (list.size > RENDER_OBJECTS_PER_PLAYER)
-        state.overflow = 1;
-    if (!list.head || !list.size)
-        return;
+    if (!list.size) return;
+    if (!list.head) { state.overflow = 1; return; }
     auto *node = list.head->next;
-    while (node && node != list.head && state.counts[owner] < RENDER_OBJECTS_PER_PLAYER) {
+    unsigned visited = 0;
+    while (node && node != list.head && visited < list.size) {
         if (!node->val) {
             state.overflow = 1;
             break;
         }
-        entity(*node->val, state.objects[owner][state.counts[owner]++]);
+        RenderEntity object{};
+        entity(*node->val, object);
+        captureRenderObject(state, object, owner);
+        ++visited;
         node = node->next;
     }
-    if (state.counts[owner] != list.size)
+    if (visited != list.size || node != list.head)
         state.overflow = 1;
 }
 }
