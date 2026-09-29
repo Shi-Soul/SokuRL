@@ -1,0 +1,7 @@
+defaults:
+  - netplay
+  - _self_
+
+decisions: 4096
+maximum_p99_ms: 10.0
+output: logs/inference/${candidate.name}-${now:%Y%m%d-%H%M%S}
