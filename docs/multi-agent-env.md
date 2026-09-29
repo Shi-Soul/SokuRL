@@ -135,4 +135,16 @@ python tools/train.py --config-dir config/local +machine=gpu41 algorithm=psro
 
 增加 `track=superhuman` 可使用超人赛道配置；拟人赛道可用 `episode.observation_mode=image` 切换图像。
 
+### 从完成的训练目录发起评测
+
+`tools/benchmark_training.py` 读取训练目录的 `result.json` 和 `config.yaml`，要求训练成功结束且两个座位的最终模型都存在。PPO 使用每座位的 `final.zip`，NFSP 使用最终平均策略，PSRO 使用最终种群混合策略，IPPO 使用最终决策数对应的检查点。中途检查点不能代替缺失的最终模型。
+
+```text
+python tools/benchmark_training.py --config-dir config/local +machine=gpu41 training_directory=logs/training/run-name evaluation=validation
+```
+
+评测自动采用保存的算法、观测、动作包装、赛道和延迟配置。运行设备、采样进程、并行实例数、评估种子和输出位置仍由本次评测的 Hydra 配置决定。记录中包含训练结果文件的 SHA-256。旧的 12 帧策略会按 12 帧评测，不能因当前默认延迟是 5 帧而改变其条件。
+
+模型选择完成后，将 `evaluation` 改为 `test` 执行独立测试。两个划分均包含 15 个规则对手、32 个世界种子和交换座位，共 960 局。加载与推理成功只证明模型文件可用，胜率目标仍须由完整评测证明。需要指定中途检查点时，使用原有的 `tools/benchmark.py` 并显式填写双方模型，不得将其报告为最终策略。
+
 已取得的真实对局和接口检查证据见[环境验收记录](env-validation.md)。正式训练和最终交付须满足[完整验收清单](training-acceptance.md)。未完成双赛道胜率目标、可玩策略交付、回放视频和联网人机对战之前，不能宣布整个任务完成。
