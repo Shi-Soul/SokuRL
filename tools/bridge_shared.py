@@ -50,6 +50,7 @@ COMMAND_MENU_CONFIRM = 8
 COMMAND_STEP_WITH_INPUTS = 9
 COMMAND_APPLY_SIMPLE_STATE = 10
 COMMAND_RESET_EPISODE = 11
+COMMAND_MENU_CHOOSE_CHARACTER = 12
 
 RESULT_NAMES = {
     0: "IDLE", 1: "ACCEPTED", 2: "COMPLETE", 3: "RELEASED",
@@ -514,6 +515,11 @@ class BridgeClient:
 
     def menu_confirm(self) -> int:
         return self._send(COMMAND_MENU_CONFIRM)
+
+    def menu_choose_character(self, character: int) -> int:
+        if type(character) is not int or character not in (0, 1):
+            raise ValueError("network character must be Reimu (0) or Marisa (1)")
+        return self._send(COMMAND_MENU_CHOOSE_CHARACTER, argument=character)
 
     def step_back(self) -> int:
         current = self.snapshot().game_frame

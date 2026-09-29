@@ -763,6 +763,27 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
                 g_lastCommandSeq = sequence;
                 publishResult(SokuRLBridge::ResultCode::Complete);
                 acknowledge(sequence);
+            } else if (networkSelection && type == SokuRLBridge::CommandType::MenuChooseCharacter) {
+                const auto seat = SokuRLBridge::currentNetworkState().localSeat;
+                const auto character = g_control->commandArgument;
+                if (seat > 1 || character > 1 || !SokuLib::currentScene) {
+                    publishResult(SokuRLBridge::ResultCode::InvalidCommand);
+                } else {
+                    const auto &select = SokuLib::currentScene->to<SokuLib::Select>();
+                    const auto cursor = seat ? select.rightCursor.cursorPos : select.leftCursor.cursorPos;
+                    const auto stage = seat ? select.rightSelectionStage : select.leftSelectionStage;
+                    // Use the local menu's original packed inputs so the peer sees
+                    // the same selection. Never overwrite either player's character.
+                    if (cursor == character)
+                        self->input.a = 1;
+                    else if (stage != 0)
+                        self->input.b = 1;
+                    else
+                        self->input.horizontalAxis = cursor < character ? 1 : -1;
+                    publishResult(SokuRLBridge::ResultCode::Complete);
+                }
+                g_lastCommandSeq = sequence;
+                acknowledge(sequence);
             } else if (!networkSelection && type == SokuRLBridge::CommandType::EstablishCheckpoint) {
                 const auto seed = g_control->commandArgument;
                 if (SokuLib::practiceSettings)

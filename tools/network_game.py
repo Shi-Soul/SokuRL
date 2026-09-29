@@ -171,7 +171,7 @@ class NetworkGame:
             if latest.scene in (8, 9):
                 menu = self.clients["menu"]
                 if menu.block.commandSeq == menu.block.ackSeq:
-                    menu.menu_confirm()
+                    menu.menu_choose_character(1 if self.settings["role"] == "host" else 0)
                     menu_reply = "selection_requested"
                     self.next_confirm = now+1
             elif latest.in_battle and max(latest.scores) >= 2:
