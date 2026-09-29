@@ -51,6 +51,7 @@ def game_memory(character):
         memory.write(base + 0x1D0, "4i", 100, -20, 200, 30)
         memory.write(base + 0x220, "4i", 120, -40, 300, 40)
         memory.write(base + 0x320, "2I", 0, base + 0x1100)
+        memory.write(base + 0x334, "I", 1)
         memory.write(base + 0x1100, "4i", -40, -60, 80, 70)
         memory.write(base + 0x5E4, "HB", 123, 2)
         memory.write(base + 0x5EC, "4I", base + 0x1200, 5, 4, 2)

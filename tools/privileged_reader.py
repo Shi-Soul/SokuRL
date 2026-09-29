@@ -88,9 +88,12 @@ class PrivilegedReader:
             for index in range(count):
                 pointer = read(0x320 + index * 4, "I") if key == "attackarea" else 0
                 box = list(self.value(pointer if pointer else address + boxes_offset + index * 16, "4i"))
-                if pointer:
-                    box[0] += int(entity["x"]); box[2] += int(entity["x"])
-                    box[1] -= int(entity["y"]); box[3] -= int(entity["y"])
+                relative = pointer or (key == "hitarea" and read(0x334 + index * 4, "I"))
+                if relative:
+                    # Packaged ver0.93 adds coordinates before truncation.
+                    # Source ver0.96 truncates first and omits hit-box flags.
+                    box[0] = int(box[0] + entity["x"]); box[2] = int(box[2] + entity["x"])
+                    box[1] = int(box[1] - entity["y"]); box[3] = int(box[3] - entity["y"])
                 box[1] *= -1; box[3] *= -1
                 boxes.append(tuple(box))
             entity[key], entity[key + "_n"] = tuple(boxes), count

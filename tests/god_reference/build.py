@@ -35,6 +35,15 @@ def generate(upstream, output):
     parts.append(b"short GetCardId(int player,int n);\n")
     for name in ("obj_base.cpp", "character.cpp"):
         source = (upstream / name).read_bytes().replace(b'#include "stdafx.h"', b"")
+        if name == "obj_base.cpp":
+            # The packaged 0.93 machine code performs x87 addition before
+            # integer conversion, and transforms hit boxes when flag != 0.
+            source = source.replace(b"static_cast<int>(x)", b"static_cast<double>(x)")
+            source = source.replace(b"static_cast<int>(y)", b"static_cast<double>(y)")
+            marker = b"ReadProcessMemory(ph,  base_addr + ADDR_HITAREA2OFS + i * sizeof(box), &box, sizeof(box));"
+            source = source.replace(marker, marker + b"\nif(flag) {"
+                b"box.left = x + static_cast<double>(box.left); box.right = x + static_cast<double>(box.right);"
+                b"box.top = -y + static_cast<double>(box.top); box.bottom = -y + static_cast<double>(box.bottom); }\n")
         if name == "character.cpp":
             # MSVC accepts false as a null pointer constant; GCC requires 0.
             signature = b"const Obj *Character::GetOptionObject("

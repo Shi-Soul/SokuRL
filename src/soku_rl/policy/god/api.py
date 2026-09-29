@@ -34,7 +34,7 @@ class ScriptAPI:
           function set_data_delay(n) _set_delay('data_delay',n); data_delay=n end
           function set_weather_delay(n) _set_delay('weather_delay',n); weather_delay=n end
         """)
-        self.globals[b"get_version"] = lambda: b"ver0.96"
+        self.globals[b"get_version"] = lambda: b"ver0.93"
         self.globals[b"get_real_key_stat"] = self.no_external_keys
         self.globals[b"_random_unit"] = self.random
         self.lua.execute(b"""
@@ -175,7 +175,7 @@ class ScriptAPI:
             return ()
         obj = objects[int(index)]
         return tuple(obj[key] for key in ("act", "x", "y", "hp", "img", "frame", "xspeed",
-                                         "yspeed", "address", "attackarea_n", "hitarea_n", "fflags", "aflags"))
+                                         "yspeed", "address", "attackarea_n", "hitarea_n"))
 
     def box(self, entity, kind, index):
         boxes = entity[kind]
