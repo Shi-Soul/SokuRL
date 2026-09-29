@@ -1,5 +1,5 @@
 """Load a play opponent without importing training libraries for rules or ONNX."""
-from soku_rl.env.wrappers.learning import LearningRulePolicy
+from soku_rl.policy.rules.observed_rules import LearningRulePolicy
 from soku_rl.policy.rules.observed_rules import RulePolicy
 from soku_rl.policy.rules.strategies import rule_implementation
 

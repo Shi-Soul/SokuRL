@@ -2,7 +2,9 @@
 from collections import deque
 from dataclasses import dataclass
 
-from soku_rl.policy.rules.baselines import Decision, Observation, TreeConfig, TreePolicy, _decision
+from soku_rl.env.encoding import Decision
+from soku_rl.env.observation.diagnostic import Observation
+from soku_rl.policy.rules.baselines import TreeConfig, TreePolicy, _decision
 
 
 @dataclass(frozen=True, slots=True)

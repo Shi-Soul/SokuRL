@@ -1,7 +1,35 @@
 """Convert exported game frames to immutable, player-relative observations."""
-from soku_rl.policy.rules.baselines import Fighter, Observation, Projectile
+from dataclasses import dataclass
 from soku_rl.env.observation.gauges import spirit_fraction
 
+
+@dataclass(frozen=True, slots=True)
+class Fighter:
+    x: float
+    y: float
+    hp: int
+    spirit_fraction: float
+    action_id: int
+    airborne: bool
+    hitstop: int
+    character_id: int
+    facing: int
+
+
+@dataclass(frozen=True, slots=True)
+class Projectile:
+    x: float
+    y: float
+    speed_x: float
+    speed_y: float
+
+
+@dataclass(frozen=True, slots=True)
+class Observation:
+    frame: int
+    player: Fighter
+    opponent: Fighter
+    enemy_projectiles: tuple[Projectile, ...]
 
 def observe(state, player_index):
     if player_index not in (0, 1):

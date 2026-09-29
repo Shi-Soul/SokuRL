@@ -1,8 +1,7 @@
 """Fixed observation tensors and lossless discrete logical key encoding."""
-from dataclasses import astuple
+from dataclasses import astuple, dataclass
 import numpy as np
 from gymnasium import spaces
-from soku_rl.policy.rules.baselines import Decision
 
 AGENTS = ("player_0", "player_1")
 NUM_ACTIONS = 3 * 3 * 64
@@ -10,6 +9,11 @@ MAX_PROJECTILES = 64
 FRAME_FEATURES = 19 + MAX_PROJECTILES * 5
 FIGHTER_SCALES = np.asarray([1280, 1280, 10000, 1, 1000, 1, 60, 19, 1], dtype=np.float32)
 
+
+@dataclass(frozen=True, slots=True)
+class Decision:
+    inputs: tuple[int, int, int, int, int, int, int, int]
+    rule: str
 
 def decode_action(action):
     if isinstance(action, (bool, np.bool_)) or not isinstance(action, (int, np.integer)):

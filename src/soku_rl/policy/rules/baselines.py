@@ -2,40 +2,8 @@
 from dataclasses import dataclass
 from math import hypot, isfinite
 
-
-@dataclass(frozen=True, slots=True)
-class Fighter:
-    x: float
-    y: float
-    hp: int
-    spirit_fraction: float
-    action_id: int
-    airborne: bool
-    hitstop: int
-    character_id: int
-    facing: int
-
-
-@dataclass(frozen=True, slots=True)
-class Projectile:
-    x: float
-    y: float
-    speed_x: float
-    speed_y: float
-
-
-@dataclass(frozen=True, slots=True)
-class Observation:
-    frame: int
-    player: Fighter
-    opponent: Fighter
-    enemy_projectiles: tuple[Projectile, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class Decision:
-    inputs: tuple[int, int, int, int, int, int, int, int]
-    rule: str
+from soku_rl.env.encoding import Decision
+from soku_rl.env.observation.diagnostic import Observation
 
 
 @dataclass(frozen=True, slots=True)

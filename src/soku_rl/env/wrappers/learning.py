@@ -1,8 +1,6 @@
 """Apply one learning contract to both PettingZoo and vector game environments."""
 from collections import deque
-from dataclasses import asdict, dataclass
-import hashlib
-import json
+from dataclasses import dataclass
 
 from gymnasium import spaces
 import numpy as np
@@ -175,31 +173,3 @@ class LearningVectorEnv:
 
     def close(self):
         self.env.close()
-
-
-@dataclass(frozen=True)
-class LearningRulePolicy:
-    """Map an existing rule policy into the same learner action vocabulary."""
-    policy: object
-    interface: LearningInterface
-
-    @property
-    def name(self):
-        return self.policy.name
-
-    @property
-    def fingerprint(self):
-        return hashlib.sha256(json.dumps([self.policy.fingerprint,
-            asdict(self.interface.config)], sort_keys=True).encode()).hexdigest()
-
-    def spawn(self, seed):
-        return LearningRuleEpisode(self.policy.spawn(seed), self.interface)
-
-
-@dataclass
-class LearningRuleEpisode:
-    actor: object
-    interface: LearningInterface
-
-    def act(self, observation):
-        return self.interface.action(self.actor.act(self.interface.base_observation(observation)))

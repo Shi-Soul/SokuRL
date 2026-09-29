@@ -18,7 +18,8 @@ def run(cfg):
     from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
     from soku_rl.policy.rules.observed_rules import RulePolicy
     from soku_rl.policy.rules.strategies import rule_implementation
-    from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv, LearningRulePolicy
+    from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
+    from soku_rl.policy.rules.observed_rules import LearningRulePolicy
     from soku_rl.evaluation.benchmark import benchmark
     from soku_rl.env.worker_pipe import WorkerBackend
 

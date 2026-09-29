@@ -7,7 +7,9 @@ import math
 
 import numpy as np
 
-from soku_rl.policy.rules.baselines import Fighter, Observation, Projectile, _decision
+from soku_rl.env.observation.diagnostic import Fighter, Observation, Projectile
+from soku_rl.policy.rules.baselines import _decision
+from soku_rl.env.wrappers.learning import LearningInterface
 from soku_rl.env.encoding import FRAME_FEATURES, FIGHTER_SCALES, encode_action
 from soku_rl.policy.rules.strategies import strategy_from_config
 from soku_rl.policy.rules.tactical_observation import screen_view
@@ -202,3 +204,31 @@ class ScreenRules:
             return _decision(0, 0, "", "release_attack")
         self.next_attack = self.frame + max(self.movement["attack_interval"], 2 * self.stride)
         return _decision(0, 0, button, "visible_range_attack")
+
+
+@dataclass(frozen=True)
+class LearningRulePolicy(RulePolicyBase):
+    """Map an existing rule policy into the same learner action vocabulary."""
+    policy: object
+    interface: LearningInterface
+
+    @property
+    def name(self):
+        return self.policy.name
+
+    @property
+    def fingerprint(self):
+        return hashlib.sha256(json.dumps([self.policy.fingerprint,
+            asdict(self.interface.config)], sort_keys=True).encode()).hexdigest()
+
+    def spawn(self, seed):
+        return LearningRuleEpisode(self.policy.spawn(seed), self.interface)
+
+
+@dataclass
+class LearningRuleEpisode:
+    actor: object
+    interface: LearningInterface
+
+    def act(self, observation):
+        return self.interface.action(self.actor.act(self.interface.base_observation(observation)))

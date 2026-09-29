@@ -46,19 +46,6 @@ class TimeStep(Generic[ObservationT]):
         return self.outcome == Outcome.TRUNCATED
 
 
-class Policy(Protocol[ObservationT, ActionT]):
-    def act(self, observation: ObservationT) -> ActionT: ...
-
-
-class StrategySpec(Protocol[ObservationT, ActionT]):
-    name: str
-
-    @property
-    def fingerprint(self) -> str: ...
-
-    def spawn(self, seed: int) -> Policy[ObservationT, ActionT]: ...
-
-
 class GameBatch(Protocol[ObservationT, ActionT]):
     """Slots evolve independently. Step accepts exactly the still-active slots.
 

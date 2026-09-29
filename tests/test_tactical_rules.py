@@ -7,10 +7,11 @@ import numpy as np
 from omegaconf import OmegaConf
 import pytest
 
-from soku_rl.policy.rules.baselines import Fighter, Observation, Projectile
+from soku_rl.env.observation.diagnostic import Fighter, Observation, Projectile
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.encoding import decode_action, encode_action, encode_observation
-from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningRulePolicy
+from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
+from soku_rl.policy.rules.observed_rules import LearningRulePolicy
 from soku_rl.policy.rules.observed_rules import RulePolicy
 from soku_rl.policy.rules.strategies import rule_implementation, strategy_from_config
 from soku_rl.policy.rules.tactical_rules import TACTICAL_STYLES, TacticalConfig

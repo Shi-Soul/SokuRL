@@ -10,7 +10,7 @@ from stable_baselines3.common.logger import configure
 
 from soku_rl.policy.rules.observed_rules import RulePolicy
 from soku_rl.policy.rules.strategies import rule_implementation
-from soku_rl.env.wrappers.learning import LearningRulePolicy
+from soku_rl.policy.rules.observed_rules import LearningRulePolicy
 from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
 from soku_rl.policy.contract import read_training_contract
 

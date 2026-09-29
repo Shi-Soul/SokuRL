@@ -4,7 +4,7 @@ from dataclasses import replace
 import numpy as np
 from pettingzoo.test import parallel_api_test
 
-from soku_rl.policy.rules.baselines import Fighter, Observation
+from soku_rl.env.observation.diagnostic import Fighter, Observation
 from soku_rl.env import EpisodeConfig, HisoutenParallelEnv, TwoPlayerVectorEnv
 from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.encoding import AGENTS, decode_action
