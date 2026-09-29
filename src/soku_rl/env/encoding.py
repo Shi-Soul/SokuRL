@@ -2,7 +2,7 @@
 from dataclasses import astuple
 import numpy as np
 from gymnasium import spaces
-from soku_rl.baselines import Decision
+from soku_rl.policy.rules.baselines import Decision
 
 AGENTS = ("player_0", "player_1")
 NUM_ACTIONS = 3 * 3 * 64

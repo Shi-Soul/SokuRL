@@ -1,7 +1,7 @@
 """Explicit partial reset and joint stepping for multiple two-player episodes."""
 from gymnasium import spaces
-from .encoding import AGENTS, NUM_ACTIONS, observation_space
-from .hisouten_env import Episode
+from soku_rl.env.encoding import AGENTS, NUM_ACTIONS, observation_space
+from soku_rl.env.hisouten_env import Episode
 
 
 class TwoPlayerVectorEnv:

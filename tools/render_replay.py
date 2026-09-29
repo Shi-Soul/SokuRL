@@ -13,8 +13,8 @@ from omegaconf import OmegaConf
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.control import ControlConfig, DelayedControls
 from soku_rl.env.encoding import AGENTS
-from soku_rl.learning_wrappers import LearningConfig, LearningInterface
-from soku_rl.worker_pipe import WorkerBackend
+from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
+from soku_rl.env.worker_pipe import WorkerBackend
 
 
 def write_pixels(stream, pixels):

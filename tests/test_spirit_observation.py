@@ -4,10 +4,10 @@ from dataclasses import replace
 
 import pytest
 
-from soku_rl.render_state import RenderEntity, RenderSnapshot
-from soku_rl.visible_state import observe_visible_states
-from soku_rl.observations import observe
-from soku_rl.gauges import spirit_fraction
+from soku_rl.env.observation.render_state import RenderEntity, RenderSnapshot
+from soku_rl.env.observation.visible_state import observe_visible_states
+from soku_rl.env.observation.diagnostic import observe
+from soku_rl.env.observation.gauges import spirit_fraction
 from test_env_timing import VISIBILITY
 
 
@@ -63,7 +63,7 @@ def test_malformed_spirit_words_and_positive_overflow_still_fail(invalid):
 
 def test_guard_break_diagnostic_observation_keeps_rules_usable():
     from soku_rl.env.encoding import encode_observation
-    from soku_rl.observed_rules import decode_diagnostic
+    from soku_rl.policy.rules.observed_rules import decode_diagnostic
     from test_tactical_rules import actor
 
     raw, _ = recorded_frame(-88)

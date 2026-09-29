@@ -10,8 +10,8 @@ pytest.importorskip("stable_baselines3")
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from soku_rl.learning_wrappers import LearningInterface
-from soku_rl.ppo_training import initialize_ppo, parameter_hash
+from soku_rl.env.wrappers.learning import LearningInterface
+from soku_rl.rl.training import initialize_ppo, parameter_hash
 from test_policy_artifacts import interface
 
 

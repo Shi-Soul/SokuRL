@@ -3,9 +3,9 @@ from collections import deque
 
 import numpy as np
 
-from soku_rl.pixels import RGBFrame
-from soku_rl.visible_state import StateObservation
-from .encoding import AGENTS
+from soku_rl.env.observation.pixels import RGBFrame
+from soku_rl.env.observation.visible_state import StateObservation
+from soku_rl.env.encoding import AGENTS
 
 
 class ObservationHistory:

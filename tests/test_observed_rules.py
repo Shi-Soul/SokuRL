@@ -5,10 +5,10 @@ import numpy as np
 from omegaconf import OmegaConf
 import pytest
 
-from soku_rl.baselines import Fighter, Observation, Projectile
+from soku_rl.policy.rules.baselines import Fighter, Observation, Projectile
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.encoding import decode_action, encode_observation
-from soku_rl.observed_rules import RulePolicy, decode_diagnostic
+from soku_rl.policy.rules.observed_rules import RulePolicy, decode_diagnostic
 
 
 def episode(mode):

@@ -2,7 +2,7 @@
 import sys
 import traceback
 
-from soku_rl.worker_pipe import PROTOCOL, receive, send
+from soku_rl.env.worker_pipe import PROTOCOL, receive, send
 from network_game import NetworkGame
 from runtime_identity import fingerprints
 

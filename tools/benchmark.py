@@ -14,13 +14,13 @@ def main(cfg):
 
 def run(cfg):
     import torch
-    from soku_rl.checkpoint_policy import SeatPolicies, load_policy
+    from soku_rl.policy.checkpoint import SeatPolicies, load_policy
     from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
-    from soku_rl.observed_rules import RulePolicy
-    from soku_rl.strategies import rule_implementation
-    from soku_rl.learning_wrappers import LearningConfig, LearningInterface, LearningVectorEnv, LearningRulePolicy
-    from soku_rl.policy_benchmark import benchmark
-    from soku_rl.worker_pipe import WorkerBackend
+    from soku_rl.policy.rules.observed_rules import RulePolicy
+    from soku_rl.policy.rules.strategies import rule_implementation
+    from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv, LearningRulePolicy
+    from soku_rl.evaluation.benchmark import benchmark
+    from soku_rl.env.worker_pipe import WorkerBackend
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     episode = EpisodeConfig.from_dict(config["episode"])

@@ -3,8 +3,8 @@ import ctypes
 import struct
 import time
 
-from soku_rl.pixels import RGBFrame
-from soku_rl.render_state import CapturedScene, RenderSnapshot, RENDER_STATE_SIZE
+from soku_rl.env.observation.pixels import RGBFrame
+from soku_rl.env.observation.render_state import CapturedScene, RenderSnapshot, RENDER_STATE_SIZE
 
 import bridge_shared
 

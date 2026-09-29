@@ -11,8 +11,8 @@ import time
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from soku_rl.observations import observe
-from soku_rl.strategies import strategy_from_config
+from soku_rl.env.observation.diagnostic import observe
+from soku_rl.policy.rules.strategies import strategy_from_config
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
 from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl

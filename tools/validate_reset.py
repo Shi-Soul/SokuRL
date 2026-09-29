@@ -13,8 +13,8 @@ from omegaconf import OmegaConf
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.encoding import AGENTS, NUM_ACTIONS
 from soku_rl.env.control import ControlConfig, DelayedControls
-from soku_rl.pixels import RGBFrame
-from soku_rl.worker_pipe import WorkerBackend
+from soku_rl.env.observation.pixels import RGBFrame
+from soku_rl.env.worker_pipe import WorkerBackend
 
 
 def save_images(state, directory):

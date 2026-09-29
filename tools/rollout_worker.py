@@ -2,7 +2,7 @@
 import sys
 import traceback
 
-from soku_rl.worker_pipe import PROTOCOL, receive, send
+from soku_rl.env.worker_pipe import PROTOCOL, receive, send
 from game_batch import RESET_METHODS, SokuGameBatch
 from runtime_identity import fingerprints
 

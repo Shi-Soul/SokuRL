@@ -11,8 +11,8 @@ from omegaconf import OmegaConf
 
 from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
 from soku_rl.env.encoding import AGENTS
-from soku_rl.worker_pipe import WorkerBackend
-from soku_rl.learning_wrappers import LearningConfig, LearningVectorEnv
+from soku_rl.env.worker_pipe import WorkerBackend
+from soku_rl.env.wrappers.learning import LearningConfig, LearningVectorEnv
 
 
 def observation_hash(observation):

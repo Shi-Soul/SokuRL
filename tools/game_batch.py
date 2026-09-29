@@ -1,9 +1,9 @@
 """Adapt owned th123 processes to the simultaneous two-player game contract."""
 import ctypes
 
-from soku_rl.observations import observe
-from soku_rl.visible_state import observe_visible_states
-from soku_rl.visibility import VisibilityConfig
+from soku_rl.env.observation.diagnostic import observe
+from soku_rl.env.observation.visible_state import observe_visible_states
+from soku_rl.env.observation.visibility import VisibilityConfig
 from soku_rl.pomg import Outcome, TimeStep
 from soku_rl.env.match import MatchConfig
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps

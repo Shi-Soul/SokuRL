@@ -6,8 +6,8 @@ from omegaconf import OmegaConf
 import pytest
 
 from soku_rl.env import EpisodeConfig
-from soku_rl.learning_wrappers import LearningConfig, LearningInterface
-from soku_rl.play_policy import load_play_policy
+from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
+from soku_rl.play.loader import load_play_policy
 
 
 def test_all_fifteen_rules_run_without_a_checkpoint():

@@ -6,7 +6,7 @@ import sys
 from omegaconf import OmegaConf
 import pytest
 
-from soku_rl.training_artifacts import completed_policies
+from soku_rl.policy.artifacts import completed_policies
 
 
 def save_report(directory, name, result):

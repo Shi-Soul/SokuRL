@@ -2,9 +2,9 @@
 from dataclasses import replace
 from types import SimpleNamespace
 
-from soku_rl.render_state import RenderEntity, RenderSnapshot
-from soku_rl.visibility import VisibilityConfig, visible_entities
-from soku_rl.visible_state import observe_visible_states, STATE_FEATURES
+from soku_rl.env.observation.render_state import RenderEntity, RenderSnapshot
+from soku_rl.env.observation.visibility import VisibilityConfig, visible_entities
+from soku_rl.env.observation.visible_state import observe_visible_states, STATE_FEATURES
 
 
 def test_large_scene_keeps_model_shape_and_uses_all_contours():

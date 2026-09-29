@@ -10,8 +10,8 @@ import numpy as np
 from omegaconf import OmegaConf
 
 from soku_rl.env import EpisodeConfig
-from soku_rl.learning_wrappers import LearningConfig, LearningInterface
-from soku_rl.onnx_policy import OnnxPolicy
+from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
+from soku_rl.policy.onnx import OnnxPolicy
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="benchmark_inference")

@@ -5,7 +5,7 @@ import struct
 import time
 
 import bridge_shared
-from soku_rl.render_state import RENDER_STATE_SIZE, RenderSnapshot
+from soku_rl.env.observation.render_state import RENDER_STATE_SIZE, RenderSnapshot
 
 
 HEADER = struct.Struct("<8IQ2I")

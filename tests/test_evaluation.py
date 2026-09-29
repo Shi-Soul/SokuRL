@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from soku_rl.evaluation import make_plan, run_batch, summarize
+from soku_rl.evaluation.tournament import make_plan, run_batch, summarize
 from soku_rl.pomg import Outcome, TimeStep
 
 

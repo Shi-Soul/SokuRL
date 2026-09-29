@@ -11,10 +11,10 @@ import numpy as np
 from omegaconf import OmegaConf
 
 from soku_rl.env import EpisodeConfig
-from soku_rl.learning_wrappers import LearningConfig, LearningInterface
-from soku_rl.network_session import run_session
-from soku_rl.worker_pipe import WorkerConnection
-from soku_rl.play_policy import load_play_policy
+from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
+from soku_rl.play.network_session import run_session
+from soku_rl.env.worker_pipe import WorkerConnection
+from soku_rl.play.loader import load_play_policy
 from network_launch import start_games
 
 

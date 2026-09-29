@@ -5,13 +5,13 @@ import unittest
 from test_env_timing import RecordingBackend, VISIBILITY
 from soku_rl.env import EpisodeConfig, HisoutenParallelEnv
 from soku_rl.env.match import LEGACY_MATCH
-from soku_rl.learning_wrappers import LearningConfig, LearningParallelEnv
+from soku_rl.env.wrappers.learning import LearningConfig, LearningParallelEnv
 
 
 @unittest.skipUnless(importlib.util.find_spec("torchrl"), "install the marl extra")
 class TorchRLContractTests(unittest.TestCase):
     def test_training_horizon_has_no_bootstrap_but_keeps_timeout_record(self):
-        from soku_rl.torchrl_env import TorchRLInputs
+        from soku_rl.env.adapters.torchrl import TorchRLInputs
         from soku_rl.env.encoding import AGENTS
 
         base = HisoutenParallelEnv(RecordingBackend(), EpisodeConfig(6, 4, 3, 12, "diagnostic_state", VISIBILITY, LEGACY_MATCH))
@@ -30,8 +30,8 @@ class TorchRLContractTests(unittest.TestCase):
 
     def test_numeric_specs_and_episode_boundaries(self):
         from torchrl.envs.utils import check_env_specs
-        from soku_rl.torchrl_env import wrap_torchrl
-        from soku_rl.benchmarl_task import SokuTask
+        from soku_rl.env.adapters.torchrl import wrap_torchrl
+        from soku_rl.marl.benchmarl_task import SokuTask
 
         config = EpisodeConfig(30, 4, 3, 12, "diagnostic_state", VISIBILITY, LEGACY_MATCH)
         env = wrap_torchrl(HisoutenParallelEnv(RecordingBackend(), config), 123, "cpu")
@@ -49,7 +49,7 @@ class TorchRLContractTests(unittest.TestCase):
 
     def test_learning_wrappers_preserve_torchrl_specs(self):
         from torchrl.envs.utils import check_env_specs
-        from soku_rl.torchrl_env import wrap_torchrl
+        from soku_rl.env.adapters.torchrl import wrap_torchrl
 
         base = HisoutenParallelEnv(RecordingBackend(), EpisodeConfig(30, 4, 3, 12, "diagnostic_state", VISIBILITY, LEGACY_MATCH))
         env = wrap_torchrl(LearningParallelEnv(base, LearningConfig("combat", False, 8, 1.)), 123, "cpu")

@@ -18,8 +18,8 @@ from network_input_events import NetworkInputEventsClient
 from network_match import NetworkMatch
 from network_state import NetworkStateClient
 from startup_dialogs import blocking_dialogs
-from soku_rl.visibility import VisibilityConfig
-from soku_rl.visible_state import observe_visible_states
+from soku_rl.env.observation.visibility import VisibilityConfig
+from soku_rl.env.observation.visible_state import observe_visible_states
 
 
 class NetworkGame:

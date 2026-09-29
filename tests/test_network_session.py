@@ -5,8 +5,8 @@ from test_env_timing import VISIBILITY
 from test_live_policy import RecordingPolicy, observations
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.match import LEGACY_MATCH
-from soku_rl.learning_wrappers import LearningConfig, LearningInterface
-from soku_rl.network_session import run_session
+from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
+from soku_rl.play.network_session import run_session
 
 
 class Connection:

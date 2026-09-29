@@ -3,8 +3,8 @@ from pathlib import Path
 from uuid import uuid4
 import json
 
-from soku_rl.worker_pipe import WorkerBackend
-from .hisouten_env import EpisodeConfig, HisoutenParallelEnv
+from soku_rl.env.worker_pipe import WorkerBackend
+from soku_rl.env.hisouten_env import EpisodeConfig, HisoutenParallelEnv
 
 
 def make_pettingzoo_env(runtime, episode, log_directory):

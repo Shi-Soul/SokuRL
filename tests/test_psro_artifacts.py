@@ -9,9 +9,9 @@ pytest.importorskip("open_spiel")
 from stable_baselines3 import PPO
 import gymnasium as gym
 
-from soku_rl.checkpoint_policy import load_policy
-from soku_rl.population import MixturePolicy, PPOPolicy, UniformPolicy
-from soku_rl.psro import initial_policies, policy_artifact
+from soku_rl.policy.checkpoint import load_policy
+from soku_rl.policy.population import MixturePolicy, PPOPolicy, UniformPolicy
+from soku_rl.marl.psro import initial_policies, policy_artifact
 from test_policy_artifacts import interface, training_config
 
 

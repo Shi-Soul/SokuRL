@@ -1,7 +1,7 @@
 """Keep renderer slot decoding identical when unused slots are skipped."""
 import pytest
 
-from soku_rl.render_state import CAMERA, ENTITY, COUNTS, MAX_OBJECTS, RenderEntity, RenderSnapshot
+from soku_rl.env.observation.render_state import CAMERA, ENTITY, COUNTS, MAX_OBJECTS, RenderEntity, RenderSnapshot
 
 
 @pytest.mark.parametrize("counts", [(0, 0), (1, 0), (0, 1), (7, 19), (64, 64), (67, 1024)])

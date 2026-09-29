@@ -6,7 +6,7 @@ import hydra
 from omegaconf import OmegaConf
 
 from benchmark import run
-from soku_rl.training_artifacts import completed_policies
+from soku_rl.policy.artifacts import completed_policies
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="benchmark_training")

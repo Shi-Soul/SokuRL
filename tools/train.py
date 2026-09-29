@@ -18,22 +18,22 @@ def main(cfg: DictConfig):
     import numpy as np
     import torch
     from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
-    from soku_rl.worker_pipe import WorkerBackend
-    from soku_rl.learning_wrappers import LearningConfig, LearningInterface, LearningVectorEnv
+    from soku_rl.env.worker_pipe import WorkerBackend
+    from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     algorithm = config["algorithm"]["name"]
     if algorithm == "nfsp":
-        from soku_rl.nfsp import train_nfsp as train
+        from soku_rl.marl.nfsp import train_nfsp as train
         dependencies = ["open-spiel", "dm-tree"]
     elif algorithm == "psro":
-        from soku_rl.psro import train_psro as train
+        from soku_rl.marl.psro import train_psro as train
         dependencies = ["open-spiel", "stable-baselines3", "cvxpy"]
     elif algorithm == "ippo":
-        from soku_rl.benchmarl_training import train_benchmarl as train
+        from soku_rl.marl.benchmarl_training import train_benchmarl as train
         dependencies = ["torchrl", "tensordict", "benchmarl"]
     elif algorithm == "ppo":
-        from soku_rl.ppo_training import train_ppo as train
+        from soku_rl.rl.training import train_ppo as train
         dependencies = ["stable-baselines3"]
         if config["algorithm"]["policy_type"] == "lstm":
             dependencies.append("sb3-contrib")

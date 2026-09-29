@@ -14,8 +14,8 @@ from onnx import TensorProto, helper, numpy_helper
 from test_env_timing import VISIBILITY
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.match import LEGACY_MATCH
-from soku_rl.learning_wrappers import LearningConfig, LearningInterface
-from soku_rl.onnx_policy import OnnxPolicy
+from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
+from soku_rl.policy.onnx import OnnxPolicy
 
 
 def artifact(directory):

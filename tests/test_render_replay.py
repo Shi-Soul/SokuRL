@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from render_replay import check_trial_identity, write_pixels
-from soku_rl.evaluation import make_plan
+from soku_rl.evaluation.tournament import make_plan
 
 
 @dataclass

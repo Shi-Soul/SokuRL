@@ -10,9 +10,9 @@ from omegaconf import OmegaConf
 import torch
 from torch import nn
 
-from soku_rl.checkpoint_policy import load_policy
+from soku_rl.policy.checkpoint import load_policy
 from soku_rl.env import EpisodeConfig
-from soku_rl.learning_wrappers import LearningConfig, LearningInterface
+from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
 
 
 class RecurrentActor(nn.Module):

@@ -2,7 +2,7 @@
 def __getattr__(name):
     # The Wine worker imports match configuration without NumPy or Gymnasium.
     if name == "TwoPlayerVectorEnv":
-        from .vector_env import TwoPlayerVectorEnv
+        from soku_rl.env.vector_env import TwoPlayerVectorEnv
         return TwoPlayerVectorEnv
     if name in {"EpisodeConfig", "HisoutenParallelEnv"}:
         from . import hisouten_env

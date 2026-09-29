@@ -17,7 +17,7 @@ class SpielNFSPTests(unittest.TestCase):
 
     def check_learning(self, response_update):
         import torch
-        from soku_rl.spiel_nfsp import VectorNFSP
+        from soku_rl.marl.spiel_nfsp import VectorNFSP
         from gymnasium import spaces
 
         if not torch.cuda.is_available():

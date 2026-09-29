@@ -3,9 +3,9 @@ from dataclasses import replace
 import unittest
 import random
 
-from soku_rl.render_state import RenderEntity, RenderSnapshot
-from soku_rl.visibility import VisibilityConfig, screen_entity, visible_entities, quantize_gauge
-from soku_rl.contours import Contour, SAMPLES, visible_fraction
+from soku_rl.env.observation.render_state import RenderEntity, RenderSnapshot
+from soku_rl.env.observation.visibility import VisibilityConfig, screen_entity, visible_entities, quantize_gauge
+from soku_rl.env.observation.contours import Contour, SAMPLES, visible_fraction
 
 
 class VisibilityTests(unittest.TestCase):

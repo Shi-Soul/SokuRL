@@ -2,7 +2,7 @@
 from collections import deque
 from dataclasses import dataclass
 
-from .encoding import AGENTS, decode_action
+from soku_rl.env.encoding import AGENTS, decode_action
 
 
 @dataclass(frozen=True)

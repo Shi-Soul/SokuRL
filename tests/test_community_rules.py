@@ -4,8 +4,8 @@ from pathlib import Path
 from omegaconf import OmegaConf
 import pytest
 
-from soku_rl.baselines import Fighter, Observation
-from soku_rl.strategies import strategy_from_config
+from soku_rl.policy.rules.baselines import Fighter, Observation
+from soku_rl.policy.rules.strategies import strategy_from_config
 
 
 def config():

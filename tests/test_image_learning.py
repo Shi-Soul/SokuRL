@@ -9,8 +9,8 @@ from test_env_timing import RecordingBackend, VISIBILITY
 from soku_rl.env import EpisodeConfig, HisoutenParallelEnv, TwoPlayerVectorEnv
 from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.encoding import AGENTS, decode_action
-from soku_rl.learning_wrappers import LearningConfig, LearningParallelEnv, LearningVectorEnv
-from soku_rl.pixels import RGBFrame
+from soku_rl.env.wrappers.learning import LearningConfig, LearningParallelEnv, LearningVectorEnv
+from soku_rl.env.observation.pixels import RGBFrame
 
 
 class ImageBackend(RecordingBackend):
@@ -63,7 +63,7 @@ def test_image_dictionary_obeys_pettingzoo_contract():
 def test_torchrl_preserves_image_and_command_fields():
     pytest.importorskip("torchrl")
     from torchrl.envs.utils import check_env_specs
-    from soku_rl.torchrl_env import wrap_torchrl
+    from soku_rl.env.adapters.torchrl import wrap_torchrl
     env = wrap_torchrl(LearningParallelEnv(HisoutenParallelEnv(ImageBackend(), episode()), learning()), 3, "cpu")
     try:
         check_env_specs(env)
@@ -79,8 +79,8 @@ def test_benchmarl_cnn_accepts_both_image_and_command_inputs():
     pytest.importorskip("benchmarl")
     from benchmarl.models import CnnConfig
     from torchrl.data import Composite, Unbounded
-    from soku_rl.benchmarl_task import SokuTask
-    from soku_rl.torchrl_env import wrap_torchrl
+    from soku_rl.marl.benchmarl_task import SokuTask
+    from soku_rl.env.adapters.torchrl import wrap_torchrl
     env = wrap_torchrl(LearningParallelEnv(HisoutenParallelEnv(ImageBackend(), episode()), learning()), 3, "cpu")
     try:
         group = "player_0"
@@ -101,9 +101,9 @@ def test_benchmarl_cnn_accepts_both_image_and_command_inputs():
 def test_sb3_image_view_keeps_terminal_observation_before_reset(tmp_path):
     pytest.importorskip("stable_baselines3")
     from stable_baselines3 import PPO
-    from soku_rl.population import UniformPolicy
-    from soku_rl.ppo_response import OpponentMixtureVecEnv
-    from soku_rl.checkpoint_policy import load_policy
+    from soku_rl.policy.population import UniformPolicy
+    from soku_rl.rl.response import OpponentMixtureVecEnv
+    from soku_rl.policy.checkpoint import load_policy
     from test_policy_artifacts import training_config
     env = LearningVectorEnv(TwoPlayerVectorEnv(ImageBackend(), 1, episode()), learning())
     view = OpponentMixtureVecEnv(env, 0, [UniformPolicy("random", 90)], [1.], 4)

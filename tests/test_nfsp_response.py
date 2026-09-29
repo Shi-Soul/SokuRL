@@ -2,7 +2,7 @@
 import pytest
 
 torch = pytest.importorskip("torch")
-from soku_rl.nfsp_response import double_q_targets
+from soku_rl.marl.nfsp_response import double_q_targets
 
 
 def test_double_q_uses_online_selection_target_evaluation_and_terminal_payoff():

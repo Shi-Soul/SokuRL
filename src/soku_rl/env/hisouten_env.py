@@ -4,13 +4,13 @@ import numpy as np
 from gymnasium import spaces
 from gymnasium.utils import seeding
 from pettingzoo import ParallelEnv
-from soku_rl.pixels import RGBFrame
-from soku_rl.visibility import VisibilityConfig
-from soku_rl.visible_state import StateObservation, STATE_FEATURES
-from .encoding import AGENTS, NUM_ACTIONS, decode_action, encode_observation, observation_space
-from .control import ControlConfig, DelayedControls
-from .observation_history import ObservationHistory
-from .match import LEGACY_MATCH, MatchConfig
+from soku_rl.env.observation.pixels import RGBFrame
+from soku_rl.env.observation.visibility import VisibilityConfig
+from soku_rl.env.observation.visible_state import StateObservation, STATE_FEATURES
+from soku_rl.env.encoding import AGENTS, NUM_ACTIONS, decode_action, encode_observation, observation_space
+from soku_rl.env.control import ControlConfig, DelayedControls
+from soku_rl.env.observation_history import ObservationHistory
+from soku_rl.env.match import LEGACY_MATCH, MatchConfig
 
 
 @dataclass(frozen=True)
