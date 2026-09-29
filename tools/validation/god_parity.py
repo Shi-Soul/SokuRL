@@ -94,7 +94,8 @@ def main(config):
     sokurl.SKIPINTRO_INI = sokurl.GAME_DIR / "modules/SkipIntro/SkipIntro.ini"
     package = ScriptPackage(config.rules.god.package, config.rules.god.api_source)
     reference = Reference(Path(config.validation.reference_library).resolve(strict=True))
-    names = (sorted(name for name in package.files if name[:2].isdigit() and "_main" in name)
+    names = (sorted(name for name in package.files
+                    if name.endswith(".ai") and name[:2].isdigit() and "_main" in name)
              if config.validation.scripts == "all" else list(config.validation.scripts))
     if not 0 <= config.validation.shard < config.validation.shards <= len(names):
         raise ValueError("validation requires 0 <= shard < shards <= script count")
