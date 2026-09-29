@@ -15,7 +15,7 @@ def test_all_fifteen_rules_run_without_a_checkpoint():
     config = OmegaConf.to_container(OmegaConf.load(root / "config/rules/default.yaml"))
     training = OmegaConf.to_container(OmegaConf.load(root / "config/train.yaml"))
     episode = training["episode"] | {"decision_frames": 3, "latency_frames": 5, "observation_mode": "state"}
-    interface = LearningInterface(EpisodeConfig(**episode), LearningConfig("combat", True, 8, 1.))
+    interface = LearningInterface(EpisodeConfig.from_dict(episode), LearningConfig("combat", True, 8, 1.))
     assert len(config["roster"]) == 15
     for seat in (0, 1):
         for name in config["roster"]:
@@ -37,7 +37,7 @@ def test_rules_can_face_every_playable_human_character(enemy_character):
     rules = OmegaConf.to_container(OmegaConf.load(root / "config/rules/default.yaml"))
     training = OmegaConf.to_container(OmegaConf.load(root / "config/train.yaml"))
     episode = training["episode"] | {"decision_frames": 3, "latency_frames": 5, "observation_mode": "state"}
-    interface = LearningInterface(EpisodeConfig(**episode), LearningConfig("combat", True, 8, 1.))
+    interface = LearningInterface(EpisodeConfig.from_dict(episode), LearningConfig("combat", True, 8, 1.))
     for seat, own_character in ((0, 1), (1, 0)):
         observation = np.zeros(interface.observation_space.shape, np.float32)
         history = observation[:1600].reshape(4, 400)

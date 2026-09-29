@@ -27,8 +27,7 @@ def play_batch(config, seed, pairs):
         started = time.perf_counter()
         processes = sokurl._launch_vs_group_from_title(
             len(pairs), 180.0, headless=True, unlimited=True,
-            seed=seed, pause_at_start=True,
-        )
+            seed=seed, pause_at_start=True, match=sokurl.configured_match())
         states, policies, rules, records = [], [], [], []
         for process, pair in zip(processes, pairs, strict=True):
             client = BridgeClient(process.pid)

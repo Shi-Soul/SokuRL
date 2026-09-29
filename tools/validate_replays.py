@@ -36,7 +36,7 @@ def main(cfg):
     if type(validation["next_seed"]) is not int or not 0 <= validation["next_seed"] < 0xFFFFFFFF:
         raise ValueError("next_seed must be a supported native seed")
     source_config = OmegaConf.to_container(OmegaConf.load(source / "config.yaml"), resolve=True)
-    episode = EpisodeConfig(**source_config["episode"])
+    episode = EpisodeConfig.from_dict(source_config["episode"])
     interface = LearningInterface(episode, LearningConfig(**source_config["wrappers"]))
     trials, actions = {}, {}
     for slot, index in enumerate(selected):

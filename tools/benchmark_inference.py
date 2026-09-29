@@ -21,7 +21,7 @@ def main(cfg):
         raise ValueError("this deployment benchmark requires the CPU ONNX actor")
     if type(config["decisions"]) is not int or config["decisions"] < 2048 or config["maximum_p99_ms"] <= 0:
         raise ValueError("measure at least 2048 decisions with an explicit positive latency bound")
-    interface = LearningInterface(EpisodeConfig(**config["episode"]), LearningConfig(**config["wrappers"]))
+    interface = LearningInterface(EpisodeConfig.from_dict(config["episode"]), LearningConfig(**config["wrappers"]))
     started = time.perf_counter()
     policy = OnnxPolicy(config["candidate"]["name"], config["candidate"]["policy"]["path"], interface)
     load_seconds = time.perf_counter()-started

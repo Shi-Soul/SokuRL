@@ -10,6 +10,7 @@ from soku_rl.visible_state import StateObservation, STATE_FEATURES
 from .encoding import AGENTS, NUM_ACTIONS, decode_action, encode_observation, observation_space
 from .control import ControlConfig, DelayedControls
 from .observation_history import ObservationHistory
+from .match import LEGACY_MATCH, MatchConfig
 
 
 @dataclass(frozen=True)
@@ -20,8 +21,13 @@ class EpisodeConfig:
     latency_frames: int
     observation_mode: str
     visibility: VisibilityConfig
+    match: MatchConfig
 
     def __post_init__(self):
+        if isinstance(self.match, dict):
+            object.__setattr__(self, "match", MatchConfig(**self.match))
+        if not isinstance(self.match, MatchConfig):
+            raise TypeError("match must be a MatchConfig")
         if type(self.max_frames) is not int or self.max_frames < 1:
             raise ValueError("max_frames must be a positive integer")
         observation_space(self.history_frames)
@@ -34,7 +40,13 @@ class EpisodeConfig:
             raise ValueError("unsupported observation mode")
 
     def backend_observation(self):
-        return {"mode": self.observation_mode, "visibility": asdict(self.visibility)}
+        return {"mode": self.observation_mode, "visibility": asdict(self.visibility),
+                "match": asdict(self.match)}
+
+    @classmethod
+    def from_dict(cls, values):
+        """Read the current schema or migrate the fixed selections of schema 1."""
+        return cls(**({"match": LEGACY_MATCH} | values))
 
     def space(self):
         if self.observation_mode == "image":

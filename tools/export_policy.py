@@ -42,7 +42,7 @@ def main(cfg):
     if type(config["verification_steps"]) is not int or config["verification_steps"] < 512:
         raise ValueError("verify at least 512 sequential recurrent decisions")
     torch.set_num_threads(1)
-    interface = LearningInterface(EpisodeConfig(**config["episode"]), LearningConfig(**config["wrappers"]))
+    interface = LearningInterface(EpisodeConfig.from_dict(config["episode"]), LearningConfig(**config["wrappers"]))
     loaded = load_policy(config["candidate"]["name"], spec, interface, torch.device("cpu"))
     policy = loaded.model.policy.eval()
     actor = RecurrentActor(policy).eval()

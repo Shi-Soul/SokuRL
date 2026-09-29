@@ -25,7 +25,7 @@ def main(cfg):
             raise ValueError("human.seat must be 1 or 2")
         cfg.network.role = "join" if cfg.human.seat == 1 else "host"
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    episode = EpisodeConfig(**config["episode"])
+    episode = EpisodeConfig.from_dict(config["episode"])
     if (episode.observation_mode, episode.decision_frames, episode.latency_frames) != ("state", 3, 5):
         raise ValueError("the network bridge requires public state, decision_frames=3 and latency_frames=5")
     if config["network"]["role"] not in ("host", "join"):

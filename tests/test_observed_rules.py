@@ -13,8 +13,8 @@ from soku_rl.observed_rules import RulePolicy, decode_diagnostic
 
 def episode(mode):
     raw = OmegaConf.to_container(OmegaConf.load(Path(__file__).parents[1] / "config/train.yaml"))
-    return EpisodeConfig(**(raw["episode"] | {"decision_frames": 3 if mode == "state" else 1,
-        "latency_frames": 12 if mode == "state" else 0, "observation_mode": mode}))
+    return EpisodeConfig.from_dict(raw["episode"] | {"decision_frames": 3 if mode == "state" else 1,
+        "latency_frames": 12 if mode == "state" else 0, "observation_mode": mode})
 
 
 def policy(name, mode):

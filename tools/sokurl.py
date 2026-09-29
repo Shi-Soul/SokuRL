@@ -297,6 +297,14 @@ def practice(timeout: float, pid: int | None) -> int:
     raise RuntimeError(f"timed out after {timeout:.1f}s waiting for PRACTICE_READY")
 
 
+def configured_match():
+    from soku_rl.env.match import MatchConfig, PlayerSetup
+    config = configparser.ConfigParser()
+    config.read_string(SKIPINTRO_INI.read_text(encoding="ascii"))
+    return MatchConfig(*(PlayerSetup(*(config.getint(player, field)
+        for field in ("character", "palette", "deck"))) for player in ("P1", "P2")))
+
+
 def _launch_vs_group_from_title(
     worker_count: int,
     timeout: float,
@@ -308,6 +316,7 @@ def _launch_vs_group_from_title(
     seeds: tuple[int, ...] | None = None,
     capture_images: bool = False,
     capture_state: bool = False,
+    match,
 ) -> list[psutil.Process]:
     if worker_count < 1:
         raise ValueError("worker_count must be positive")
@@ -346,9 +355,7 @@ def _launch_vs_group_from_title(
         original = SKIPINTRO_INI.read_bytes()
         config = configparser.ConfigParser()
         config.read_string(original.decode("ascii"))
-        for player in ("P1", "P2"):
-            for field in ("character", "palette", "deck"):
-                env[f"SOKURL_VS_{player}_{field.upper()}"] = str(config.getint(player, field))
+        env.update(match.environment())
         title_config, replacements = re.subn(
             rb"(?m)^(\s*scene_id\s*=\s*)\d+(\s*)$", rb"\g<1>2\g<2>", original, count=1
         )
@@ -416,8 +423,7 @@ def _launch_vs_from_title(
 ) -> psutil.Process:
     return _launch_vs_group_from_title(
         1, timeout, headless=headless, unlimited=unlimited,
-        seed=seed, pause_at_start=pause_at_start,
-    )[0]
+        seed=seed, pause_at_start=pause_at_start, match=configured_match())[0]
 
 
 def versus(timeout: float, headless: bool = False, unlimited: bool = False) -> int:

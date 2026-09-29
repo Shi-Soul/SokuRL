@@ -9,6 +9,9 @@ seed: 1732
 device: cuda:0
 num_envs: 16
 episode:
+  match:
+    player_0: {character: 1, palette: 0, deck: 0}
+    player_1: {character: 0, palette: 0, deck: 0}
   max_frames: 7200
   history_frames: 4
   visibility:

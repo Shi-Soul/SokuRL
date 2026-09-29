@@ -4,6 +4,7 @@ import pytest
 from test_env_timing import VISIBILITY
 from test_live_policy import RecordingPolicy, observations
 from soku_rl.env import EpisodeConfig
+from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.learning_wrappers import LearningConfig, LearningInterface
 from soku_rl.network_session import run_session
 
@@ -27,7 +28,7 @@ def frame(match, round_id, step, phase, events, scores):
 
 
 def interface():
-    return LearningInterface(EpisodeConfig(7200, 4, 3, 5, "state", VISIBILITY),
+    return LearningInterface(EpisodeConfig(7200, 4, 3, 5, "state", VISIBILITY, LEGACY_MATCH),
                              LearningConfig("combat", True, 8, 1.))
 
 

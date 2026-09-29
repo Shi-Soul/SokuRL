@@ -67,8 +67,7 @@ def benchmark(config):
     try:
         initial_hashes = []
         processes = sokurl._launch_vs_group_from_title(
-            workers, 180.0, headless=True, unlimited=True, seed=seed, pause_at_start=True,
-        )
+            workers, 180.0, headless=True, unlimited=True, seed=seed, pause_at_start=True, match=sokurl.configured_match())
         for index, process in enumerate(processes):
             client = BridgeClient(process.pid)
             clients.append(client)
@@ -98,8 +97,7 @@ def benchmark(config):
                 processes.clear()
                 processes = sokurl._launch_vs_group_from_title(
                     workers, 180.0, headless=True, unlimited=True,
-                    seed=seed, pause_at_start=True,
-                )
+                    seed=seed, pause_at_start=True, match=sokurl.configured_match())
                 for process, initial in zip(processes, initial_hashes, strict=True):
                     client = BridgeClient(process.pid)
                     clients.append(client)

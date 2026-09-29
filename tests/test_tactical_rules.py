@@ -28,9 +28,9 @@ def actor(name):
 
 def episode(mode):
     raw = OmegaConf.to_container(OmegaConf.load(ROOT / "config/train.yaml"))
-    return EpisodeConfig(**(raw["episode"] | {"observation_mode": mode,
+    return EpisodeConfig.from_dict(raw["episode"] | {"observation_mode": mode,
         "decision_frames": 3 if mode == "state" else 1,
-        "latency_frames": 12 if mode == "state" else 0}))
+        "latency_frames": 12 if mode == "state" else 0})
 
 
 def tensor(observation, mode):

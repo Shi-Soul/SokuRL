@@ -7,6 +7,7 @@ from pettingzoo.test import parallel_api_test
 
 from test_env_timing import RecordingBackend, VISIBILITY
 from soku_rl.env import EpisodeConfig, HisoutenParallelEnv, TwoPlayerVectorEnv
+from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.encoding import AGENTS, decode_action
 from soku_rl.learning_wrappers import LearningConfig, LearningParallelEnv, LearningVectorEnv
 from soku_rl.pixels import RGBFrame
@@ -20,7 +21,7 @@ class ImageBackend(RecordingBackend):
 
 
 def episode():
-    return EpisodeConfig(6, 1, 3, 12, "image", VISIBILITY)
+    return EpisodeConfig(6, 1, 3, 12, "image", VISIBILITY, LEGACY_MATCH)
 
 
 def learning():

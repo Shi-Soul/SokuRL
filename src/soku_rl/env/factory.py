@@ -8,7 +8,7 @@ from .hisouten_env import EpisodeConfig, HisoutenParallelEnv
 
 
 def make_pettingzoo_env(runtime, episode, log_directory):
-    config = EpisodeConfig(**episode)
+    config = EpisodeConfig.from_dict(episode)
     log_path = Path(log_directory) / f"worker-{uuid4().hex}.log"
     backend = WorkerBackend(log_path=log_path, **runtime)
     try:

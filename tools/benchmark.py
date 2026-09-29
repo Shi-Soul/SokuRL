@@ -23,7 +23,7 @@ def run(cfg):
     from soku_rl.worker_pipe import WorkerBackend
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    episode = EpisodeConfig(**config["episode"])
+    episode = EpisodeConfig.from_dict(config["episode"])
     learning = LearningConfig(**config["wrappers"])
     interface = LearningInterface(episode, learning)
     if config["track"] == "human" and episode.observation_mode != "state":

@@ -4,6 +4,7 @@ import unittest
 
 from test_env_timing import RecordingBackend, VISIBILITY
 from soku_rl.env import EpisodeConfig, HisoutenParallelEnv
+from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.learning_wrappers import LearningConfig, LearningParallelEnv
 
 
@@ -13,7 +14,7 @@ class TorchRLContractTests(unittest.TestCase):
         from soku_rl.torchrl_env import TorchRLInputs
         from soku_rl.env.encoding import AGENTS
 
-        base = HisoutenParallelEnv(RecordingBackend(), EpisodeConfig(6, 4, 3, 12, "diagnostic_state", VISIBILITY))
+        base = HisoutenParallelEnv(RecordingBackend(), EpisodeConfig(6, 4, 3, 12, "diagnostic_state", VISIBILITY, LEGACY_MATCH))
         env = TorchRLInputs(base)
         try:
             _, reset_info = env.reset(seed=3)
@@ -32,7 +33,7 @@ class TorchRLContractTests(unittest.TestCase):
         from soku_rl.torchrl_env import wrap_torchrl
         from soku_rl.benchmarl_task import SokuTask
 
-        config = EpisodeConfig(30, 4, 3, 12, "diagnostic_state", VISIBILITY)
+        config = EpisodeConfig(30, 4, 3, 12, "diagnostic_state", VISIBILITY, LEGACY_MATCH)
         env = wrap_torchrl(HisoutenParallelEnv(RecordingBackend(), config), 123, "cpu")
         try:
             check_env_specs(env)
@@ -50,7 +51,7 @@ class TorchRLContractTests(unittest.TestCase):
         from torchrl.envs.utils import check_env_specs
         from soku_rl.torchrl_env import wrap_torchrl
 
-        base = HisoutenParallelEnv(RecordingBackend(), EpisodeConfig(30, 4, 3, 12, "diagnostic_state", VISIBILITY))
+        base = HisoutenParallelEnv(RecordingBackend(), EpisodeConfig(30, 4, 3, 12, "diagnostic_state", VISIBILITY, LEGACY_MATCH))
         env = wrap_torchrl(LearningParallelEnv(base, LearningConfig("combat", False, 8, 1.)), 123, "cpu")
         try:
             check_env_specs(env)

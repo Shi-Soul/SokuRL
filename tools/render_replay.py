@@ -48,7 +48,7 @@ def main(cfg):
         raise ValueError("replay requires exactly one completed benchmark trial")
     record = matches[0]
     source_config = OmegaConf.to_container(OmegaConf.load(source / "config.yaml"), resolve=True)
-    episode = EpisodeConfig(**source_config["episode"])
+    episode = EpisodeConfig.from_dict(source_config["episode"])
     interface = LearningInterface(episode, LearningConfig(**source_config["wrappers"]))
     trace = (source / record["replay"]).resolve(strict=True)
     if trace.parent != source:
@@ -81,7 +81,7 @@ def main(cfg):
     hashes = []
     try:
         with closing(WorkerBackend(log_path=directory / "worker.log", **config["runtime"])) as backend:
-            backend.configure_observation({"mode": "image", "visibility": source_config["episode"]["visibility"]})
+            backend.configure_observation(episode.backend_observation() | {"mode": "image"})
             report["runtime"] = backend.identity
             # The trial block includes the original artifact hash, seed and both
             # policy identities. Check it even while the benchmark is running.

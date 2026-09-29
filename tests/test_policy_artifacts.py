@@ -11,11 +11,12 @@ from torch import nn
 from test_env_timing import VISIBILITY
 from soku_rl.checkpoint_policy import load_policy
 from soku_rl.env import EpisodeConfig
+from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.learning_wrappers import LearningConfig, LearningInterface
 
 
 def interface():
-    episode = EpisodeConfig(7200, 1, 3, 12, "state", VISIBILITY)
+    episode = EpisodeConfig(7200, 1, 3, 12, "state", VISIBILITY, LEGACY_MATCH)
     return LearningInterface(episode, LearningConfig("combat", True, 8, 1.))
 
 

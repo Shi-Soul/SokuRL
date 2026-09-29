@@ -29,7 +29,7 @@ def observation_hash(observation):
 @hydra.main(version_base="1.3", config_path="../config", config_name="validate")
 def main(cfg):
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    episode = EpisodeConfig(**config["episode"])
+    episode = EpisodeConfig.from_dict(config["episode"])
     count = config["validation"]["episodes_per_slot"]
     if type(count) is not int or count < 1:
         raise ValueError("episodes_per_slot must be a positive integer")

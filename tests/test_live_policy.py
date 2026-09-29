@@ -6,6 +6,7 @@ import pytest
 
 from test_env_timing import VISIBILITY
 from soku_rl.env import EpisodeConfig, HisoutenParallelEnv
+from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.encoding import AGENTS
 from soku_rl.learning_wrappers import LearningConfig, LearningInterface, LearningParallelEnv
 from soku_rl.live_policy import LivePolicy
@@ -56,7 +57,7 @@ class RecordingPolicy:
 
 @pytest.mark.parametrize("seat", (0, 1))
 def test_live_features_equal_training_at_each_decision(seat):
-    episode = EpisodeConfig(17, 4, 3, 5, "state", VISIBILITY)
+    episode = EpisodeConfig(17, 4, 3, 5, "state", VISIBILITY, LEGACY_MATCH)
     wrappers = LearningConfig("combat", True, 8, 1.)
     env = LearningParallelEnv(HisoutenParallelEnv(PublicBackend(), episode), wrappers)
     training, _ = env.reset(seed=5)
@@ -77,7 +78,7 @@ def test_live_features_equal_training_at_each_decision(seat):
 
 
 def test_live_history_rejects_missing_frames_and_saturates_only_the_clock():
-    interface = LearningInterface(EpisodeConfig(3, 4, 3, 5, "state", VISIBILITY),
+    interface = LearningInterface(EpisodeConfig(3, 4, 3, 5, "state", VISIBILITY, LEGACY_MATCH),
                                   LearningConfig("combat", True, 8, 1.))
     policy = RecordingPolicy()
     live = LivePolicy(policy, interface, 0)

@@ -6,6 +6,7 @@ import pytest
 
 from test_env_timing import RecordingBackend, VISIBILITY
 from soku_rl.env import EpisodeConfig, HisoutenParallelEnv, TwoPlayerVectorEnv
+from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.encoding import AGENTS, decode_action
 from soku_rl.learning_features import relative_features
 from soku_rl.learning_wrappers import (LearningConfig, LearningEpisode, LearningInterface,
@@ -13,7 +14,7 @@ from soku_rl.learning_wrappers import (LearningConfig, LearningEpisode, Learning
 
 
 def config(mode):
-    return EpisodeConfig(17, 4, 3, 12, mode, VISIBILITY)
+    return EpisodeConfig(17, 4, 3, 12, mode, VISIBILITY, LEGACY_MATCH)
 
 
 def gauges(own, enemy):

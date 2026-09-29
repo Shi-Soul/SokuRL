@@ -45,7 +45,7 @@ def main(cfg: DictConfig):
         raise ValueError("num_envs must be a positive integer")
     if not isinstance(config["runtime"]["command"], list):
         raise ValueError("runtime.command must be an explicit argument list")
-    episode = EpisodeConfig(**config["episode"])
+    episode = EpisodeConfig.from_dict(config["episode"])
     learning = LearningConfig(**config["wrappers"])
     interface = LearningInterface(episode, learning)
     if algorithm == "nfsp" and (interface.observation_space.shape is None

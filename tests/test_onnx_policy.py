@@ -13,12 +13,13 @@ from onnx import TensorProto, helper, numpy_helper
 
 from test_env_timing import VISIBILITY
 from soku_rl.env import EpisodeConfig
+from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.learning_wrappers import LearningConfig, LearningInterface
 from soku_rl.onnx_policy import OnnxPolicy
 
 
 def artifact(directory):
-    interface = LearningInterface(EpisodeConfig(7200, 4, 3, 5, "state", VISIBILITY),
+    interface = LearningInterface(EpisodeConfig(7200, 4, 3, 5, "state", VISIBILITY, LEGACY_MATCH),
                                   LearningConfig("combat", True, 8, 1.))
     shape, memory, actions = (1, *interface.observation_space.shape), (1, 1, 2), int(interface.action_space.n)
     fields = lambda name, size: helper.make_tensor_value_info(name, TensorProto.FLOAT, size)

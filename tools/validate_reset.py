@@ -62,7 +62,7 @@ def compare(reference, actual):
 @hydra.main(version_base="1.3", config_path="../config", config_name="validate_reset")
 def main(cfg):
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    episode = EpisodeConfig(**config["episode"])
+    episode = EpisodeConfig.from_dict(config["episode"])
     validation = config["reset_validation"]
     seeds = validation["seeds"]
     if not seeds or len(set(seeds)) != len(seeds) or validation["cycles"] < 1:

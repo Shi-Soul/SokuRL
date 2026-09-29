@@ -5,6 +5,7 @@ from soku_rl.observations import observe
 from soku_rl.visible_state import observe_visible_states
 from soku_rl.visibility import VisibilityConfig
 from soku_rl.pomg import Outcome, TimeStep
+from soku_rl.env.match import MatchConfig
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
 from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
@@ -56,6 +57,7 @@ class SokuGameBatch:
             raise ValueError("set a supported observation mode before launching games")
         self.observation_mode = mode
         self.visibility = VisibilityConfig(**configuration["visibility"])
+        self.match = MatchConfig(**configuration["match"])
 
     def _observe(self, slot, raw, dropped):
         if self.observation_mode == "image":
@@ -114,6 +116,7 @@ class SokuGameBatch:
             seeds=tuple(seeds.values()), pause_at_start=True,
             capture_images=self.observation_mode == "image",
             capture_state=self.observation_mode == "state",
+            match=self.match,
         )
         self.processes.update(zip(seeds, processes, strict=True))
         states = {}
