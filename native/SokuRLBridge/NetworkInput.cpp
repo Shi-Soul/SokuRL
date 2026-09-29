@@ -110,10 +110,15 @@ void serviceNetworkInput() {
 }
 
 void applyNetworkInput(SokuLib::KeymapManager *keyboard) {
-    if (keyboard != reinterpret_cast<SokuLib::KeymapManager *>(0x008986A8)) return;
     serviceNetworkInput();
     const auto &state = currentNetworkState();
     if (!g_owned || (state.scene != 13 && state.scene != 14)) return;
+    // Loading changes +0x208 from the menu keyboard to the local profile input
+    // (0x43F045/0x43F08A). The sender reads this object's +0x62 packed keys at
+    // 0x454CA9/0x454CCB; the peer receive objects at +0xF8/+0x174 are separate.
+    const auto network = *reinterpret_cast<unsigned char **>(0x008986A0);
+    if (!network || keyboard != *reinterpret_cast<SokuLib::KeymapManager **>(network + 0x208))
+        return;
     if (state.updates >= g_expires) g_held = {};
     while (!g_pending.empty() && g_pending.front().target <= state.updates) {
         const auto request = g_pending.front();
