@@ -4,7 +4,13 @@
 
 ## 启动入口
 
-配置完成后，双击 `scripts/play-local.cmd`。程序先启动 AI 房主，再启动人类玩家的游戏。请在标题为 `SokuRL - Player` 的窗口中选人和操作，按键沿用游戏的玩家配置。AI 自动确认选人和赛后对话；人类玩家自行确认。
+配置完成后，双击 `scripts/play-local.cmd`，输入玩家座位 `1` 或 `2`，再输入对手名称 `ppo` 或菜单列出的规则策略名称。请在标题为 `SokuRL - Player` 的窗口中选人和操作，按键沿用游戏的玩家配置。
+
+玩家选 1P 时，玩家窗口先建房，AI 加入成为 2P 并选择灵梦；玩家选 2P 时，AI 先建房成为 1P 并选择魔理沙。AI 用原游戏菜单按键选择角色；战斗开始时再次校验角色，选错就报错。人类玩家自行选人、确认赛后对话，AI 自动确认自己的菜单。
+
+也可以直接运行 `scripts/play-local.cmd -PlayerSeat 2 -Opponent ppo`，或 `scripts/play-local.cmd -PlayerSeat 1 -Opponent community_combo`。Python 入口使用同一套 Hydra 配置：`human.seat=1` 指定玩家 1P；`+play_opponent=rule play_rule=rush` 指定规则对手。
+
+当前模型、逐个规则的独立测试成绩和可加载策略范围见[当前试玩策略](current-play-policy.md)。
 
 一次会话最多运行 100 场，或运行 7200 秒；这两个限制由 `config/play_local.yaml` 指定。一方先赢两局才计为一场。局间清除 AI 待执行按键，重建模型记忆。训练中的单局时限不会提前结束真实比赛。
 
