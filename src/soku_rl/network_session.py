@@ -15,6 +15,10 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
     try:
         while time.monotonic()-started < timeout:
             batch = connection.request("poll", {})
+            for event in batch["input_events"]:
+                record({"kind": "input_event", **event})
+                if event["result"] == "expired" and event["command_type"] == 1:
+                    raise RuntimeError(f"network input {event['request']} expired before injection")
             if batch["menu_reply"] != "not_requested":
                 record({"kind": "menu", "reply": batch["menu_reply"]})
             for frame in batch["records"]:

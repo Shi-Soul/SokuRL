@@ -13,6 +13,7 @@ import psutil
 import sokurl
 from network_history import NetworkHistoryClient
 from network_input import NetworkInputClient
+from network_input_events import NetworkInputEventsClient
 from network_match import NetworkMatch
 from network_state import NetworkStateClient
 from startup_dialogs import blocking_dialogs
@@ -36,6 +37,7 @@ class NetworkGame:
         self.clients = {}
         self.frames = OrderedDict()
         self.cursor = 0
+        self.input_cursor = 0
         self.next_confirm = 0.
         self.next_dialog_check = 0.
         try:
@@ -84,6 +86,7 @@ class NetworkGame:
                     self.clients["state"] = NetworkStateClient(self.process.pid)
                     self.clients["history"] = NetworkHistoryClient(self.process.pid)
                     self.clients["input"] = NetworkInputClient(self.process.pid)
+                    self.clients["input_events"] = NetworkInputEventsClient(self.process.pid)
                     self.clients["menu"] = sokurl.BridgeClient(self.process.pid)
                     return
                 self._check_dialogs()
@@ -115,6 +118,12 @@ class NetworkGame:
                 "frame": snapshot.updates, "scene": snapshot.scene, "seat": snapshot.local_seat,
                 "scores": snapshot.scores, "phase": self.lifecycle.phase,
                 "events": tuple(asdict(event) for event in events)}
+            if snapshot.in_battle:
+                record["engine_inputs"] = tuple(
+                    tuple(getattr(player.input, name) for name, _ in player.input._fields_)
+                    for player in (snapshot.raw.p1, snapshot.raw.p2))
+                record["render"] = asdict(snapshot.render)
+                record["state_hash"] = snapshot.raw.stateHash
             if self.lifecycle.can_act:
                 record["observations"] = observe_visible_states(snapshot.raw, snapshot.render, self.visibility)
                 self.frames[snapshot.match, snapshot.updates] = snapshot
@@ -139,7 +148,8 @@ class NetworkGame:
                 self.next_confirm = now+1
         if not latest.in_battle:
             self._check_dialogs()
-        return {"records": records, "cursor": cursor, "menu_reply": menu_reply,
+        self.input_cursor, input_events = self.clients["input_events"].read_after(self.input_cursor, 2.)
+        return {"records": records, "cursor": cursor, "input_events": input_events, "menu_reply": menu_reply,
                 "pid": self.process.pid}
 
     def submit(self, match, frame, keys, duration):

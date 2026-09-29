@@ -21,29 +21,24 @@ def retained_indices(written, cursor):
     return tuple(index % CAPACITY for index in range(cursor, written))
 
 
-class NetworkHistoryClient:
-    """A cursor counts records, including scene transitions, not game frames.
-
-    Start with cursor 0 before entering the match. Each read returns the next
-    cursor and ordered snapshots. An empty batch means no new record exists.
-    A closed producer raises EOFError; overwritten records raise BufferError.
-    The reader cannot pause the game or advance the writer's position.
-    """
+class NetworkHistoryReader:
+    """Copy a typed network history without changing its producer or cursor."""
 
     def __init__(self, pid):
         if type(pid) is not int or pid <= 0:
             raise ValueError("a positive game PID is required")
         kernel = bridge_shared._kernel32
-        self.handle = kernel.OpenFileMappingW(4, False, rf"Local\SokuRLNetworkHistory_{pid}")
+        self.handle = kernel.OpenFileMappingW(4, False, rf"Local\SokuRL{self.mapping}_{pid}")
         if not self.handle:
             raise OSError(ctypes.get_last_error(), "network history is unavailable")
-        self.view = kernel.MapViewOfFile(self.handle, 4, 0, 0, SIZE)
+        size = HEADER.size + CAPACITY*self.entry_size
+        self.view = kernel.MapViewOfFile(self.handle, 4, 0, 0, size)
         if not self.view:
             error = ctypes.get_last_error()
             kernel.CloseHandle(self.handle)
             self.handle = None
             raise OSError(error, "cannot map network history")
-        if struct.unpack("<4I", ctypes.string_at(self.view, 16)) != (MAGIC, 1, SIZE, CAPACITY):
+        if struct.unpack("<4I", ctypes.string_at(self.view, 16)) != (self.magic, 1, size, CAPACITY):
             self.close()
             raise ValueError("unsupported network history ABI")
 
@@ -61,7 +56,7 @@ class NetworkHistoryClient:
             # Defer validation until the complete copy has a stable sequence.
             valid_range = type(cursor) is int and 0 <= cursor <= written and written-cursor <= CAPACITY
             indices = retained_indices(written, cursor) if valid_range else ()
-            entries = [ctypes.string_at(self.view + HEADER.size + index*MAPPING_SIZE, MAPPING_SIZE)
+            entries = [ctypes.string_at(self.view + HEADER.size + index*self.entry_size, self.entry_size)
                        for index in indices]
             after = ctypes.c_uint32.from_address(self.view + 16).value
             if before != after or before != header[4]:
@@ -69,7 +64,7 @@ class NetworkHistoryClient:
             if not header[5]:
                 raise EOFError("network history producer closed")
             retained_indices(written, cursor)
-            return written, tuple(decode_network_state(entry) for entry in entries)
+            return written, tuple(self.decode(entry) for entry in entries)
         raise TimeoutError("could not copy stable network history")
 
     def close(self):
@@ -80,3 +75,17 @@ class NetworkHistoryClient:
         if self.handle:
             kernel.CloseHandle(self.handle)
             self.handle = None
+
+
+class NetworkHistoryClient(NetworkHistoryReader):
+    """A cursor counts records, including scene transitions, not game frames.
+
+    Start with cursor 0 before entering the match. Each read returns the next
+    cursor and ordered snapshots. An empty batch means no new record exists.
+    A closed producer raises EOFError; overwritten records raise BufferError.
+    The reader cannot pause the game or advance the writer's position.
+    """
+    mapping = "NetworkHistory"
+    magic = MAGIC
+    entry_size = MAPPING_SIZE
+    decode = staticmethod(decode_network_state)

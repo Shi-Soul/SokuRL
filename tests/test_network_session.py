@@ -14,7 +14,7 @@ class Connection:
 
     def request(self, operation, payload):
         if operation == "poll":
-            return {"menu_reply": "not_requested", "records": [next(self.frames)]}
+            return {"menu_reply": "not_requested", "input_events": (), "records": [next(self.frames)]}
         assert operation == "submit"
         self.commands.append(payload)
         return {"reply": self.reply}
