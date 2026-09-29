@@ -114,3 +114,29 @@ def test_all_character_fields_and_objects_match_original_reader(reference, chara
                 assert player["cards"][2*index] == reference.dll.reference_field(seat, 0, index)
                 assert player["cards"][2*index+1] == reference.dll.reference_field(seat, 1, index)
         assert not reference.errors
+
+
+def test_float_filter_keeps_the_same_persistent_fighter_value(reference):
+    memory = game_memory(1)
+    reference.initialize(memory)
+    reader = PrivilegedReader(memory)
+    for value in (1.25, -0., 1e-8, -1e-8, 0., -2.5, 2e-6):
+        memory.write(0x101000 + 0xF4, "f", value)
+        reference.dll.reference_reload(0x100000, 1, 0)
+        own = reader.fighter(0x101000, 0, 0)
+        reader.previous[0] = own
+        assert own["xspeed"] == reference.value("my_xspeed")
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the original Windows CRT is required")
+def test_random_sequence_matches_the_original_windows_crt():
+    crt = C.CDLL("msvcrt")
+    crt.srand.argtypes, crt.srand.restype = [C.c_uint], None
+    crt.rand.argtypes, crt.rand.restype = [], C.c_int
+    lua = LuaRuntime(encoding=None, unpack_returned_tuples=True)
+    api = ScriptAPI(lua, 1)
+    for seed in (1, 37, 2**31, 2**32-1):
+        crt.srand(seed)
+        api.randomseed(seed)
+        for _ in range(1000):
+            assert api.random() == (crt.rand() % 32767) / 32767.

@@ -44,10 +44,20 @@ class PrivilegedReader:
         values = struct.unpack("<" + kind, self.memory.read(address, struct.calcsize("<" + kind)))
         return values[0] if len(values) == 1 else values
 
-    def entity(self, address):
+    def float_field(self, value, previous):
+        bits = struct.unpack("<I", struct.pack("<f", value))[0]
+        exponent = (bits >> 23) & 255
+        # th123_ai/lib.cpp leaves persistent fighter fields unchanged when
+        # CheckFloat rejects a read, including negative zero and tiny speeds.
+        return previous if exponent > 254 or (bits != 0 and exponent < 108) else value
+
+    def entity(self, address, previous):
         data = self.memory.read(address, 0x360)
         read = lambda offset, kind: struct.unpack_from("<" + kind, data, offset)[0]
         entity = {name: read(offset, kind) for name, (offset, kind) in OBJECT_FIELDS.items()}
+        for name, (_, kind) in OBJECT_FIELDS.items():
+            if kind == "f":
+                entity[name] = self.float_field(entity[name], 0. if previous is None else previous[name])
         animation = read(0x150, "I")
         entity.update(img=self.value(animation + 0xA, "I"),
                       fflags=self.value(animation + 0x4C, "I"),
@@ -84,7 +94,7 @@ class PrivilegedReader:
             if node in (0, sentinel):
                 raise RuntimeError("object list ended before its declared count")
             node, _, address = self.value(node, "3I")
-            result.append(self.entity(address))
+            result.append(self.entity(address, None))
         if node != sentinel:
             raise RuntimeError("object list exceeded its declared count")
         return tuple(result)
@@ -99,12 +109,15 @@ class PrivilegedReader:
                                 + ((counter + i) & 7) * 2, "H") for i in range(20))
 
     def fighter(self, address, seat, weather):
-        entity = self.entity(address)
+        previous = self.previous[seat]
+        entity = self.entity(address, previous)
         data = self.memory.read(address + 0x400, 0x530)
         read = lambda offset, kind: struct.unpack_from("<" + kind, data, offset - 0x400)[0]
         entity.update({name: read(offset, kind) for name, (offset, kind) in FIGHTER_FIELDS.items()})
+        for name, (_, kind) in FIGHTER_FIELDS.items():
+            if kind == "f":
+                entity[name] = self.float_field(entity[name], 0. if previous is None else previous[name])
         entity["char"] = self.value(0x899D10 + seat * 0x20, "I")
-        previous = self.previous[seat]
         entity["spell"] = 0 if weather == 11 else read(0x5E4, "H") + read(0x5E6, "B") * 500
         entity["card"] = -1 if weather == 11 else 0 if previous is None else previous["cards"][0]
         count, point, table, maximum = read(0x5F8, "i"), read(0x5F4, "I"), read(0x5EC, "I"), read(0x5F0, "I")
