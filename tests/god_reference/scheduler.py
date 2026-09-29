@@ -35,8 +35,20 @@ class OriginalScheduler:
         lua.globals()[b"_yield"] = boundary
         lua.globals()[b"require"] = require
         lua.globals()[b"print"] = lambda *parts: None
+        lua.globals()[b"_reference_error"] = lambda error: self.results.put(("error", error))
         try:
             lua.execute(self.package.api)
+            # The reference keeps the original scheduler for successful calls.
+            # Stop on its first coroutine error so a dead main coroutine cannot
+            # turn a failed comparison into a busy loop that holds Python's GIL.
+            lua.execute(b"""
+              local resume = coroutine.resume
+              coroutine.resume = function(...)
+                local values = {resume(...)}
+                if not values[1] then _reference_error(values[2]); thread_num=0 end
+                return unpack(values)
+              end
+            """)
             api.observe(self.first)
             require(self.script.encode("utf-8"))
             lua.globals()[b"api_main"]()
