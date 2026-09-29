@@ -25,6 +25,8 @@ add_library(SokuRLBridge MODULE
     NetworkState.cpp
     NetworkInput.hpp
     NetworkInput.cpp
+    NetworkInputEvents.hpp
+    NetworkInputEvents.cpp
     AudioMute.hpp
     AudioMute.cpp
     ControlBlock.hpp

@@ -1,4 +1,5 @@
 #include "NetworkInput.hpp"
+#include "NetworkInputEvents.hpp"
 #include "NetworkState.hpp"
 #include <InputManager.hpp>
 #include <Windows.h>
@@ -10,7 +11,7 @@ using namespace SokuRLBridge;
 HANDLE g_handle = nullptr;
 NetworkInputBlock *g_block = nullptr;
 struct Request {
-    unsigned sequence, match, round, duration;
+    unsigned sequence, command, match, round, duration;
     std::uint64_t observed, target;
     LogicalInput input;
 };
@@ -24,7 +25,12 @@ std::uint64_t g_lastObservation = 0, g_expires = 0;
 unsigned load(const unsigned *p) {
     return InterlockedCompareExchange(reinterpret_cast<volatile LONG *>(const_cast<unsigned *>(p)), 0, 0);
 }
-void clear() {
+void record(const Request &request, unsigned kind, std::uint64_t at) {
+    appendNetworkInputEvent({request.sequence, kind, request.command, request.match,
+        request.round, request.duration, request.observed, request.target, at});
+}
+void clear(std::uint64_t at) {
+    for (const auto &request : g_pending) record(request, 10, at);
     g_pending.clear();
     g_held = {};
     g_hasObservation = false;
@@ -60,13 +66,15 @@ bool initializeNetworkInput() {
     g_block->version = 1;
     g_block->size = sizeof(NetworkInputBlock);
     g_block->injectedAt = NO_FRAME;
+    if (!initializeNetworkInputEvents()) { closeNetworkInput(); return false; }
     return true;
 }
 
 void closeNetworkInput() {
+    clear(NO_FRAME);
+    closeNetworkInputEvents();
     if (g_block) { UnmapViewOfFile(g_block); g_block = nullptr; }
     if (g_handle) { CloseHandle(g_handle); g_handle = nullptr; }
-    clear();
     g_owned = false;
 }
 
@@ -80,7 +88,7 @@ void serviceNetworkInput() {
     const unsigned phase = finished ? 3 : fighting ? 2 : battle ? 1 : 0;
     if ((!fighting && !finished) || phase != g_phase ||
         state.match != g_match || state.raw.roundId != g_round) {
-        clear();
+        clear(state.updates);
         g_match = state.match;
         g_round = state.raw.roundId;
     }
@@ -89,9 +97,12 @@ void serviceNetworkInput() {
     if (sequence == load(&g_block->ackSequence)) return;
     MemoryBarrier();
     const auto command = g_block->command;
-    const Request request{sequence, g_block->match, g_block->round, g_block->duration,
+    const Request request{sequence, command, g_block->match, g_block->round, g_block->duration,
         g_block->observed, g_block->target, g_block->input};
-    if (command == 2) { clear(); g_owned = false; acknowledge(sequence, 2); return; }
+    if (command == 2) {
+        clear(state.updates); g_owned = false;
+        record(request, 2, state.updates); acknowledge(sequence, 2); return;
+    }
     unsigned result = 1; // Accepted; injection is reported separately.
     const auto &keys = request.input;
     const bool confirm = command == 3 && request.duration == 1 && keys.a == 1 &&
@@ -116,6 +127,7 @@ void serviceNetworkInput() {
         g_lastObservation = request.observed;
         g_hasObservation = g_owned = true;
     }
+    record(request, result, state.updates);
     acknowledge(sequence, result);
 }
 
@@ -143,7 +155,7 @@ void applyNetworkInput(SokuLib::KeymapManager *keyboard) {
         g_pending.pop_front();
         // The network input hook can be skipped while waiting for the peer.
         // Never apply a command after its specified boundary.
-        if (request.target != state.updates) continue;
+        if (request.target != state.updates) { record(request, 9, state.updates); continue; }
         g_held = request.input;
         g_expires = request.target + request.duration;
         InterlockedIncrement(&g_block->statusSequence);
@@ -152,6 +164,7 @@ void applyNetworkInput(SokuLib::KeymapManager *keyboard) {
         g_block->injectedAt = state.updates;
         MemoryBarrier();
         InterlockedIncrement(&g_block->statusSequence);
+        record(request, 8, state.updates);
     }
     keyboard->input = {g_held.horizontalAxis, g_held.verticalAxis, g_held.a,
         g_held.b, g_held.c, g_held.d, g_held.changeCard, g_held.spellcard};
