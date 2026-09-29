@@ -180,7 +180,9 @@ class NetworkGame:
                 if menu.block.commandSeq == menu.block.ackSeq:
                     menu.menu_choose_character(1 if self.settings["role"] == "host" else 0)
                     menu_reply = "selection_requested"
-                    self.next_confirm = now+1
+                    # Six render frames between pulses leave a released key and
+                    # let the original network menu synchronize each selection.
+                    self.next_confirm = now+.1
             elif latest.in_battle and max(latest.scores) >= 2:
                 controller = self.clients["input"]
                 self.result_confirmation = controller.confirm_result(latest)

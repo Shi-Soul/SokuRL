@@ -5,6 +5,7 @@
 #include "NetworkStart.hpp"
 #include "NetworkState.hpp"
 #include "NetworkInput.hpp"
+#include "NetworkSelection.hpp"
 
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
@@ -779,8 +780,11 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
                         self->input.a = 1;
                     else if (stage != 0)
                         self->input.b = 1;
-                    else
-                        self->input.horizontalAxis = 1;
+                    else {
+                        const auto cursor = seat ? select.rightCursor.cursorPos : select.leftCursor.cursorPos;
+                        self->input.horizontalAxis = SokuRLBridge::selectionDirection(
+                            cursor, SokuRLBridge::characterCursor(static_cast<unsigned>(character)));
+                    }
                     publishResult(SokuRLBridge::ResultCode::Complete);
                 }
                 g_lastCommandSeq = sequence;
