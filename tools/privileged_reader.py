@@ -106,7 +106,7 @@ class PrivilegedReader:
         entity["char"] = self.value(0x899D10 + seat * 0x20, "I")
         previous = self.previous[seat]
         entity["spell"] = 0 if weather == 11 else read(0x5E4, "H") + read(0x5E6, "B") * 500
-        entity["card"] = -1 if weather == 11 or previous is None else previous["cards"][0]
+        entity["card"] = -1 if weather == 11 else 0 if previous is None else previous["cards"][0]
         count, point, table, maximum = read(0x5F8, "i"), read(0x5F4, "I"), read(0x5EC, "I"), read(0x5F0, "I")
         if not 0 <= count <= 5:
             raise RuntimeError("invalid hand card count")

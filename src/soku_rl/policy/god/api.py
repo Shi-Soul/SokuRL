@@ -9,7 +9,8 @@ class ScriptAPI:
         self.requested, self.applied = [0] * 10, [0] * 10
         self.events = []
         self.frame = 0
-        self.history = []
+        self.data_delay = 0
+        self.delayed_actions, self.delayed_blocks, self.delayed_frames = [], [], []
         self.delays = {b"key_delay": 0, b"data_delay": 0, b"weather_delay": 300}
         self.globals[b"key_delay"] = 0
         self.globals[b"data_delay"] = 0
@@ -226,19 +227,31 @@ class ScriptAPI:
         dx, dy = int(abs(own["x"] - enemy["x"])), int(abs(own["y"] - enemy["y"]))
         for name, value in (("dis", dx), ("dis_x", dx), ("dis_y", dy), ("dis2", int(math.hypot(dx, dy)))):
             self.globals[name.encode()] = value
-        distances = [10000]; centres = [10000]
+        distance, centre = 10000, 10000
         for obj in enemy["objects"]:
-            centres.append(int(abs(own["x"] - obj["x"])))
+            centre = min(centre, int(abs(own["x"] - obj["x"])))
             for left, _, right, _ in obj["attackarea"]:
-                distances.append(1 if left < own["x"] < right else int(min(abs(left - own["x"]), abs(right - own["x"]))))
-        self.globals[b"obj_dis"], self.globals[b"obj_dis2"] = min(distances), min(centres)
+                # is_bullethit assigns 1 directly for an enclosing box. A
+                # preceding zero distance must not survive that assignment.
+                distance = (1 if left < own["x"] < right else
+                            min(distance, int(min(abs(left - own["x"]), abs(right - own["x"])))))
+        self.globals[b"obj_dis"], self.globals[b"obj_dis2"] = distance, centre
         if world["weather2"] == 19 and 1000 - self.globals[b"weather_delay"] < world["weather_time"]:
             self.globals[b"weather"] = world["weather2"]
         delay = int(self.globals[b"data_delay"])
-        previous = self.history[-delay] if delay and len(self.history) >= delay else (0, 0, 0)
+        if delay != self.data_delay:
+            self.delayed_actions = [0] * delay
+            self.delayed_blocks = [0] * delay
+            self.delayed_frames = [0] * delay
+            self.data_delay = delay
         if delay:
+            previous = (self.delayed_actions[0], self.delayed_blocks[0], self.delayed_frames[0])
             for name, value in zip((b"enemy_act", b"enemy_act_block", b"enemy_frame"), previous, strict=True):
                 self.globals[name] = value
-        self.history.append(tuple(enemy[name] for name in ("act", "act_block", "frame")))
-        if len(self.history) > 10000:
-            del self.history[0]
+            # Preserve main.cpp's second memmove destination (act, not
+            # act_block). It overwrites the shifted action buffer with blocks.
+            self.delayed_actions[:-1] = self.delayed_blocks[1:]
+            self.delayed_frames[:-1] = self.delayed_frames[1:]
+            self.delayed_actions[-1] = (int(enemy["act"]) + 32768) % 65536 - 32768
+            self.delayed_blocks[-1] = (int(enemy["act_block"]) + 32768) % 65536 - 32768
+            self.delayed_frames[-1] = (int(enemy["frame"]) + 2**31) % 2**32 - 2**31

@@ -33,7 +33,8 @@ def reference(tmp_path_factory):
     output = tmp_path_factory.mktemp("god-reference")
     generate(upstream, output)
     library = output / ("god_reference.dll" if sys.platform == "win32" else "libgod_reference.so")
-    subprocess.run([compiler, "-std=c++17", "-O2", "-shared", "-fPIC", "-static-libgcc",
+    platform_flags = ["-static"] if sys.platform == "win32" else ["-fPIC"]
+    subprocess.run([compiler, "-std=c++17", "-O2", "-shared", *platform_flags, "-static-libgcc",
                     "-static-libstdc++", str(output / "reference.cpp"), "-o", str(library)],
                    check=True, capture_output=True)
     return Reference(library)
