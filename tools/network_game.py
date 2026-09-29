@@ -133,6 +133,8 @@ class NetworkGame:
                 "scores": snapshot.scores, "phase": self.lifecycle.phase,
                 "events": tuple(asdict(event) for event in events)}
             if snapshot.in_battle:
+                record["battle_mode"] = snapshot.raw.battleMode
+                record["battle_submode"] = snapshot.raw.battleSubMode
                 record["engine_inputs"] = tuple(
                     tuple(getattr(player.input, name) for name, _ in player.input._fields_)
                     for player in (snapshot.raw.p1, snapshot.raw.p2))

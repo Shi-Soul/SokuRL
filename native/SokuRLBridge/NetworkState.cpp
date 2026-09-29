@@ -111,8 +111,7 @@ void observeNetworkScene(std::uint32_t scene)
         g_state->scores[0] = g_state->scores[1] = 0;
     }
     g_state->scene = scene;
-    g_state->localSeat = (scene == 8 || scene == 10 || scene == 13) ? 0 :
-        (scene == 9 || scene == 11 || scene == 14) ? 1 : UINT32_MAX;
+    g_state->localSeat = networkSeat(g_state->localSeat, scene);
     endWrite();
     appendHistory();
 }

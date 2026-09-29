@@ -48,6 +48,8 @@ set_property(SOURCE NetworkInput.cpp APPEND PROPERTY OBJECT_DEPENDS
 set_property(SOURCE RenderState.cpp ImageCapture.cpp NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp
     APPEND PROPERTY OBJECT_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/RenderState.hpp")
+set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PROPERTY OBJECT_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/NetworkState.hpp")
 
 include(CTest)
 if(BUILD_TESTING)
@@ -55,4 +57,6 @@ if(BUILD_TESTING)
     add_test(NAME NetworkInputSchedule COMMAND NetworkInputScheduleTest)
     add_executable(RenderObjectSelectionTest tests/RenderObjectSelectionTest.cpp)
     add_test(NAME RenderObjectSelection COMMAND RenderObjectSelectionTest)
+    add_executable(NetworkSeatTest tests/NetworkSeatTest.cpp)
+    add_test(NAME NetworkSeat COMMAND NetworkSeatTest)
 endif()
