@@ -5,9 +5,30 @@
 namespace {
 HANDLE g_handle = nullptr;
 SokuRLBridge::NetworkState *g_state = nullptr;
+constexpr unsigned HISTORY_CAPACITY = 256;
+#pragma pack(push, 4)
+struct NetworkHistory {
+    unsigned magic, version, size, capacity;
+    volatile LONG sequence;
+    unsigned alive;
+    std::uint64_t written;
+    SokuRLBridge::NetworkState entries[HISTORY_CAPACITY];
+};
+#pragma pack(pop)
+static_assert(offsetof(NetworkHistory, entries) == 32, "network history header");
+HANDLE g_historyHandle = nullptr;
+NetworkHistory *g_history = nullptr;
 bool battle(unsigned scene) { return scene == 13 || scene == 14; }
 void beginWrite() { InterlockedIncrement(&g_state->sequence); MemoryBarrier(); }
 void endWrite() { MemoryBarrier(); InterlockedIncrement(&g_state->sequence); }
+void appendHistory() {
+    InterlockedIncrement(&g_history->sequence);
+    MemoryBarrier();
+    g_history->entries[g_history->written % HISTORY_CAPACITY] = *g_state;
+    ++g_history->written;
+    MemoryBarrier();
+    InterlockedIncrement(&g_history->sequence);
+}
 }
 
 namespace SokuRLBridge {
@@ -32,11 +53,40 @@ bool initializeNetworkState()
     g_state->size = sizeof(NetworkState);
     g_state->connected = 1;
     g_state->localSeat = UINT32_MAX;
+    swprintf_s(name, L"Local\\SokuRLNetworkHistory_%lu", GetCurrentProcessId());
+    g_historyHandle = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+        0, sizeof(NetworkHistory), name);
+    if (g_historyHandle)
+        g_history = static_cast<NetworkHistory *>(MapViewOfFile(g_historyHandle,
+            FILE_MAP_ALL_ACCESS, 0, 0, sizeof(NetworkHistory)));
+    if (!g_history) {
+        closeNetworkState();
+        return false;
+    }
+    // A newly created page-file mapping is already zero-filled.
+    g_history->magic = 0x484E4B53;
+    g_history->version = 1;
+    g_history->size = sizeof(NetworkHistory);
+    g_history->capacity = HISTORY_CAPACITY;
+    g_history->alive = 1;
     return true;
 }
 
 void closeNetworkState()
 {
+    if (g_history) {
+        InterlockedIncrement(&g_history->sequence);
+        MemoryBarrier();
+        g_history->alive = 0;
+        MemoryBarrier();
+        InterlockedIncrement(&g_history->sequence);
+        UnmapViewOfFile(g_history);
+        g_history = nullptr;
+    }
+    if (g_historyHandle) {
+        CloseHandle(g_historyHandle);
+        g_historyHandle = nullptr;
+    }
     if (g_state) {
         beginWrite();
         g_state->connected = 0;
@@ -64,6 +114,7 @@ void observeNetworkScene(std::uint32_t scene)
     g_state->localSeat = (scene == 8 || scene == 10 || scene == 13) ? 0 :
         (scene == 9 || scene == 11 || scene == 14) ? 1 : UINT32_MAX;
     endWrite();
+    appendHistory();
 }
 
 std::uint64_t nextNetworkUpdate() { return g_state->updates + 1; }
@@ -79,5 +130,6 @@ void publishNetworkState(const RawFrameState &raw, unsigned leftScore, unsigned 
     g_state->raw = raw;
     captureRenderState(g_state->render);
     endWrite();
+    appendHistory();
 }
 }
