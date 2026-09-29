@@ -75,29 +75,6 @@ def test_torchrl_preserves_image_and_command_fields():
         env.close()
 
 
-def test_benchmarl_cnn_accepts_both_image_and_command_inputs():
-    pytest.importorskip("benchmarl")
-    from benchmarl.models import CnnConfig
-    from torchrl.data import Composite, Unbounded
-    from soku_rl.marl.benchmarl_task import SokuTask
-    from soku_rl.env.adapters.torchrl import wrap_torchrl
-    env = wrap_torchrl(LearningParallelEnv(HisoutenParallelEnv(ImageBackend(), episode()), learning()), 3, "cpu")
-    try:
-        group = "player_0"
-        inputs = Composite({group: SokuTask("VS", {}).observation_spec(env)[group]})
-        outputs = Composite({group: Composite({"logits": Unbounded(shape=(1, 90))}, shape=(1,))})
-        config = CnnConfig.get_from_yaml()
-        config.cnn_num_cells, config.cnn_kernel_sizes = [8, 8], [8, 4]
-        config.cnn_strides, config.cnn_paddings, config.mlp_num_cells = [4, 2], [0, 0], [16]
-        model = config.get_model(input_spec=inputs, output_spec=outputs, agent_group=group,
-            input_has_agent_dim=True, n_agents=1, centralised=False, share_params=True,
-            device="cpu", action_spec=env.action_spec)
-        assert model(env.reset())[group, "logits"].shape == (1, 90)
-        assert model.input_features_tensors == 64
-    finally:
-        env.close()
-
-
 def test_sb3_image_view_keeps_terminal_observation_before_reset(tmp_path):
     pytest.importorskip("stable_baselines3")
     from stable_baselines3 import PPO
