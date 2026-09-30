@@ -651,6 +651,7 @@ void consumeCommand(bool gameplay)
     const auto inputP2 = g_control->commandInputP2;
     const auto duration = g_control->durationFrames;
     const auto argument = g_control->commandArgument;
+    const auto stepInputMask = SokuRLBridge::controlledStepMask(type, argument);
     g_lastCommandSeq = sequence;
 
     if (type == SokuRLBridge::CommandType::Release) {
@@ -685,11 +686,11 @@ void consumeCommand(bool gameplay)
         g_paused = true;
         g_stepsRemaining = duration;
         publishResult(SokuRLBridge::ResultCode::Accepted);
-    } else if (type == SokuRLBridge::CommandType::StepWithInputs &&
+    } else if (stepInputMask &&
         isValidInput(input, 1) && isValidInput(inputP2, 1)) {
         g_activeInputs[0] = toKeyInput(input);
         g_activeInputs[1] = toKeyInput(inputP2);
-        g_activeInputMask = 3;
+        g_activeInputMask = stepInputMask;
         g_activeInputFrames = 1;
         g_activeInputEnabled = true;
         g_neutralPending = false;

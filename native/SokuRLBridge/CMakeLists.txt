@@ -61,6 +61,8 @@ set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PR
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(ControlledStepTest tests/ControlledStepTest.cpp)
+    add_test(NAME ControlledStep COMMAND ControlledStepTest)
     add_executable(NetworkInputScheduleTest tests/NetworkInputScheduleTest.cpp)
     add_test(NAME NetworkInputSchedule COMMAND NetworkInputScheduleTest)
     add_executable(RenderObjectSelectionTest tests/RenderObjectSelectionTest.cpp)

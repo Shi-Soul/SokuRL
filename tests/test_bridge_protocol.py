@@ -26,7 +26,7 @@ from scenario_runner import compile_steps, token_input
 
 class BridgeProtocolTests(unittest.TestCase):
     def test_cpp_python_layout_agreement(self) -> None:
-        self.assertEqual(bridge_shared.CONTROL_VERSION, 8)
+        self.assertEqual(bridge_shared.CONTROL_VERSION, 9)
         self.assertEqual(ctypes.sizeof(bridge_shared.LogicalInput), 32)
         self.assertEqual(ctypes.sizeof(bridge_shared.PlayerState), 140)
         self.assertEqual(ctypes.sizeof(bridge_shared.ObjectState), 80)
@@ -49,7 +49,7 @@ class BridgeProtocolTests(unittest.TestCase):
         ):
             self.assertIn(assertion, header)
         launcher = (ROOT / "tools" / "sokurl.py").read_text(encoding="utf-8")
-        self.assertIn("version in (4, 5, 6, 7, 8)", launcher)
+        self.assertIn("version in (4, 5, 6, 7, 8, 9)", launcher)
 
     def test_spirit_uses_signed_game_semantics(self) -> None:
         player_fields = dict(bridge_shared.PlayerState._fields_)
@@ -97,6 +97,7 @@ class BridgeProtocolTests(unittest.TestCase):
         self.assertEqual(bridge_shared.COMMAND_STEP_WITH_INPUTS, 9)
         self.assertEqual(bridge_shared.COMMAND_APPLY_SIMPLE_STATE, 10)
         self.assertEqual(bridge_shared.COMMAND_RESET_EPISODE, 11)
+        self.assertEqual(bridge_shared.COMMAND_STEP_WITH_CONTROLLED_INPUTS, 13)
         self.assertEqual(bridge_shared.RESULT_NAMES[12], "CHECKPOINT_RESTORE_UNSUPPORTED")
 
     def test_invalid_reset_seed_is_rejected_before_accessing_process_memory(self):

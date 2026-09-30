@@ -6,7 +6,7 @@
 namespace SokuRLBridge
 {
 constexpr std::uint32_t CONTROL_MAGIC = 0x554B4F53;
-constexpr std::uint32_t CONTROL_VERSION = 8;
+constexpr std::uint32_t CONTROL_VERSION = 9;
 constexpr wchar_t MAPPING_NAME_FORMAT[] = L"Local\\SokuRLBridge_%lu";
 constexpr std::uint32_t MAX_DURATION_FRAMES = 10000;
 constexpr std::uint32_t FRAME_RING_CAPACITY = 512;
@@ -18,8 +18,15 @@ enum class CommandType : std::uint32_t {
     None = 0, Input = 1, Release = 2, Run = 3, Pause = 4,
     StepFrames = 5, EstablishCheckpoint = 6, GotoFrame = 7,
     MenuConfirm = 8, StepWithInputs = 9, ApplySimpleState = 10,
-    ResetEpisode = 11, MenuChooseCharacter = 12,
+    ResetEpisode = 11, MenuChooseCharacter = 12, StepWithControlledInputs = 13,
 };
+
+constexpr std::uint32_t controlledStepMask(CommandType type, std::uint64_t argument) {
+    if (type == CommandType::StepWithInputs) return 3;
+    if (type == CommandType::StepWithControlledInputs && argument >= 1 && argument <= 3)
+        return static_cast<std::uint32_t>(argument);
+    return 0; // Not a valid controlled-step request.
+}
 
 enum class ResultCode : std::uint32_t {
     Idle = 0, Accepted = 1, Complete = 2, Released = 3,

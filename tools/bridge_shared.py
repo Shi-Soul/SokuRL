@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 MAPPING_NAME_FORMAT = r"Local\SokuRLBridge_{}"
 CONTROL_MAGIC = 0x554B4F53
-CONTROL_VERSION = 8
+CONTROL_VERSION = 9
 MAX_DURATION_FRAMES = 10_000
 FRAME_RING_CAPACITY = 512
 INPUT_HISTORY_CAPACITY = 4096
@@ -51,6 +51,7 @@ COMMAND_STEP_WITH_INPUTS = 9
 COMMAND_APPLY_SIMPLE_STATE = 10
 COMMAND_RESET_EPISODE = 11
 COMMAND_MENU_CHOOSE_CHARACTER = 12
+COMMAND_STEP_WITH_CONTROLLED_INPUTS = 13
 
 RESULT_NAMES = {
     0: "IDLE", 1: "ACCEPTED", 2: "COMPLETE", 3: "RELEASED",
@@ -471,9 +472,24 @@ class BridgeClient:
         p1: tuple[int, ...] | LogicalInput,
         p2: tuple[int, ...] | LogicalInput,
     ) -> int:
-        self._write_input(self.block.commandInput, p1)
-        self._write_input(self.block.commandInputP2, p2)
-        return self._send(COMMAND_STEP_WITH_INPUTS, duration=1)
+        return self.step_controlled({0: p1, 1: p2})
+
+    def step_controlled(self, inputs):
+        """Advance once; only listed seats replace the original physical inputs."""
+        if not inputs or any(type(seat) is not int or seat not in (0, 1) for seat in inputs):
+            raise ValueError("controlled inputs require one or both seats, numbered 0 and 1")
+        values = [LogicalInput(), LogicalInput()]
+        for seat, keys in inputs.items():
+            if isinstance(keys, LogicalInput):
+                keys = tuple(getattr(keys, name) for name, _ in keys._fields_)
+            if (len(keys) != 8 or any(type(key) is not int for key in keys)
+                    or any(key not in (-1, 0, 1) for key in keys[:2])
+                    or any(key not in (0, 1) for key in keys[2:])):
+                raise ValueError("controlled inputs require two signed axes and six binary buttons")
+            self._write_input(values[seat], keys)
+        self.block.commandInput, self.block.commandInputP2 = values
+        return self._send(COMMAND_STEP_WITH_CONTROLLED_INPUTS, duration=1,
+                          argument=sum(1 << seat for seat in inputs))
 
     def apply_simple_state(self, state: RawFrameState) -> int:
         patch = SimpleStatePatch()
