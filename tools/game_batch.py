@@ -209,15 +209,12 @@ class SokuGameBatch:
                 self._finish_recording(slot, "close")
             except Exception as error:
                 errors.append(repr(error))
-            if slot in self.privileged_readers:
-                self.privileged_readers.pop(slot).close()
-            if slot in self.image_clients:
-                self.image_clients.pop(slot).close()
-            try:
-                if slot in self.clients:
-                    self.clients.pop(slot).close()
-            except Exception as error:
-                errors.append(repr(error))
+            for resources in (self.privileged_readers, self.image_clients, self.clients):
+                try:
+                    if slot in resources:
+                        resources.pop(slot).close()
+                except Exception as error:
+                    errors.append(repr(error))
             try:
                 process = self.processes[slot]
                 if process.is_running():

@@ -40,7 +40,12 @@ def main():
                     raise ValueError(f"unsupported worker operation: {operation}")
                 send(replies, {"ok": True, "value": {"value": value, "replays": backend.take_replays()}})
             except Exception:
-                send(replies, {"ok": False, "error": traceback.format_exc()})
+                error = traceback.format_exc()
+                try:
+                    backend.close()
+                except Exception:
+                    error += "\nEpisode cleanup also failed:\n" + traceback.format_exc()
+                send(replies, {"ok": False, "error": error, "replays": backend.take_replays()})
                 raise
     finally:
         backend.close()

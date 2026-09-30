@@ -94,12 +94,15 @@ class WorkerConnection:
                 response = self.replies.get(timeout=self.timeout)
                 if isinstance(response, BaseException):
                     raise response
-                if not response["ok"]:
-                    raise RuntimeError(response["error"])
-                return response["value"]
+                return self._response_value(response)
             except BaseException:
                 self.broken = True
                 raise
+
+    def _response_value(self, response):
+        if not response["ok"]:
+            raise RuntimeError(response["error"])
+        return response["value"]
 
     def close(self):
         if self.closed:
@@ -137,6 +140,11 @@ class WorkerBackend(WorkerConnection):
             return result
         self._save_replays(result["replays"])
         return result["value"]
+
+    def _response_value(self, response):
+        if not response["ok"]:
+            self._save_replays(response["replays"])
+        return super()._response_value(response)
 
     def _save_replays(self, replays):
         for replay in replays:
