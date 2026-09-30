@@ -4,7 +4,7 @@ import struct
 import time
 
 import bridge_shared
-from network_state import MAPPING_SIZE, decode_network_state
+from network_runtime.state import MAPPING_SIZE, decode_network_state
 
 
 HEADER = struct.Struct("<6IQ")

@@ -12,11 +12,11 @@ import time
 import psutil
 
 import sokurl
-from network_history import NetworkHistoryClient
-from network_input import NetworkInputClient
-from network_input_events import NetworkInputEventsClient
-from network_match import NetworkMatch
-from network_state import NetworkStateClient
+from network_runtime.history import NetworkHistoryClient
+from network_runtime.input import NetworkInputClient
+from network_runtime.input_events import NetworkInputEventsClient
+from soku_rl.play.match import NetworkMatch
+from network_runtime.state import NetworkStateClient
 from startup_dialogs import blocking_dialogs
 from soku_rl.env.observation.visibility import VisibilityConfig
 from soku_rl.env.observation.visible_state import observe_visible_states

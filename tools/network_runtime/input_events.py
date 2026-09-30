@@ -1,8 +1,8 @@
 """Read each request result and its terminal scheduling event in order."""
 import struct
 
-from network_history import NetworkHistoryReader
-from network_input import RESULTS
+from network_runtime.history import NetworkHistoryReader
+from network_runtime.input import RESULTS
 
 
 EVENT = struct.Struct("<6I3Q")

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from network_input import BODY, SIZE, NetworkInputClient, input_payload, result_confirm_payload
+from network_runtime.input import BODY, SIZE, NetworkInputClient, input_payload, result_confirm_payload
 
 
 def test_request_binds_match_round_and_latency():

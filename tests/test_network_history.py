@@ -6,8 +6,8 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from network_history import CAPACITY, HEADER, MAGIC, SIZE, NetworkHistoryClient, retained_indices
-from network_state import MAPPING_SIZE
+from network_runtime.history import CAPACITY, HEADER, MAGIC, SIZE, NetworkHistoryClient, retained_indices
+from network_runtime.state import MAPPING_SIZE
 from test_network_state import snapshot
 
 

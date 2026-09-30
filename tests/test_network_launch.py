@@ -6,7 +6,7 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from network_launch import start_games
+from network_runtime.launch import start_games
 
 
 @pytest.mark.parametrize("seat", [1, 2])

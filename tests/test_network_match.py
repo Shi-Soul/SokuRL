@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from network_match import NetworkMatch
+from soku_rl.play.match import NetworkMatch
 
 
 def frame(match, round_id, scores, hp, scene, updates):

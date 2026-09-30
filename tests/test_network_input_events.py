@@ -6,8 +6,8 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from network_history import CAPACITY, HEADER
-from network_input_events import EVENT, NetworkInputEventsClient, decode_input_event
+from network_runtime.history import CAPACITY, HEADER
+from network_runtime.input_events import EVENT, NetworkInputEventsClient, decode_input_event
 
 
 def test_ordered_acceptance_injection_expiry_and_round_cancellation():

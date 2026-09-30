@@ -6,7 +6,7 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from network_state import HEADER, MAGIC, MAPPING_SIZE, decode_network_state
+from network_runtime.state import HEADER, MAGIC, MAPPING_SIZE, decode_network_state
 from bridge_shared import RawFrameState, calculate_state_hash
 from soku_rl.env.observation.render_state import RENDER_STATE_SIZE
 

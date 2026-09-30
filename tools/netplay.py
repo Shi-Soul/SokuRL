@@ -15,7 +15,7 @@ from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
 from soku_rl.play.network_session import run_session
 from soku_rl.env.worker_pipe import WorkerConnection
 from soku_rl.play.loader import load_play_policy
-from network_launch import start_games
+from network_runtime.launch import start_games
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="netplay")
