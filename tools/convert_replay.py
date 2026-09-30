@@ -9,7 +9,7 @@ from soku_rl.replay import Replay
 from soku_rl.replay.rollout import export_replay, write_rollout
 
 
-@hydra.main(version_base="1.3", config_path="../config", config_name="replay")
+@hydra.main(version_base="1.3", config_path="../config", config_name="replay_conversion")
 def main(config):
     source = Path(config.replay.source).resolve(strict=True)
     destination = Path(config.output).resolve()

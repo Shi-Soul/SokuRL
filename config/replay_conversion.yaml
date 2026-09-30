@@ -1,0 +1,9 @@
+defaults:
+  - train
+  - _self_
+replay:
+  operation: import
+  source: ???
+  game_directory: ???
+  match_index: 0
+output: ???
