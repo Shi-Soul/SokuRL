@@ -8,12 +8,7 @@ import sokurl
 ROOT = Path(__file__).resolve().parents[1]
 
 def fingerprints():
-    sources = sorted((ROOT / "src/soku_rl").rglob("*.py")) + [
-        ROOT / "tools" / name for name in (
-            "game_batch.py", "evaluate.py", "bridge_shared.py", "sokurl.py", "runtime_identity.py", "rollout_worker.py",
-            "startup_dialogs.py", "netplay.py")]
-    sources += sorted((ROOT / "tools").glob("network_*.py"))
-    sources += sorted((ROOT / "tools/game_runtime").rglob("*.py"))
+    sources = sorted((ROOT / "src/soku_rl").rglob("*.py")) + sorted((ROOT / "tools").rglob("*.py"))
     source_hashes = {str(p.relative_to(ROOT)).replace("\\", "/"):
                      hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
     artifacts = [sokurl.GAME_DIR / name for name in
