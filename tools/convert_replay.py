@@ -26,7 +26,7 @@ def main(config):
         replay = Replay.decode(source.read_bytes())
         episode = EpisodeConfig.from_dict(OmegaConf.to_container(config.episode, resolve=True))
         index = config.replay.match_index
-        frames = replay_frames(replay, index, episode, float(config.runtime.launch_timeout))
+        frames = replay_frames(replay, index, episode, float(config.runtime.launch_timeout), destination.parent)
         try:
             count = write_rollout(destination, replay, index, episode, frames)
         finally:

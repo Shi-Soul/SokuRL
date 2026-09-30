@@ -17,14 +17,14 @@ from soku_rl.pomg import Outcome
 from soku_rl.replay.rollout import RolloutFrame
 
 
-def replay_frames(replay, match_index, config, launch_timeout):
+def replay_frames(replay, match_index, config, launch_timeout, scratch_directory):
     if type(match_index) is not int or not 0 <= match_index < len(replay.matches):
         raise ValueError("a valid replay match index is required")
     header = bytearray(replay.header)
     header[7] = 1
     selected = replace(replay, header=bytes(header), matches=(replay.matches[match_index],))
     with ExitStack() as resources:
-        directory = resources.enter_context(TemporaryDirectory(prefix="sokurl-replay-"))
+        directory = resources.enter_context(TemporaryDirectory(prefix="sokurl-replay-", dir=scratch_directory))
         path = Path(directory) / "selected.rep"
         path.write_bytes(selected.encode())
         instance = launch_replay(path, launch_timeout, True, config.observation_mode)
