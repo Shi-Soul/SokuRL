@@ -1,41 +1,16 @@
 """Adapt owned th123 processes to the simultaneous two-player game contract."""
 import ctypes
 
-from soku_rl.env.observation.diagnostic import observe
-from soku_rl.env.observation.visible_state import observe_visible_states
 from soku_rl.env.observation.visibility import VisibilityConfig
-from soku_rl.pomg import Outcome, TimeStep
 from soku_rl.env.match import MatchConfig
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
 from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
+from game_runtime.observation import ObservationReader, time_step as _time_step
 
 
 RESET_METHODS = {"image": "process_restart", "state": "native_scene_reload",
                  "diagnostic_state": "native_scene_reload", "privileged_state": "native_scene_reload"}
-
-
-def _time_step(raw, dropped_frames, observations, pid):
-    if raw.sceneId != sokurl.SCENE_BATTLE or raw.battleMode != sokurl.BATTLE_MODE_VSPLAYER:
-        raise RuntimeError("game left VS battle")
-    if dropped_frames:
-        raise RuntimeError("frame recording was incomplete")
-    hp = raw.p1.hp, raw.p2.hp
-    if hp[0] <= 0 and hp[1] <= 0:
-        outcome, rewards = Outcome.DRAW, (0.0, 0.0)
-    elif hp[0] <= 0:
-        outcome, rewards = Outcome.P2_WIN, (-1.0, 1.0)
-    elif hp[1] <= 0:
-        outcome, rewards = Outcome.P1_WIN, (1.0, -1.0)
-    else:
-        outcome, rewards = Outcome.ONGOING, (0.0, 0.0)
-    return TimeStep(raw.frameId, observations, rewards, outcome, {
-        "pid": pid, "segment": raw.segmentId,
-        "hp": hp, "characters": (raw.p1.characterId, raw.p2.characterId),
-        "stage": raw.stageId, "weather": raw.activeWeather,
-        "hash": f"{raw.stateHash:016X}", "dropped_frames": dropped_frames,
-        "objects": (raw.p1ObjectCount, raw.p2ObjectCount),
-    })
 
 
 class SokuGameBatch:
@@ -48,8 +23,7 @@ class SokuGameBatch:
         self.buffers = {}
         self.frames = {}
         self.active = set()
-        self.image_clients = {}
-        self.privileged_readers = {}
+        self.readers = {}
         self.observation_mode = "diagnostic_state"
         self.recording_enabled = False
         self.recordings = {}
@@ -81,17 +55,9 @@ class SokuGameBatch:
             raise ValueError("a positive episode frame limit is required")
 
     def _observe(self, slot, raw, dropped):
-        if self.observation_mode == "privileged_state":
-            observations = self.privileged_readers[slot].observe(raw, self.clients[slot])
-        elif self.observation_mode == "image":
-            scene = self.image_clients[slot].read(int(raw.frameId), 10.0)
-            observations = (scene.image, scene.image)
-        elif self.observation_mode == "state":
-            render = self.image_clients[slot].read_state(int(raw.frameId), 10.0)
-            observations = observe_visible_states(raw, render, self.visibility)
-        else:
-            observations = tuple(observe(raw, p) for p in (0, 1))
-        return _time_step(raw, dropped, observations, self.processes[slot].pid)
+        if dropped:
+            raise RuntimeError("frame recording was incomplete")
+        return self.readers[slot].read(raw, self.clients[slot])
 
     def reset(self, seeds):
         if self.processes or not seeds:
@@ -156,12 +122,7 @@ class SokuGameBatch:
                 raw = wait_for_frame_zero(client, process.pid, self.launch_timeout)
                 self.buffers[slot] = (ctypes.c_ubyte * (FRAME_RING_CAPACITY * FRAME_SIZE))()
                 self.frames[slot] = 0
-                if self.observation_mode == "privileged_state":
-                    from privileged_reader import PrivilegedReader, ProcessMemory
-                    self.privileged_readers[slot] = PrivilegedReader(ProcessMemory(process.pid))
-                if self.observation_mode in {"image", "state"}:
-                    from image_shared import ImageClient
-                    self.image_clients[slot] = ImageClient(process.pid)
+                self.readers[slot] = ObservationReader(process.pid, self.observation_mode, self.visibility)
                 states[slot] = self._observe(slot, raw, 0)
                 self.active.add(slot)
         except BaseException:
@@ -209,7 +170,7 @@ class SokuGameBatch:
                 self._finish_recording(slot, "close")
             except Exception as error:
                 errors.append(repr(error))
-            for resources in (self.privileged_readers, self.image_clients, self.clients):
+            for resources in (self.readers, self.clients):
                 try:
                     if slot in resources:
                         resources.pop(slot).close()

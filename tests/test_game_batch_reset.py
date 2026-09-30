@@ -24,7 +24,7 @@ def batch(monkeypatch):
         result.clients[slot] = Mock()
         result.clients[slot].snapshot.return_value.latest.segmentId = 3
         result.clients[slot].reset_episode.return_value = 10 + slot
-        result.image_clients[slot] = Mock()
+        result.readers[slot] = Mock()
         result.frames[slot] = 20
         result.buffers[slot] = object()
     result.active = {0, 1}
@@ -44,7 +44,7 @@ def test_reset_only_recreates_selected_image_slots(batch, mode):
     backend, game = batch
     backend.observation_mode = mode
     selected, peer = backend.clients[0], backend.clients[1]
-    selected_image, peer_image = backend.image_clients[0], backend.image_clients[1]
+    selected_image, peer_image = backend.readers[0], backend.readers[1]
     peer_buffer = backend.buffers[1]
     states = backend.reset_slots({0: 1732, 2: 291038774})
     assert backend.active == {0, 1, 2}
