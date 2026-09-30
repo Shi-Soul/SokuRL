@@ -66,13 +66,14 @@ class BridgeProtocolTests(unittest.TestCase):
         mapping = bridge_shared.BridgeMapping()
         block = mapping.control
         block.magic = bridge_shared.CONTROL_MAGIC
-        block.version = 7
         block.structSize = bridge_shared.CONTROL_BLOCK_SIZE
         block.mappingSize = bridge_shared.MAPPING_SIZE
         client = bridge_shared.BridgeClient.__new__(bridge_shared.BridgeClient)
         client._mapping_pointer = ctypes.pointer(mapping)
-        with self.assertRaisesRegex(bridge_shared.BridgeUnavailable, "ABI mismatch"):
-            client._validate_abi()
+        for version in (7, 8):
+            block.version = version
+            with self.assertRaisesRegex(bridge_shared.BridgeUnavailable, "ABI mismatch"):
+                client._validate_abi()
         block.version = bridge_shared.CONTROL_VERSION
         client._validate_abi()
 

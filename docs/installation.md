@@ -98,7 +98,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_sokumods.ps1 
 
 模板的 Practice 配置使用 1P 魔理沙、2P 灵梦和卡组 0；MemoryPatch 开启多实例支持。VS 启动器临时使用标题场景配置，经正常加载流程进入对战，并恢复启动配置。不同 Wine 环境不能共享这一可写配置目录。
 
-部署后的桥接 DLL 必须与 Python 同为 ABI 8。旧 ABI 7 的灵力字段和重置命令存在分支差异，不能混用。
+部署后的桥接 DLL 必须与 Python 同为 ABI 9。ABI 9 增加按座位接管输入的逐帧命令；Python 拒绝旧 DLL，防止其忽略座位选择。旧 ABI 7 的灵力字段和重置命令还存在分支差异，不能混用。
 
 ## 启动和验收
 

@@ -56,9 +56,13 @@ episode-reset contract.
 
 ## Shared memory ABI
 
-ABI version 8 uses 4-byte packing. It combines `ResetEpisode` with the signed
-resource fields added upstream. The two development branches used version 7
-for different semantics, so clients must reject version 7 for control.
+ABI version 9 uses 4-byte packing. `StepWithControlledInputs` (command 13)
+advances one simulation frame. Its argument selects player one (1), player two
+(2), or both players (3). The original game processes inputs for unselected
+players. Network games reject this offline command. Clients must reject older
+versions, which do not support this selection. Version 8 combined `ResetEpisode`
+with signed resource fields. The two development branches used version 7 for
+different semantics.
 Spirit fields are signed 32-bit ABI values
 that preserve the game's signed 16-bit resource semantics, including transient
 negative values. The structure sizes are unchanged from version 6:
