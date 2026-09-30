@@ -11,7 +11,7 @@ import json
 from uuid import uuid4
 
 
-PROTOCOL = 1
+PROTOCOL = 2
 MAX_MESSAGE = 64 * 1024 * 1024
 
 
