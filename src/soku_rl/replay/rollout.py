@@ -22,12 +22,13 @@ def write_rollout(path, replay, match_index, episode, frames):
     if not isinstance(replay, Replay) or not 0 <= match_index < len(replay.matches):
         raise ValueError("a decoded replay and a valid match index are required")
     count = 0
+    expected_shape = (2, *episode.space().shape)
     with ZipFile(path, "x") as archive:
         archive.writestr("original.rep", replay.encode())
         for frame in frames:
             if frame.frame != count:
                 raise ValueError("rollout frames must start at zero and remain consecutive")
-            if frame.observations.shape != (2, *episode.space().shape):
+            if frame.observations.shape != expected_shape:
                 raise ValueError("rollout observations differ from the environment space")
             if frame.engine_inputs.shape != (2, 8):
                 raise ValueError("rollout requires both players' eight engine input counters")
