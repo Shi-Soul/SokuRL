@@ -1,0 +1,9 @@
+defaults:
+  - train
+  - override track: superhuman
+  - _self_
+episode:
+  max_frames: 600
+validation:
+  seeds: [1732, 291038774, 1928]
+output: logs/validation/replay-delivery-${now:%Y%m%d-%H%M%S}
