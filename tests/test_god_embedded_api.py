@@ -16,7 +16,7 @@ def test_scheduler_instructions_match_the_packaged_executable():
         pytest.skip("original package and source are unavailable")
     lua = LuaRuntime(encoding=None)
     compile_code = lua.eval(b"function(s) return string.dump(assert(loadstring(s, '@api.ai'))) end")
-    original = lua_program(compile_code(embedded_api(executable)))
+    original = lua_program(embedded_api(executable))
     migrated = lua_program(compile_code(source.read_bytes()))
     assert original == migrated
     assert len(original[3]) == 11
