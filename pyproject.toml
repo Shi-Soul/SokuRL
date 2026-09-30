@@ -28,3 +28,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not desktop'"
+markers = ["desktop: opens visible Windows UI; run only when explicitly requested"]

@@ -6,9 +6,11 @@ import subprocess
 import sys
 import time
 import unittest
+import pytest
 
 
 @unittest.skipUnless(os.name == "nt", "requires Windows dialog APIs")
+@pytest.mark.desktop
 class StartupDialogTests(unittest.TestCase):
     def test_reads_only_the_owned_process_dialog(self):
         path = Path(__file__).parents[1] / "tools/startup_dialogs.py"
