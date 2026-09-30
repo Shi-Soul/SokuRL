@@ -32,11 +32,19 @@ def embedded_api(executable):
 
     def entries(relative):
         named, numbered = struct.unpack_from("<2H", data, root + relative + 12)
-        return [struct.unpack_from("<2I", data, root + relative + 16 + i * 8)
-                for i in range(named + numbered)]
+        result = []
+        for index in range(named + numbered):
+            name, child = struct.unpack_from("<2I", data, root + relative + 16 + index * 8)
+            if name & 0x80000000:
+                offset = root + (name & 0x7FFFFFFF)
+                length, = struct.unpack_from("<H", data, offset)
+                name = data[offset + 2:offset + 2 + length * 2].decode("utf-16le")
+            result.append((name, child))
+        return result
 
     directory = 0
-    for identifier in (10, 103):  # RT_RCDATA, original api.ai resource identifier.
+    # The shipped executable uses the literal type name, not Windows type ID 10.
+    for identifier in ("RT_RCDATA", 103):
         children = [child for name, child in entries(directory) if name == identifier]
         if len(children) != 1 or not children[0] & 0x80000000:
             raise ValueError("original Lua resource directory is missing or ambiguous")
