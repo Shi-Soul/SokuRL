@@ -13,6 +13,7 @@ import psutil
 
 import sokurl
 from startup_dialogs import blocking_dialogs
+from game_runtime.startup import title_configuration
 from bridge_shared import BridgeClient, BridgeUnavailable, RawFrameState
 from frame_validation import (
     InputPair,
@@ -38,6 +39,11 @@ def launch_replay_checkpoint(replay: Path, timeout: float, unlimited: bool) -> P
     if not replay.is_file() or replay.suffix.casefold() != ".rep":
         raise ValueError(f"not a replay file: {replay}")
     sokurl._validate_game()
+    with title_configuration(sokurl.SKIPINTRO_INI, timeout):
+        return _start_replay(replay, timeout, unlimited)
+
+
+def _start_replay(replay, timeout, unlimited):
     process = psutil.Process(
         subprocess.Popen([str(sokurl.GAME_EXE), str(replay)], cwd=sokurl.GAME_DIR,
                          env=os.environ | {"SOKURL_UNLIMITED_PACING": str(int(unlimited))}).pid

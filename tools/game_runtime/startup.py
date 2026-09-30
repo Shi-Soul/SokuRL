@@ -1,0 +1,45 @@
+"""Serialize temporary title-screen configuration across owned game launches."""
+from contextlib import contextmanager
+import ctypes
+from ctypes import wintypes
+import re
+
+
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
+kernel32.CreateMutexW.restype = wintypes.HANDLE
+kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+kernel32.WaitForSingleObject.restype = wintypes.DWORD
+kernel32.ReleaseMutex.argtypes = [wintypes.HANDLE]
+kernel32.ReleaseMutex.restype = wintypes.BOOL
+kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+kernel32.CloseHandle.restype = wintypes.BOOL
+
+
+@contextmanager
+def title_configuration(path, timeout):
+    if timeout <= 0:
+        raise ValueError("title configuration requires a positive timeout")
+    mutex = kernel32.CreateMutexW(None, False, r"Local\SokuRLVsLaunchConfig")
+    if not mutex:
+        raise ctypes.WinError(ctypes.get_last_error())
+    acquired = False
+    try:
+        status = kernel32.WaitForSingleObject(mutex, int(timeout * 1000))
+        if status not in (0, 0x80):  # Success or an abandoned mutex now owned by us.
+            raise TimeoutError(f"cannot acquire game startup configuration: {status:#x}")
+        acquired = True
+        original = path.read_bytes()
+        title, replacements = re.subn(
+            rb"(?m)^(\s*scene_id\s*=\s*)\d+(\s*)$", rb"\g<1>2\g<2>", original, count=1)
+        if replacements != 1:
+            raise ValueError("SkipIntro scene_id setting was not found")
+        try:
+            path.write_bytes(title)
+            yield
+        finally:
+            path.write_bytes(original)
+    finally:
+        if acquired:
+            kernel32.ReleaseMutex(mutex)
+        kernel32.CloseHandle(mutex)

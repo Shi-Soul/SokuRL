@@ -6,7 +6,6 @@ import ctypes
 import hashlib
 import json
 import os
-import re
 import struct
 import subprocess
 import sys
@@ -19,6 +18,7 @@ from ctypes import wintypes
 
 from bridge_shared import BridgeClient, BridgeUnavailable
 from startup_dialogs import blocking_dialogs
+from game_runtime.startup import title_configuration
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -344,24 +344,14 @@ def _launch_vs_group_from_title(
     else:
         env.pop("SOKURL_VS_SEED", None)
 
-    mutex = kernel32.CreateMutexW(None, False, r"Local\SokuRLVsLaunchConfig")
-    if not mutex:
-        raise OSError(ctypes.get_last_error(), "CreateMutexW failed")
-    processes: list[psutil.Process] = []
-    original = b""
-    try:
-        if kernel32.WaitForSingleObject(mutex, INFINITE) != WAIT_OBJECT_0:
-            raise OSError(ctypes.get_last_error(), "WaitForSingleObject failed")
-        original = SKIPINTRO_INI.read_bytes()
-        config = configparser.ConfigParser()
-        config.read_string(original.decode("ascii"))
+    with title_configuration(SKIPINTRO_INI, timeout):
         env.update(match.environment())
-        title_config, replacements = re.subn(
-            rb"(?m)^(\s*scene_id\s*=\s*)\d+(\s*)$", rb"\g<1>2\g<2>", original, count=1
-        )
-        if replacements != 1:
-            raise RuntimeError("SkipIntro scene_id setting was not found")
-        SKIPINTRO_INI.write_bytes(title_config)
+        return _start_vs_processes(worker_count, timeout, env, seeds)
+
+
+def _start_vs_processes(worker_count, timeout, env, seeds):
+    processes: list[psutil.Process] = []
+    try:
         for index in range(worker_count):
             process_env = env.copy()
             if seeds is not None:
@@ -406,11 +396,6 @@ def _launch_vs_group_from_title(
                 process.terminate()
                 process.wait(timeout=5.0)
         raise
-    finally:
-        if original:
-            SKIPINTRO_INI.write_bytes(original)
-        kernel32.ReleaseMutex(mutex)
-        kernel32.CloseHandle(mutex)
 
 
 def _launch_vs_from_title(
