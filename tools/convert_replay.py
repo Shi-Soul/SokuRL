@@ -6,6 +6,7 @@ from omegaconf import OmegaConf
 
 from soku_rl.env import EpisodeConfig
 from soku_rl.replay import Replay
+from soku_rl.replay.episode import RecordedEpisode
 from soku_rl.replay.rollout import export_replay, write_rollout
 
 
@@ -24,7 +25,14 @@ def main(config):
         replay = Replay.decode(source.read_bytes())
         episode = EpisodeConfig.from_dict(OmegaConf.to_container(config.episode, resolve=True))
         index = config.replay.match_index
-        frames = replay_frames(replay, index, episode, float(config.runtime.launch_timeout), destination.parent)
+        if config.replay.boundary == "recorded_episode":
+            boundary = RecordedEpisode.read(source, replay, index)
+        elif config.replay.boundary == "input_stream":
+            boundary = "input_stream"
+        else:
+            raise ValueError("replay.boundary must be recorded_episode or input_stream")
+        frames = replay_frames(replay, index, episode, float(config.runtime.launch_timeout),
+                               destination.parent, boundary)
         try:
             count = write_rollout(destination, replay, index, episode, frames)
         finally:

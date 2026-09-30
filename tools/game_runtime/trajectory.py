@@ -15,11 +15,17 @@ from soku_rl.env.encoding import AGENTS
 from soku_rl.env.observation_history import ObservationHistory
 from soku_rl.pomg import Outcome
 from soku_rl.replay.rollout import RolloutFrame
+from soku_rl.replay.episode import RecordedEpisode
 
 
-def replay_frames(replay, match_index, config, launch_timeout, scratch_directory):
+def replay_frames(replay, match_index, config, launch_timeout, scratch_directory, boundary):
     if type(match_index) is not int or not 0 <= match_index < len(replay.matches):
         raise ValueError("a valid replay match index is required")
+    if isinstance(boundary, RecordedEpisode):
+        if config.max_frames < boundary.frames:
+            raise ValueError("episode.max_frames cannot truncate a recorded episode")
+    elif boundary != "input_stream":
+        raise ValueError("replay boundary must be input_stream or a recorded episode")
     header = bytearray(replay.header)
     header[7] = 1
     selected = replace(replay, header=bytes(header), matches=(replay.matches[match_index],))
@@ -46,7 +52,8 @@ def replay_frames(replay, match_index, config, launch_timeout, scratch_directory
             if not record:
                 raise RuntimeError("original replay input record is unavailable")
             remaining, = struct.unpack("<I", memory.read(record + 0x4C, 4))
-            ended = state.ended or state.frame >= config.max_frames or remaining == 0
+            ended = (boundary.finished(state) if isinstance(boundary, RecordedEpisode)
+                     else state.ended or state.frame >= config.max_frames or remaining == 0)
             outcome = state.outcome
             if ended and not state.terminated:
                 outcome = Outcome.TRUNCATED

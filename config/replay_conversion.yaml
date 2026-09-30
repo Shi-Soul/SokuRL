@@ -6,4 +6,5 @@ replay:
   source: ???
   game_directory: ${runtime.game_directory}
   match_index: 0
+  boundary: recorded_episode
 output: ???
