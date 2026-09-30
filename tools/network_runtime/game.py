@@ -5,13 +5,13 @@ import ctypes
 from ctypes import wintypes
 import ipaddress
 import os
-import re
 import sys
 import time
 
 import psutil
 
 import sokurl
+from game_runtime.startup import title_configuration
 from network_runtime.history import NetworkHistoryClient
 from network_runtime.input import NetworkInputClient
 from network_runtime.input_events import NetworkInputEventsClient
@@ -53,20 +53,7 @@ class NetworkGame:
             raise
 
     def _launch(self):
-        mutex = sokurl.kernel32.CreateMutexW(None, False, r"Local\SokuRLVsLaunchConfig")
-        if not mutex:
-            raise OSError(ctypes.get_last_error(), "cannot lock game launch configuration")
-        acquired = False
-        original = None
-        try:
-            acquired = sokurl.kernel32.WaitForSingleObject(mutex, int(self.timeout*1000)) == sokurl.WAIT_OBJECT_0
-            if not acquired:
-                raise TimeoutError("network launch configuration lock timed out")
-            original = sokurl.SKIPINTRO_INI.read_bytes()
-            title, count = re.subn(rb"(?m)^(\s*scene_id\s*=\s*)\d+(\s*)$", rb"\g<1>2\g<2>", original, count=1)
-            if count != 1:
-                raise ValueError("SkipIntro scene_id setting is missing")
-            sokurl.SKIPINTRO_INI.write_bytes(title)
+        with title_configuration(sokurl.SKIPINTRO_INI, self.timeout):
             env = os.environ.copy()
             env.update(SOKURL_VS_BOOTSTRAP="0", SOKURL_UNLIMITED_PACING="0",
                 SOKURL_HEADLESS_RENDER="0", SOKURL_CAPTURE_IMAGES="0",
@@ -95,12 +82,6 @@ class NetworkGame:
                 self._check_dialogs()
                 time.sleep(.01)
             raise TimeoutError("network game did not reach the title scene")
-        finally:
-            if original is not None:
-                sokurl.SKIPINTRO_INI.write_bytes(original)
-            if acquired:
-                sokurl.kernel32.ReleaseMutex(mutex)
-            sokurl.kernel32.CloseHandle(mutex)
 
     def _check_dialogs(self):
         now = time.monotonic()
