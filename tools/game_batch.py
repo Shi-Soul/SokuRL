@@ -51,6 +51,23 @@ class SokuGameBatch:
         self.image_clients = {}
         self.privileged_readers = {}
         self.observation_mode = "diagnostic_state"
+        self.recording_enabled = False
+        self.recordings = {}
+        self.completed_replays = []
+
+    def enable_recording(self):
+        if self.processes:
+            raise RuntimeError("enable replay recording before launching a game")
+        self.recording_enabled = True
+
+    def _finish_recording(self, slot, reason):
+        if slot in self.recordings:
+            recording = self.recordings.pop(slot)
+            self.completed_replays.append(recording.finish(self.clients[slot], reason))
+
+    def take_replays(self):
+        completed, self.completed_replays = self.completed_replays, []
+        return completed
 
     def configure_observation(self, configuration):
         mode = configuration["mode"]
@@ -59,6 +76,9 @@ class SokuGameBatch:
         self.observation_mode = mode
         self.visibility = VisibilityConfig(**configuration["visibility"])
         self.match = MatchConfig(**configuration["match"])
+        self.max_frames = configuration["max_frames"]
+        if type(self.max_frames) is not int or self.max_frames < 1:
+            raise ValueError("a positive episode frame limit is required")
 
     def _observe(self, slot, raw, dropped):
         if self.observation_mode == "privileged_state":
@@ -83,6 +103,8 @@ class SokuGameBatch:
             raise ValueError("nonempty nonnegative slot IDs are required")
         if any(type(s) is not int or not 0 <= s < 0xFFFFFFFF for s in seeds.values()):
             raise ValueError("native seed 0xFFFFFFFF is reserved; use a smaller uint32")
+        for slot in seeds:
+            self._finish_recording(slot, "reset")
         if RESET_METHODS[self.observation_mode] == "process_restart":
             # Scene reload preserves renderer state that changes pixels across
             # episodes. Recreate only the selected image slots; state-only
@@ -111,6 +133,10 @@ class SokuGameBatch:
             self.frames[slot] = 0
             states[slot] = self._observe(slot, raw, 0)
         self.active.update(seeds)
+        if self.recording_enabled:
+            from episode_recording import EpisodeRecording
+            for slot, seed in seeds.items():
+                self.recordings[slot] = EpisodeRecording(self.processes[slot].pid, slot, seed)
         return states
 
     def _launch_slots(self, seeds):
@@ -166,6 +192,10 @@ class SokuGameBatch:
         for slot, snapshot in zip(slots, snapshots, strict=True):
             states[slot] = self._observe(slot, snapshot.latest, snapshot.dropped_frames)
             drain_frames_into(self.clients[slot], self.buffers[slot])
+            if states[slot].ended:
+                self._finish_recording(slot, states[slot].outcome.value)
+            elif self.recording_enabled and states[slot].frame >= self.max_frames:
+                self._finish_recording(slot, "time_limit")
         self.active.difference_update(s for s, state in states.items() if state.ended)
         return states
 
@@ -175,6 +205,10 @@ class SokuGameBatch:
     def _close_slots(self, slots):
         errors = []
         for slot in slots:
+            try:
+                self._finish_recording(slot, "close")
+            except Exception as error:
+                errors.append(repr(error))
             if slot in self.privileged_readers:
                 self.privileged_readers.pop(slot).close()
             if slot in self.image_clients:

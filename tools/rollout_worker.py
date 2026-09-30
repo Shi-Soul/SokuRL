@@ -15,6 +15,7 @@ def main():
     if operation != "initialize" or config["protocol"] != PROTOCOL:
         raise ValueError("unsupported rollout worker protocol")
     backend = SokuGameBatch(config["launch_timeout"])
+    backend.enable_recording()
     send(replies, {"ok": True, "value": {"protocol": PROTOCOL, "reset_methods": RESET_METHODS,
                                          "fingerprints": fingerprints()}})
     try:
@@ -33,11 +34,11 @@ def main():
                     value = backend.step(payload)
                 elif operation == "close":
                     backend.close()
-                    send(replies, {"ok": True, "value": {}})
+                    send(replies, {"ok": True, "value": {"value": {}, "replays": backend.take_replays()}})
                     break
                 else:
                     raise ValueError(f"unsupported worker operation: {operation}")
-                send(replies, {"ok": True, "value": value})
+                send(replies, {"ok": True, "value": {"value": value, "replays": backend.take_replays()}})
             except Exception:
                 send(replies, {"ok": False, "error": traceback.format_exc()})
                 raise

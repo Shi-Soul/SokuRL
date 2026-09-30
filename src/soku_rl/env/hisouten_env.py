@@ -43,7 +43,7 @@ class EpisodeConfig:
 
     def backend_observation(self):
         return {"mode": self.observation_mode, "visibility": asdict(self.visibility),
-                "match": asdict(self.match)}
+                "match": asdict(self.match), "max_frames": self.max_frames}
 
     @classmethod
     def from_dict(cls, values):
