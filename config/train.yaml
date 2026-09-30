@@ -27,6 +27,8 @@ episode:
     minimum_visible_fraction: 0.25
 runtime:
   mute_audio: true
+  # Relative to the worker's working directory, in its Windows/Wine path space.
+  game_directory: th123_jp
   # Explicit command list. Linux: [absolute/path/run-python.sh, tools/rollout_worker.py].
   command: ???
   cwd: ${hydra:runtime.cwd}

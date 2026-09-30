@@ -11,7 +11,7 @@ import json
 from uuid import uuid4
 
 
-PROTOCOL = 2
+PROTOCOL = 3
 MAX_MESSAGE = 64 * 1024 * 1024
 
 
@@ -48,11 +48,13 @@ def send(stream, value):
 
 class WorkerConnection:
     """Exchange bounded requests with one owned Python/Wine worker."""
-    def __init__(self, command, cwd, log_path, timeout, launch_timeout, mute_audio):
+    def __init__(self, command, cwd, log_path, timeout, launch_timeout, mute_audio, game_directory):
         if not command or timeout <= launch_timeout or launch_timeout <= 0:
             raise ValueError("worker timeout must exceed the positive launch timeout")
         if type(mute_audio) is not bool:
             raise TypeError("mute_audio must be a boolean")
+        if not isinstance(game_directory, str) or not game_directory:
+            raise ValueError("a worker game directory is required")
         self.timeout = timeout
         self.closed = False
         self.broken = False
@@ -73,7 +75,8 @@ class WorkerConnection:
         self.lock = threading.Lock()
         threading.Thread(target=self._read_replies, daemon=True).start()
         try:
-            self.identity = self.request("initialize", {"protocol": PROTOCOL, "launch_timeout": launch_timeout})
+            self.identity = self.request("initialize", {"protocol": PROTOCOL,
+                "launch_timeout": launch_timeout, "game_directory": game_directory})
         except BaseException:
             self.close()
             raise
@@ -129,10 +132,10 @@ class WorkerConnection:
 class WorkerBackend(WorkerConnection):
     """Adapt a worker connection to independently reset offline game slots."""
 
-    def __init__(self, command, cwd, log_path, timeout, launch_timeout, mute_audio):
+    def __init__(self, command, cwd, log_path, timeout, launch_timeout, mute_audio, game_directory):
         self.replay_directory = Path(log_path).parent / "replays" / uuid4().hex
         self.replay_number = 0
-        super().__init__(command, cwd, log_path, timeout, launch_timeout, mute_audio)
+        super().__init__(command, cwd, log_path, timeout, launch_timeout, mute_audio, game_directory)
 
     def request(self, operation, payload):
         result = super().request(operation, payload)

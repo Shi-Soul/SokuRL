@@ -18,11 +18,9 @@ def main(config):
         export_replay(source, destination)
         print(f"回放已导出：{destination}")
     elif config.replay.operation == "import":
-        import sokurl
+        from game_runtime.startup import configure_game
         from game_runtime.trajectory import replay_frames
-        sokurl.GAME_DIR = Path(config.replay.game_directory).resolve(strict=True)
-        sokurl.GAME_EXE = sokurl.GAME_DIR / "th123.exe"
-        sokurl.SKIPINTRO_INI = sokurl.GAME_DIR / "modules/SkipIntro/SkipIntro.ini"
+        configure_game(config.replay.game_directory)
         replay = Replay.decode(source.read_bytes())
         episode = EpisodeConfig.from_dict(OmegaConf.to_container(config.episode, resolve=True))
         index = config.replay.match_index

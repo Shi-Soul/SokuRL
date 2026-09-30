@@ -5,6 +5,7 @@ import traceback
 from soku_rl.env.worker_pipe import PROTOCOL, receive, send
 from network_game import NetworkGame
 from runtime_identity import fingerprints
+from game_runtime.startup import configure_game
 
 
 def main():
@@ -14,6 +15,7 @@ def main():
     operation, initialization = receive(requests)
     if operation != "initialize" or initialization["protocol"] != PROTOCOL:
         raise ValueError("unsupported network worker protocol")
+    configure_game(initialization["game_directory"])
     send(replies, {"ok": True, "value": {"protocol": PROTOCOL, "kind": "network",
                                          "fingerprints": fingerprints()}})
     try:

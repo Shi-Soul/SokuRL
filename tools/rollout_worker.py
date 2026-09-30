@@ -5,6 +5,7 @@ import traceback
 from soku_rl.env.worker_pipe import PROTOCOL, receive, send
 from game_batch import RESET_METHODS, SokuGameBatch
 from runtime_identity import fingerprints
+from game_runtime.startup import configure_game
 
 
 def main():
@@ -14,6 +15,7 @@ def main():
     operation, config = receive(requests)
     if operation != "initialize" or config["protocol"] != PROTOCOL:
         raise ValueError("unsupported rollout worker protocol")
+    configure_game(config["game_directory"])
     backend = SokuGameBatch(config["launch_timeout"])
     backend.enable_recording()
     send(replies, {"ok": True, "value": {"protocol": PROTOCOL, "reset_methods": RESET_METHODS,

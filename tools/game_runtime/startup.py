@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import ctypes
 from ctypes import wintypes
+from pathlib import Path
 import re
 
 
@@ -14,6 +15,17 @@ kernel32.ReleaseMutex.argtypes = [wintypes.HANDLE]
 kernel32.ReleaseMutex.restype = wintypes.BOOL
 kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
 kernel32.CloseHandle.restype = wintypes.BOOL
+
+
+def configure_game(directory):
+    import sokurl
+    root = Path(directory).resolve(strict=True)
+    if not root.is_dir():
+        raise ValueError("game_directory must identify a directory")
+    sokurl.GAME_DIR = root
+    sokurl.GAME_EXE = root / "th123.exe"
+    sokurl.SKIPINTRO_INI = root / "modules/SkipIntro/SkipIntro.ini"
+    sokurl._validate_game()
 
 
 @contextmanager
