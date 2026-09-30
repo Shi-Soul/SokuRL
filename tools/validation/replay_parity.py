@@ -1,5 +1,4 @@
 """Compare injected episodes with unmodified official replay playback."""
-import ctypes
 import hashlib
 import json
 from pathlib import Path
@@ -23,6 +22,9 @@ from soku_rl.replay import Replay
 def compare(expected, actual):
     normalized = copy_state(actual)
     normalized.battleSubMode = expected.battleSubMode
+    # A reset increments the bridge's episode identifier; a fresh replay
+    # process starts at zero. This identifier is not part of game simulation.
+    normalized.segmentId = expected.segmentId
     normalized.stateHash = calculate_state_hash(normalized)
     if bytes(normalized) != bytes(expected):
         raise AssertionError({"frame": expected.frameId, "differences": state_diff(expected, normalized)[:20]})
@@ -40,7 +42,9 @@ def main(config):
     schedule = tuple(tuple(int(v) for v in keys) for keys in config.validation.inputs)
     if not 0 < frames < episode.max_frames or not schedule:
         raise ValueError("diagnostic frames must be positive and below the episode limit")
-    report = {"success": False, "episodes": [], "bridge_sha256": hashlib.sha256(
+    report = {"success": False, "episodes": [],
+              "normalized_fields": ["battleSubMode", "segmentId", "stateHash"],
+              "bridge_sha256": hashlib.sha256(
         (sokurl.GAME_DIR / "modules/SokuRLBridge/SokuRLBridge.dll").read_bytes()).hexdigest()}
     OmegaConf.save(config, output / "config.yaml")
     game = SokuGameBatch(float(config.runtime.launch_timeout))
