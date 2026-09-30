@@ -3,6 +3,29 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class MatchState:
+    """Transport-independent match identity, simulation time, scores and health."""
+    match: int
+    round: int
+    frame: int
+    scores: tuple[int, int]
+    hp: tuple[int, int]
+    phase: str
+
+    def __post_init__(self):
+        if self.phase not in {"battle", "menu", "loading", "disconnected"}:
+            raise ValueError("unsupported match phase")
+        if any(type(value) is not int or value < 0 for value in (self.match, self.round, self.frame)):
+            raise ValueError("match, round and frame must be nonnegative integers")
+        if self.phase == "battle" and self.match == 0:
+            raise ValueError("battle requires a positive match identifier")
+        if (len(self.scores) != 2 or len(self.hp) != 2
+                or any(type(value) is not int or value < 0 for value in self.scores)
+                or any(type(value) is not int for value in self.hp)):
+            raise ValueError("match state requires two integer scores and health values")
+
+
+@dataclass(frozen=True)
 class MatchEvent:
     kind: str
     match: int
@@ -10,12 +33,12 @@ class MatchEvent:
     scores: tuple[int, int]
 
 
-class NetworkMatch:
+class MatchLifecycle:
     """Consume ordered snapshots. Scores decide results; zero HP only stops input.
 
     `round_started` tells the caller to reset observation history and policy memory.
     `match_finished` is emitted once when the configured number of wins is reached.
-    Leaving network scenes without that result emits `match_interrupted`, not a loss.
+    Leaving battle without that result emits `match_interrupted`, not a loss.
     This observer does not control the game's rules, menus, or network connection.
     """
 
@@ -36,14 +59,17 @@ class NetworkMatch:
         return self.phase == "battle"
 
     def update(self, snapshot):
+        if not isinstance(snapshot, MatchState):
+            raise TypeError("match lifecycle requires a MatchState")
+        in_battle = snapshot.phase == "battle"
         events = []
 
         def emit(kind):
             events.append(MatchEvent(kind, self._match, self._round, self._scores))
 
-        if snapshot.in_battle and snapshot.match != self._match:
+        if in_battle and snapshot.match != self._match:
             if snapshot.match < self._match:
-                raise ValueError("network match counter moved backwards")
+                raise ValueError("match counter moved backwards")
             if self._active and not self._finished:
                 emit("match_interrupted")
             self._match, self._round = snapshot.match, -1
@@ -52,11 +78,11 @@ class NetworkMatch:
             emit("match_started")
 
         if self._active and snapshot.match == self._match:
-            if snapshot.updates < self._frame:
-                raise ValueError("network update counter moved backwards")
+            if snapshot.frame < self._frame:
+                raise ValueError("simulation frame counter moved backwards")
             if any(new < old for new, old in zip(snapshot.scores, self._scores)):
                 raise ValueError("round score decreased within a match")
-            self._frame = snapshot.updates
+            self._frame = snapshot.frame
             if snapshot.scores != self._scores:
                 self._scores = snapshot.scores
                 emit("score_changed")
@@ -64,24 +90,21 @@ class NetworkMatch:
                 self._finished = True
                 emit("match_finished")
 
-        network_scene = snapshot.connected and snapshot.scene in (8, 9, 10, 11, 13, 14)
-        if self._active and not snapshot.in_battle:
+        if self._active and not in_battle:
             if not self._finished:
                 emit("match_interrupted")
             self._active = False
-        if not network_scene:
-            self.phase = "disconnected"
-        elif not snapshot.in_battle:
-            self.phase = "menu" if snapshot.scene in (8, 9) else "loading"
+        if not in_battle:
+            self.phase = snapshot.phase
         elif self._finished:
             self.phase = "match_finished"
-        elif min(snapshot.raw.p1.hp, snapshot.raw.p2.hp) <= 0:
+        elif min(snapshot.hp) <= 0:
             self.phase = "between_rounds"
         else:
-            if snapshot.raw.roundId != self._round:
-                if snapshot.raw.roundId < self._round:
+            if snapshot.round != self._round:
+                if snapshot.round < self._round:
                     raise ValueError("round counter moved backwards")
-                self._round = snapshot.raw.roundId
+                self._round = snapshot.round
                 emit("round_started")
             self.phase = "battle"
         return tuple(events)

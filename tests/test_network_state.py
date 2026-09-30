@@ -27,6 +27,9 @@ def test_network_mapping_layout():
 
 def test_round_result_does_not_end_network_match():
     first = decode_network_state(snapshot(13, 4, 1000, 0, (1, 0)))
+    assert first.match_state.phase == "battle"
+    assert (first.match_state.match, first.match_state.round, first.match_state.frame) == (4, 0, 1000)
+    assert first.match_state.scores == (1, 0)
     second = decode_network_state(snapshot(13, 4, 1100, 1, (1, 0)))
     assert first.in_battle and second.in_battle
     assert first.match == second.match == 4

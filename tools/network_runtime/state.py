@@ -6,6 +6,7 @@ import time
 
 import bridge_shared
 from soku_rl.env.observation.render_state import RENDER_STATE_SIZE, RenderSnapshot
+from soku_rl.play.match import MatchState
 
 
 HEADER = struct.Struct("<8IQ2I")
@@ -28,6 +29,17 @@ class NetworkSnapshot:
     @property
     def in_battle(self):
         return self.connected and self.scene in (13, 14) and self.updates > 0
+
+    @property
+    def match_state(self):
+        if not self.connected or self.scene not in (8, 9, 10, 11, 13, 14):
+            phase = "disconnected"
+        elif self.in_battle:
+            phase = "battle"
+        else:
+            phase = "menu" if self.scene in (8, 9) else "loading"
+        return MatchState(self.match, self.raw.roundId, self.updates, self.scores,
+                          (self.raw.p1.hp, self.raw.p2.hp), phase)
 
 
 def decode_network_state(data):

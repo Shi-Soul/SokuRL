@@ -1,19 +1,16 @@
 """A KO is not a match result; rematches get fresh policy state."""
 from pathlib import Path
 import sys
-from types import SimpleNamespace
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from soku_rl.play.match import NetworkMatch
+from soku_rl.play.match import MatchLifecycle, MatchState
 
 
 def frame(match, round_id, scores, hp, scene, updates):
-    return SimpleNamespace(match=match, scores=scores, scene=scene, connected=True,
-        updates=updates, in_battle=scene in (13, 14) and updates > 0,
-        raw=SimpleNamespace(roundId=round_id, p1=SimpleNamespace(hp=hp[0]),
-                            p2=SimpleNamespace(hp=hp[1])))
+    phase = "battle" if scene in (13, 14) else "menu" if scene in (8, 9) else "disconnected"
+    return MatchState(match, round_id, updates, scores, hp, phase)
 
 
 def kinds(events):
@@ -21,7 +18,7 @@ def kinds(events):
 
 
 def test_three_rounds_then_rematch():
-    match = NetworkMatch(2)
+    match = MatchLifecycle(2)
     assert kinds(match.update(frame(1, 0, (0, 0), (10000, 10000), 13, 1))) == ["match_started", "round_started"]
     assert match.can_act
     assert not match.update(frame(1, 0, (0, 0), (10000, 0), 13, 100))
@@ -40,7 +37,7 @@ def test_three_rounds_then_rematch():
 
 
 def test_interruption_is_not_a_match_loss():
-    match = NetworkMatch(2)
+    match = MatchLifecycle(2)
     match.update(frame(1, 0, (0, 0), (10000, 10000), 14, 1))
     assert kinds(match.update(frame(1, 0, (0, 0), (10000, 10000), 2, 2))) == ["match_interrupted"]
     assert match.phase == "disconnected"
@@ -48,15 +45,28 @@ def test_interruption_is_not_a_match_loss():
 
 
 def test_late_reader_can_observe_final_score_in_menu():
-    match = NetworkMatch(2)
+    match = MatchLifecycle(2)
     match.update(frame(1, 0, (1, 0), (10000, 10000), 13, 1))
     assert kinds(match.update(frame(1, 1, (2, 0), (10000, 0), 8, 200))) == ["score_changed", "match_finished"]
 
 
 def test_reject_out_of_order_frames():
-    match = NetworkMatch(2)
+    match = MatchLifecycle(2)
     match.update(frame(1, 0, (0, 0), (10000, 10000), 13, 100))
     with pytest.raises(ValueError, match="counter moved backwards"):
         match.update(frame(1, 0, (0, 0), (10000, 10000), 13, 99))
     with pytest.raises(ValueError, match="positive integer"):
-        NetworkMatch(0)
+        MatchLifecycle(0)
+
+
+def test_local_battle_starts_at_zero_and_keeps_original_round_scores():
+    match = MatchLifecycle(2)
+    initial = MatchState(1, 0, 0, (0, 0), (10000, 10000), "battle")
+    assert kinds(match.update(initial)) == ["match_started", "round_started"]
+    assert not match.update(MatchState(1, 0, 1, (0, 0), (0, 0), "battle"))
+    assert match.phase == "between_rounds"
+    events = match.update(MatchState(1, 1, 2, (1, 1), (10000, 10000), "battle"))
+    assert kinds(events) == ["score_changed", "round_started"]
+    events = match.update(MatchState(1, 1, 3, (2, 1), (10000, 0), "battle"))
+    assert kinds(events) == ["score_changed", "match_finished"]
+    assert not match.can_act

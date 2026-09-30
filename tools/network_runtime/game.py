@@ -15,7 +15,7 @@ from game_runtime.startup import title_configuration
 from network_runtime.history import NetworkHistoryClient
 from network_runtime.input import NetworkInputClient
 from network_runtime.input_events import NetworkInputEventsClient
-from soku_rl.play.match import NetworkMatch
+from soku_rl.play.match import MatchLifecycle
 from network_runtime.state import NetworkStateClient
 from startup_dialogs import blocking_dialogs
 from soku_rl.env.observation.visibility import VisibilityConfig
@@ -33,7 +33,7 @@ class NetworkGame:
             raise ValueError("a valid port and positive launch timeout are required")
         self.settings, self.timeout = settings, timeout
         self.visibility = VisibilityConfig(**visibility)
-        self.lifecycle = NetworkMatch(2)
+        self.lifecycle = MatchLifecycle(2)
         self.process = None
         self.peer = None
         self.clients = {}
@@ -116,7 +116,7 @@ class NetworkGame:
         cursor, snapshots = self.clients["history"].read_after(self.cursor, 2.)
         records = []
         for snapshot in snapshots:
-            events = self.lifecycle.update(snapshot)
+            events = self.lifecycle.update(snapshot.match_state)
             record = {"match": snapshot.match, "round": snapshot.raw.roundId,
                 "frame": snapshot.updates, "scene": snapshot.scene, "seat": snapshot.local_seat,
                 "scores": snapshot.scores, "phase": self.lifecycle.phase,
