@@ -20,8 +20,10 @@ def main(cfg: DictConfig):
     from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
     from soku_rl.env.worker_pipe import WorkerBackend
     from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
+    from soku_rl.rl import ppo_settings
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    learner = ppo_settings(config)
     algorithm = config["algorithm"]["name"]
     if algorithm == "nfsp":
         from soku_rl.marl.nfsp import train_nfsp as train
@@ -35,10 +37,10 @@ def main(cfg: DictConfig):
     elif algorithm == "ppo":
         from soku_rl.rl.training import train_ppo as train
         dependencies = ["stable-baselines3"]
-        if config["algorithm"]["policy_type"] == "lstm":
-            dependencies.append("sb3-contrib")
     else:
         raise ValueError(f"unsupported algorithm: {algorithm}")
+    if learner["policy_type"] == "lstm":
+        dependencies.append("sb3-contrib")
     if type(config["seed"]) is not int or not 0 <= config["seed"] < 2**31:
         raise ValueError("training seed must be in [0, 2**31)")
     if type(config["num_envs"]) is not int or config["num_envs"] < 1:
@@ -54,9 +56,7 @@ def main(cfg: DictConfig):
     if algorithm == "ppo" and episode.observation_mode == "image":
         raise ValueError("fixed-rule PPO requires state observations; image self-play uses IPPO or PSRO")
     if learning.health_potential_scale:
-        parameters = config["algorithm"]
-        discount = (parameters["response"]["ppo"]["gamma"] if algorithm == "psro" else
-                    parameters["ppo"]["gamma"])
+        discount = learner["ppo"]["gamma"]
         if discount != 1.:
             raise ValueError("the finite-horizon health potential requires gamma=1")
     if config["track"] == "human" and episode.observation_mode in {"diagnostic_state", "privileged_state"}:
@@ -75,7 +75,7 @@ def main(cfg: DictConfig):
     destination.mkdir(parents=True, exist_ok=False)
     (destination / "config.yaml").write_text(OmegaConf.to_yaml(cfg, resolve=True), encoding="utf-8")
     root = Path(__file__).resolve().parents[1]
-    sources = [*sorted((root / "src/soku_rl").rglob("*.py")), *sorted((root / "tools").glob("*.py"))]
+    sources = [*sorted((root / "src/soku_rl").rglob("*.py")), *sorted((root / "tools").rglob("*.py"))]
     identity = {"source_hashes": {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                                    for p in sources},
                 "packages": {p: version(p) for p in ["torch", "gymnasium", "pettingzoo", *dependencies]},
