@@ -6,9 +6,7 @@ import struct
 
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_ECX, UC_X86_REG_EIP, UC_X86_REG_ESP
-
-
-PACKAGE_SHA256 = "ff8fb443c227c0eeb0e1ff6f92ec0afed965d4f95e07f35247c3fb8579ab862f"
+from god_reference.package import PACKAGE_SHA256
 
 
 class BinaryReference:
