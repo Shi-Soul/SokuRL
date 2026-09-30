@@ -1105,7 +1105,7 @@ int __fastcall titleOnProcess(SokuLib::Title *title)
 
     *reinterpret_cast<signed char *>(INPUT_MANAGER_CLUSTER_DEVICE) = -1;
     SokuLib::setBattleMode(SokuLib::BATTLE_MODE_VSPLAYER,
-        SokuLib::BATTLE_SUBMODE_PLAYING1);
+        SokuLib::BATTLE_SUBMODE_PLAYING2);
     if (!configureVsPlayer(SokuLib::leftPlayerInfo, false, g_vsP1Character,
             g_vsP1Palette, g_vsP1Deck) ||
         !configureVsPlayer(SokuLib::rightPlayerInfo, true, g_vsP2Character,
