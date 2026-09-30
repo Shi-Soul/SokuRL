@@ -10,7 +10,7 @@ import numpy as np
 from frame_validation import input_tuple
 from game_runtime.observation import ObservationReader
 from game_runtime.replay import launch_replay
-from privileged_reader import ProcessMemory
+from game_runtime.privileged import ProcessMemory
 from soku_rl.env.encoding import AGENTS
 from soku_rl.env.observation_history import ObservationHistory
 from soku_rl.pomg import Outcome

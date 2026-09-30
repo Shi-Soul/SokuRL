@@ -38,7 +38,7 @@ def episode(package, script, seat, config, reference, output):
     started = time.monotonic()
     try:
         current = game.reset_slots({0: int(config.seed)})[0]
-        reader = game.privileged_readers[0]
+        reader = game.readers[0].privileged
         reference.initialize(reader.memory)
         scripts = [package.character_script(player.character) for player in selections]
         scripts[seat] = script

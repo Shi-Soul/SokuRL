@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from bridge_shared import BridgeMapping, BridgeUnavailable, FRAME_RING_CAPACITY, RawFrameState, calculate_state_hash
-from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
+from game_runtime.frames import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 
 
 def ring_client(read, count):
@@ -82,7 +82,7 @@ def test_initial_hash_failure_keeps_unverified_records_unacknowledged():
 def test_initial_timeout_reports_last_native_state():
     client = initial_client()
     client.snapshot.return_value.game_frame = 8
-    with patch("frame_stream.time.monotonic", side_effect=[0.0, 1.0]):
+    with patch("game_runtime.frames.time.monotonic", side_effect=[0.0, 1.0]):
         with pytest.raises(RuntimeError, match="frame=8.*scene=5"):
             wait_for_frame_zero(client, 123, 0.5)
     client.drain_frames.assert_not_called()

@@ -6,7 +6,7 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from image_shared import HEADER, ImageClient, PIXEL_OFFSET
+from game_runtime.images import HEADER, ImageClient, PIXEL_OFFSET
 
 
 def test_reset_pending_image_is_not_a_future_frame(monkeypatch):
@@ -19,7 +19,7 @@ def test_reset_pending_image_is_not_a_future_frame(monkeypatch):
         ctypes.memmove(client.view, data, len(data))
 
     publish(2, -2147483638, 2**64 - 1)
-    monkeypatch.setattr("image_shared.time.sleep", lambda duration: publish(4, 0, 0))
+    monkeypatch.setattr("game_runtime.images.time.sleep", lambda duration: publish(4, 0, 0))
     result = client._read(0, 1., PIXEL_OFFSET)
     assert HEADER.unpack_from(result)[4] == 0
     publish(6, 0, 1)

@@ -12,7 +12,7 @@ from pathlib import Path
 import psutil
 
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY
-from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
+from game_runtime.frames import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 
 

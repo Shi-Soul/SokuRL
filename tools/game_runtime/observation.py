@@ -34,11 +34,11 @@ class ObservationReader:
         self.pid, self.mode, self.visibility = pid, mode, visibility
         self.resources = []
         if mode == "privileged_state":
-            from privileged_reader import PrivilegedReader, ProcessMemory
+            from game_runtime.privileged import PrivilegedReader, ProcessMemory
             self.privileged = PrivilegedReader(ProcessMemory(pid))
             self.resources.append(self.privileged)
         if mode in {"image", "state"}:
-            from image_shared import ImageClient
+            from game_runtime.images import ImageClient
             self.image = ImageClient(pid)
             self.resources.append(self.image)
 

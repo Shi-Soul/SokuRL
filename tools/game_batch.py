@@ -4,7 +4,7 @@ import ctypes
 from soku_rl.env.observation.visibility import VisibilityConfig
 from soku_rl.env.match import MatchConfig
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
-from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
+from game_runtime.frames import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 from game_runtime.observation import ObservationReader
 
@@ -100,7 +100,7 @@ class SokuGameBatch:
             states[slot] = self._observe(slot, raw, 0)
         self.active.update(seeds)
         if self.recording_enabled:
-            from episode_recording import EpisodeRecording
+            from game_runtime.recording import EpisodeRecording
             for slot, seed in seeds.items():
                 self.recordings[slot] = EpisodeRecording(self.processes[slot].pid, slot, seed)
         return states

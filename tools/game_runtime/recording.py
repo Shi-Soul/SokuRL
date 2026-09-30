@@ -1,6 +1,6 @@
 """Collect original replay records when an owned environment episode ends."""
 from soku_rl.replay.recording import OriginalReplayReader
-from privileged_reader import ProcessMemory
+from game_runtime.privileged import ProcessMemory
 
 
 class EpisodeRecording:

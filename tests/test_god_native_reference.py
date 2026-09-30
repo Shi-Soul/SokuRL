@@ -19,7 +19,7 @@ from test_god_scripts import observation
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from privileged_reader import PrivilegedReader
+from game_runtime.privileged import PrivilegedReader
 
 
 @pytest.fixture(scope="module")

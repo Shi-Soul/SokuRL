@@ -10,7 +10,7 @@ from pathlib import Path
 
 from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
 from headless_validation import fixed_trace
-from frame_stream import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
+from game_runtime.frames import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 
 RUN_STATE_PAUSED = 1

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from bridge_shared import ACTION_INPUTS, BridgeClient, calculate_state_hash
 from frame_validation import copy_state, state_diff
-from frame_stream import wait_for_frame_zero
+from game_runtime.frames import wait_for_frame_zero
 import sokurl
 
 
