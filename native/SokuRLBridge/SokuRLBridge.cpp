@@ -836,6 +836,8 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
         self->input = toKeyInput(recorded);
     } else if (g_activeInputEnabled && (g_activeInputMask & (1U << player)) &&
         g_activeInputFrames) {
+        g_simulatedInputs[player] = SokuRLBridge::advanceHeldInput(
+            g_simulatedInputs[player], toLogicalInput(g_activeInputs[player]));
         self->input = toKeyInput(g_simulatedInputs[player]);
     } else if (player == 0) {
         if (g_neutralPending) {
@@ -844,6 +846,7 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
         }
     }
     g_effectiveInputs[player] = toLogicalInput(self->input);
+    g_simulatedInputs[player] = g_effectiveInputs[player];
 }
 
 void applySimulationInputs(SokuLib::BattleManager *manager)
@@ -855,12 +858,6 @@ void applySimulationInputs(SokuLib::BattleManager *manager)
         inputs[0] = toKeyInput(recorded.p1.input);
         inputs[1] = toKeyInput(recorded.p2.input);
         mask = 3;
-    } else if (g_activeInputEnabled && g_activeInputFrames) {
-        mask = g_activeInputMask;
-        for (int player = 0; player < 2; ++player)
-            if (mask & (1U << player))
-                inputs[player] = toKeyInput(SokuRLBridge::advanceHeldInput(
-                    g_simulatedInputs[player], toLogicalInput(g_activeInputs[player])));
     }
     if (!mask)
         return;
@@ -891,8 +888,6 @@ int callSimulationUpdate(SokuLib::BattleManager *manager)
     g_inSimulationUpdate = false;
     g_effectiveInputs[0] = toLogicalInput(manager->leftCharacterManager.keyMap);
     g_effectiveInputs[1] = toLogicalInput(manager->rightCharacterManager.keyMap);
-    g_simulatedInputs[0] = g_effectiveInputs[0];
-    g_simulatedInputs[1] = g_effectiveInputs[1];
     if (!g_reconstructing && g_activeInputEnabled && g_activeInputFrames) {
         --g_activeInputFrames;
         store32(&g_control->inputFramesRemaining, g_activeInputFrames);
