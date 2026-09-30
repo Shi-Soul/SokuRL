@@ -33,6 +33,12 @@ class OriginalReplayReader:
             raise RuntimeError("the original game did not create a replay record")
         header = bytearray(self.memory.read(manager + 0xE8, 10))
         header[7] = 1  # Export the current episode, not previous matches.
+        # The normal save path fills this field after recording. It selects
+        # which input streams playback consumes; zero would enable CPU control.
+        input_managers = self.values(manager, "2I")
+        header[8] = sum(int(pointer != 0) << seat for seat, pointer in enumerate(input_managers))
+        if header[8] != 3:
+            raise RuntimeError("environment replays require two recorded input streams")
         players = []
         for seat in (0, 1):
             character, = self.values(record + seat, "B")
