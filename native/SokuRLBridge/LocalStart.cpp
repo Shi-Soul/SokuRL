@@ -1,6 +1,7 @@
 #include "LocalStart.hpp"
 #include "ProfileDeck.hpp"
 #include <BattleMode.hpp>
+#include <BattleManager.hpp>
 #include <Character.hpp>
 #include <InputManager.hpp>
 #include <Windows.h>

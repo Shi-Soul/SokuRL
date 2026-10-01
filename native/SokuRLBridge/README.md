@@ -42,7 +42,7 @@ The process stays alive; arbitrary state restoration is not supported.
 
 The opt-in VS launcher uses a separate Title-context bootstrap. After the
 original `Title::onProcess` runs, it selects fallback local input ownership,
-calls `setBattleMode(BATTLE_MODE_VSPLAYER, BATTLE_SUBMODE_PLAYING1)`, initializes
+calls `setBattleMode(BATTLE_MODE_VSPLAYER, BATTLE_SUBMODE_PLAYING2)`, initializes
 both profiles and effective decks, and returns `SCENE_LOADING`. It is armed only
 by the `SOKURL_VS_BOOTSTRAP` process environment variable from `tools/sokurl.py launch.command=vs`.
 
