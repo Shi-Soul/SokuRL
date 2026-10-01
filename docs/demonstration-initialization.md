@@ -162,8 +162,8 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=6 algorithm=br \
 
 27 项采样、聚合和初始化测试通过，日志 `.dev/pytest-demonstration-aggregation-20261001.log`；
 其中使用人工构造的跨集验证泄漏，确认即使每个数据集单独合法，合并也必须拒绝。
-真实学习者状态采样输出为 `logs/demonstrations/learner-marisa-reimu-20261001`，尚在进行。
-完成后可执行：
+真实学习者状态采样输出为 `logs/demonstrations/learner-marisa-reimu-20261001`。
+聚合命令为（本次实际使用空闲 GPU 7）：
 
 ```bash
 bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=6 rl.cpu_threads=1 \
@@ -176,3 +176,29 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=6 rl.c
 
 原示范初始化的 PPO 已到 65536 步，课程内 8 局全负，完整神 AI 配对评估已另行启动。
 保守更新的稳定性仍没有转化成已验证的策略强度。
+
+该 65536 步评估 `br-reimu-bc-adaptive-65536-20261001` 已成功完成，4 局全负，
+平均对手 HP 下降 743、自身 10030，双方符卡动作进入均为 0。
+与原规则参考按座位/世界种子配对核对通过。该样本未显示比初始化模型的 777.5 有实质改善。
+
+学习者状态采样已成功完成 8 局、24189 帧，用时 485.40 秒；
+训练集 6 局 16656 帧、验证集 2 局 7533 帧，教师与执行动作分歧率 65.90%。
+首批四局逐片 SHA256 及每局三个动作历史时点已核对，日志
+`.dev/audit-learner-demonstrations-partial-20261001.log`。
+私有 session `be5762090e14436b9f6b43fe727ace2d` 的 worker/stop/wait 均退出 0，
+prefix/game 均一次清理成功。
+
+`god-marisa-reimu-aggregate-20261001` 已在 GPU 7 成功完成 20 轮、6940 次监督更新，
+耗时 157.07 秒；总示范采样成本 125058 帧，PPO 步数仍为 0。
+初始化参数哈希与原示范模型相同，最佳合并验证 NLL 在第 11 轮为 0.63855。
+分数据集复核保存在 `validation_by_dataset.json`，包括数据/模型哈希和评分源码哈希：
+
+| 验证状态来源 | 原模型准确率 | 聚合后准确率 | 原修正帧准确率 | 聚合后修正帧准确率 |
+| --- | ---: | ---: | ---: | ---: |
+| 教师控制的 4 局 | 92.23% | 90.94% | 41.11% | 44.74% |
+| 学习者控制的 2 局 | 37.53% | 49.77% | 2.74% | 26.66% |
+
+修正帧指教师当前建议不同于上一条实际输入。原数据与新数据的表现差距，
+支持进一步检查学习者状态上的纠错能力，但还不能证明这些建议会改善游戏结果。
+聚合仅训练 actor，共享特征变化仍会影响 critic，不能声称价值预测保持不变。
+完整神 AI 配对测评 `logs/benchmark/br-reimu-aggregate-zero-shot-20261001` 已启动，尚未完成。
