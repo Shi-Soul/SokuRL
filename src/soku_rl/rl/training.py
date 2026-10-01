@@ -1,19 +1,13 @@
 """Train one SB3 PPO policy per seat against a fixed rule population."""
-import hashlib
 import json
-from pathlib import Path
 
 import numpy as np
-from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback
-from stable_baselines3.common.logger import configure
+from stable_baselines3.common.callbacks import BaseCallback
 
-from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
 from soku_rl.policy.loader import load_policy
-from soku_rl.policy.contract import read_training_contract
 
 
-from soku_rl.rl.ppo import initialize_ppo, parameter_hash, create_ppo
+from soku_rl.rl.ppo import initialize_ppo, parameter_hash
 
 
 class EpisodeRecords(BaseCallback):
@@ -50,29 +44,9 @@ def train_ppo(env, config, device, seed, directory):
     for player in config["players"]:
         destination = directory / f"player_{player}"
         destination.mkdir()
-        view = OpponentMixtureVecEnv(env, player, opponents, weights, seed + player)
-        try:
-            model, source = create_ppo(view, env.interface, config,
-                config["initial_policies"][f"player_{player}"], device, seed + player)
-            model.set_logger(configure(str(destination / "scalars"), ["csv", "stdout"]))
-            initial = parameter_hash(model.policy)
-            start_steps = model.num_timesteps
-            callbacks = CallbackList([
-                EpisodeRecords(destination),
-                CheckpointCallback(save_freq=config["checkpoint_every"] // env.num_envs,
-                                   save_path=str(destination / "checkpoints"), name_prefix="ppo"),
-            ])
-            model.learn(total_timesteps=config["timesteps_per_player"], callback=callbacks,
-                        reset_num_timesteps=False)
-            final = parameter_hash(model.policy)
-            if initial == final:
-                raise RuntimeError("PPO completed without a policy update")
-            path = destination / "final.zip"
-            model.save(path)
-            results[f"player_{player}"] = {"steps": model.num_timesteps, "start_steps": start_steps,
-                "additional_steps": model.num_timesteps - start_steps, "initial_policy": source,
-                "initial_policy_hash": initial, "final_policy_hash": final,
-                "checkpoint": str(path), "opponents": {p.name: p.fingerprint for p in opponents}}
-        finally:
-            view.close()
+        from soku_rl.marl.br import train_response
+        response = config | {"player": player, "timesteps": config["timesteps_per_player"],
+            "initial_policy": config["initial_policies"][f"player_{player}"]}
+        results[f"player_{player}"] = train_response(
+            env, response, opponents, weights, device, seed + player, destination)
     return results

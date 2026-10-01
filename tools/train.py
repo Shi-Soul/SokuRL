@@ -25,7 +25,10 @@ def main(cfg: DictConfig):
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     learner = ppo_settings(config)
     algorithm = config["algorithm"]["name"]
-    if algorithm == "nfsp":
+    if algorithm == "br":
+        from soku_rl.marl.br import train_br as train
+        dependencies = ["stable-baselines3"]
+    elif algorithm == "nfsp":
         from soku_rl.marl.nfsp import train_nfsp as train
         dependencies = ["stable-baselines3"]
     elif algorithm == "psro":

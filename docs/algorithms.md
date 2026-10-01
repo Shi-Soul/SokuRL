@@ -4,6 +4,7 @@
 
 | 配置 | 学习组织 | 导出策略 |
 | --- | --- | --- |
+| `algorithm=br` | 对显式冻结策略分布训练一个 PPO 近似最佳响应；当前指定一个座位。 | 一份 `final.zip`。 |
 | `algorithm=ppo` | 分别训练两个座位；每局从固定规则池抽取对手。 | 两份 PPO 模型。 |
 | `algorithm=ippo` | 同时收集双方当前策略的轨迹，分别更新各自的 PPO。 | 两份 PPO 模型。 |
 | `algorithm=nfsp` | 分阶段训练双方 PPO 响应，用历史响应行为拟合平均策略。 | 两份平均策略，使用相同 PPO 模型容器保存。 |
@@ -12,6 +13,22 @@
 网络类型由 `rl=ppo` 或 `rl=recurrent_ppo` 选择。NFSP 的监督样本池目前要求前馈数值观测；不能将其配置为循环网络或图像观测。固定规则对手要求规则可读取的数值观测。
 
 底层参数统一通过 `rl.ppo` 修改，例如 `rl.ppo.learning_rate=0.0001`。训练入口会检查各 MARL 配置引用的网络类型、收益约定及 PPO 参数是否与 `rl` 完全一致；单独改写算法分支而造成差异时，启动前立即报错。循环 PPO 的依赖版本也统一记录，不能因选用不同 MARL 组织方式而漏记。
+
+## BR 开发与实验
+
+`algorithm=br` 接受 `opponents` 列表，每项包含唯一的 `name`、`probability` 和统一加载器的 `policy` 规格。概率须非负、有限且总和为 1；每局抽取并冻结一个对手。规则、已训练模型和种群策略均走同一加载器。PPO 参数仍只在 `rl.ppo` 设置，旧 `algorithm=ppo` 的两座位循环调用同一 BR 训练流程。
+
+超人模式下，对默认灵梦神 AI 训练魔理沙响应的基线入口：
+
+```bash
+bash scripts/linux.sh tools/train.py algorithm=br rules=god \
+  wrappers=superhuman_learning track=superhuman \
+  output=logs/training/br-superhuman-god-baseline
+```
+
+BR 输出根目录的 `final.zip`、`progress.json`、`scalars/progress.csv` 和检查点；入口另保存配置、源码身份、运行结果及真实回放。续训使用 `algorithm.initial_policy={kind:checkpoint,path:...,training_config:...}`。训练成功仅表示完成更新，不代表取得足够胜率。
+
+当前 BR 仍固定 `algorithm.player` 和对局角色，不是最终的跨座位、跨角色单策略。后续须加入按局角色配对、共享模型跨座位采样及匹配的模型加载契约；用独立种子分别统计神 AI 脚本、角色和双方座位的胜负与超时后，才能判断配置是否通用。用户当前要求优先推进此项训练，因此先前验收清单中的调参顺序不再限制本项工作，原人机游玩待办继续保留。
 
 ## PPO 更新与时间上限
 

@@ -9,7 +9,7 @@ import pytest
 from soku_rl.rl import ppo_settings, validate_payoff
 
 
-@pytest.mark.parametrize("algorithm", ("ppo", "ippo", "nfsp", "psro"))
+@pytest.mark.parametrize("algorithm", ("br", "ppo", "ippo", "nfsp", "psro"))
 def test_all_training_methods_share_one_resolved_ppo_configuration(algorithm):
     with initialize_config_dir(config_dir=str(Path(__file__).parents[1] / "config"), version_base="1.3"):
         composed = compose(config_name="train", overrides=[f"algorithm={algorithm}", "rl.ppo.gamma=0.9"])

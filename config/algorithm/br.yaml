@@ -1,0 +1,15 @@
+name: br
+policy_type: ${rl.policy_type}
+timeout_payoff: ${rl.timeout_payoff}
+ppo: ${rl.ppo}
+player: 0
+initial_policy: {kind: fresh}
+timesteps: 262144
+checkpoint_every: 65536
+opponents:
+  - name: god
+    probability: 1.0
+    policy:
+      kind: rule
+      name: god
+      rules: ${rules}
