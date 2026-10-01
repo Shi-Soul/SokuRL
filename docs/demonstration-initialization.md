@@ -131,4 +131,7 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=6 algorithm=br \
 原始失败目录和错误保持不变；私有 session `d5b033206658459dba3be074b8dafdbb`
 的 worker 退出 1、stop/wait 均为 0，prefix/game 均一次清理成功。
 相同配置已在新目录 `logs/training/br-superhuman-reimu-bc-adaptive-20261001-v2` 重试，
-模型权重加载及日志初始化完成，后续采样和策略效果仍在观察。
+已完成前 16384 步及两次 PPO 更新，均为 3 epoch；首两批采样耗时 71.05/71.22 秒，
+更新耗时 1.85/1.67 秒。首批记录 approx_kl=0.00278、clip_fraction=0.0369、
+熵约 0.374，保存了更新后的 8192 步检查点及课程状态。
+此时尚无完整训练对局，不能据更新稳定性推断胜率；后续独立神 AI 评估仍待开展。
