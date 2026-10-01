@@ -71,6 +71,8 @@ set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PR
 
 include(CTest)
 if(BUILD_TESTING)
+    add_library(HeldInputReference SHARED tests/HeldInputReference.cpp HeldInput.cpp)
+    set_target_properties(HeldInputReference PROPERTIES PREFIX "")
     add_executable(ControlledInputTest tests/ControlledInputTest.cpp ControlledInput.cpp FrameRecords.cpp FrameState.cpp)
     target_link_libraries(ControlledInputTest PRIVATE SokuLib)
     target_compile_definitions(ControlledInputTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
