@@ -91,8 +91,13 @@ def restrict_writes(root):
         _fields_ = [("allowed", ctypes.c_uint64), ("parent", ctypes.c_int32)]
 
     devices = [Path("/dev/null"), *Path("/dev").glob("nvidia*")]
+    # CUDA names its own threads through procfs. This changes process metadata,
+    # not stored files, and must not grant access to other processes' metadata.
+    process_rights = (1 << 1) | ((1 << 14) if version >= 3 else 0)
+    allowed = [(Path(root).resolve(), rights), (Path("/proc/self/task"), process_rights)]
+    allowed.extend((p, 1 << 1) for p in devices if p.is_file() or p.is_char_device())
     try:
-        for path, access in [(Path(root).resolve(), rights), *[(p, 1 << 1) for p in devices if p.is_file() or p.is_char_device()]]:
+        for path, access in allowed:
             parent = os.open(path, os.O_PATH | os.O_CLOEXEC)
             try:
                 rule = PathRule(access, parent)
