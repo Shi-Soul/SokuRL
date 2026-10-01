@@ -127,6 +127,13 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
     model, _ = create_ppo(view, interface, algorithm, {"kind": "fresh"}, device, seed)
     initial = parameter_hash(model.policy)
     rng = np.random.default_rng(seed)
+    label_counts = {split: np.bincount([int(row[1]) for row in rows],
+        minlength=interface.action_space.n) for split, rows in samples.items()}
+    majority = int(label_counts["train"].argmax())
+    baseline = {"train_majority_action": majority,
+        "train_majority_fraction": float(label_counts["train"][majority] / len(samples["train"])),
+        "validation_accuracy": float(label_counts["validation"][majority] / len(samples["validation"])),
+        "label_counts": {split: counts.tolist() for split, counts in label_counts.items()}}
     validation = score_samples(model, samples["validation"], config["batch_size"])
     history = [{"epoch": 0, "validation": validation}]
     best, best_epoch = validation["nll"], 0
@@ -168,4 +175,5 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
     return {"checkpoint": str(directory / "best.zip"), "final_checkpoint": str(directory / "final.zip"),
         "ppo_steps": model.num_timesteps, "supervised_updates": updates, "best_epoch": best_epoch,
         "initial_policy_hash": initial, "final_policy_hash": final,
+        "constant_action_baseline": baseline,
         "train_frames": len(samples["train"]), "validation_frames": len(samples["validation"]), "history": history}

@@ -39,6 +39,8 @@ bash scripts/linux.sh tools/collect_demonstrations.py linux.cuda_devices=3 \
 `tools/pretrain_demonstrations.py` 通过 RL 层原有 `create_ppo` 创建模型；
 整局训练集用于动作交叉熵和有限时域回报回归，整局验证集只用于选择动作负对数似然最好的检查点。
 每轮记录验证动作准确率、熵、负对数似然和价值均方误差。
+结果另存完整动作标签频次，以及只输出训练集最常见动作在验证集上的准确率，
+用于识别动作分布不均衡造成的表面准确率。
 输入压缩观测沿用 PPO 的无损稀疏传输，在设备上恢复完整 float32 数组。
 不启动游戏进程，不把监督更新数记成 PPO 环境步数。
 
