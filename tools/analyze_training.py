@@ -108,8 +108,8 @@ def main(cfg):
     axes[1, 2].set_yscale("symlog", linthresh=1)
     for axis in (axes[0, 1], axes[0, 2], axes[1, 0], axes[1, 1], *axes[2]):
         axis.set_ylim(bottom=0)
-    figure.suptitle("Superhuman BR diagnostics — ongoing, one seed per configuration\n"
-                     "Updates aligned to trained steps; mixed uses a different opponent population", fontsize=14)
+    figure.suptitle("Superhuman BR snapshots — one seed per run\n"
+                     "Steps within each run; earlier pretraining is excluded and opponents may differ", fontsize=14)
     axes[0, 0].legend(fontsize=9)
     figure.savefig(output / "curves.png", dpi=150)
     figure.savefig(output / "curves.pdf")

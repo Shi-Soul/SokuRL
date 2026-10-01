@@ -292,3 +292,13 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=1 algorithm=br \
 对手 HP 平均减少 725.5，学习者符卡动作进入共 1 次。结果保存在
 `logs/benchmark/br-idle-warmup-reimu-zero-shot-20261001`，使用 `common_roles` 随机种子。
 这说明静止对手训练胜率不能替代目标强度评测；课程迁移仍需等完整对照结束。
+
+课程对照快照 `logs/diagnostics/br-curriculum-curves-20261001-b` 包含可复查的
+PNG/PDF、源文件哈希和按座位/对手分组的摘要。图的横轴是各次运行内的步数，
+课程迁移另有 65536 步预训练；不能直接当成总预算相同。快照时迁移组 57344 步
+13 局全负，从头组 49152 步 12 局全负，采样加优化吞吐均约 73 步/秒。
+
+下一项单因素候选 `rl=ppo_sparse_two_epochs` 仅将共享 PPO 的 `n_epochs` 从
+10 改为 2，保持其余训练和网络参数。其目的是检验当前较高裁剪比例下减少重复
+优化是否有帮助；不是已经有效的推荐配置。使用相同初始种子、固定神 AI 灵梦、
+随机座位、4 环境和 131072 步总预算，与从头训练对照进行独立评测。
