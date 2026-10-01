@@ -11,14 +11,15 @@ from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.observation_history import ObservationHistory
 from soku_rl.env.wrappers.learning import LearningConfig, LearningEpisode, LearningInterface
 from soku_rl.play.live_policy import LivePolicy
-from soku_rl.play.match import MatchState
+from soku_rl.play.match import MatchFrame, MatchState
 from soku_rl.play.match_policies import MatchPolicies
+from soku_rl.play.realtime_session import RealtimePolicy
 from soku_rl.env.encoding import decode_action
 from soku_rl.policy.god.package import ScriptPackage
 from soku_rl.policy.god.runtime import GodPolicy
 from soku_rl.policy.rules.observed_rules import LearningRulePolicy
 from test_env_timing import VISIBILITY
-from test_god_scripts import observation
+from test_god_scripts import NAMES, SCRIPTS, observation
 
 ROOT = Path(__file__).parents[1]
 
@@ -81,3 +82,39 @@ def test_match_controller_preserves_original_lua_state_across_knockout(seat):
         expected = interface.command(baseline.act(episode.encode(pair[seat])))
         assert result.inputs[seat] == decode_action(expected).inputs
     assert controller.instances[seat] == 1
+
+
+@pytest.mark.skipif(not NAMES, reason="external original strategy package is unavailable")
+@pytest.mark.parametrize("script", NAMES)
+@pytest.mark.parametrize("seat", (0, 1))
+def test_network_controller_matches_original_scheduler_through_knockout(script, seat):
+    from god_reference.scheduler import OriginalScheduler
+    package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
+    episode = EpisodeConfig(7200, 1, 1, 0, "privileged_state", VISIBILITY, LEGACY_MATCH)
+    interface = LearningInterface(episode, LearningConfig("full", False, 0, 0.))
+    policy = LearningRulePolicy(GodPolicy("god", package, script, episode), interface)
+    controller = RealtimePolicy(policy, interface, seat, 37)
+    current = observation(int(script[:2]))
+    current.world["battle_time"] = 500
+    reference = OriginalScheduler(package, script, 37+seat, current)
+    try:
+        for frame in range(12):
+            current = observation(int(script[:2]))
+            current.world.update(frame=frame, battle_time=500+frame)
+            current.players[1]["hp"] = 0 if frame in (2, 3) else 10000
+            current.players[0]["win_count"] = int(frame >= 3)
+            if frame:
+                reference.advance(current)
+            live = replace(current, world=current.world | {"frame": frame+1})
+            pair = (live, replace(live, players=live.players[::-1]))
+            if seat:
+                pair = pair[::-1]
+            state = MatchState(1, int(frame >= 4), frame+1,
+                tuple(value.players[0]["win_count"] for value in pair),
+                tuple(value.players[0]["hp"] for value in pair), "battle")
+            result = controller.advance(MatchFrame(state, pair))
+            assert result.inputs[seat] == reference.inputs()
+        assert controller.instances == 1
+    finally:
+        reference.close()
+        controller.stop()
