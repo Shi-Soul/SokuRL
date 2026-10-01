@@ -10,6 +10,7 @@ linux:
   wine: ???
   windows_python: ???
   windows_packages: ???
+  package_installer: ???
   prefix: ${linux.state}/prefix
   toolchain: ${linux.state}/toolchain
   game: ${linux.state}/game

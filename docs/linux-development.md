@@ -129,6 +129,16 @@ sudo -n .venv-linux/bin/python -B tools/linux.py operation=services
 Python 依赖以 `pyproject.toml` 为准，开发环境安装 `.[dev,marl,god-validation,export]`，Wine 环境安装游戏控制所需的 `.[rl,god,play]`。
 私有工具链已保留的机器可以直接持续构建；不需要 Windows 在线，也不需要重新下载安装工具链。
 
+本机 `linux.package_installer` 指向任务目录中保存的 uv。更新 Linux 依赖使用：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 .venv-linux/bin/python -B tools/linux.py operation=dependencies
+```
+
+该命令显式设置任务目录中的下载缓存、临时目录与安装目标。不要把它套在 `scripts/linux.sh` 中：
+旧内核的 Landlock ABI 1 不允许跨目录重命名，即使两个目录都在允许范围内，也会阻止安装器提交下载缓存。
+运行与构建仍使用受限启动器；安装器单独执行，不修改系统 Python。
+
 ## 当前验证记录
 
 本页的命令与实现正在 Linux 实机验证。完成的构建、测试、真实环境与训练结果将记录在本节；

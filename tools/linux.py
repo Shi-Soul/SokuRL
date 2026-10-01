@@ -10,6 +10,16 @@ from linux_runtime.build import build, deploy, prepare, test_native
 from linux_runtime.environment import REPO, native_environment, wine_environment
 
 
+def dependencies(config):
+    from linux_runtime.environment import contained, use_workspace_user
+    use_workspace_user(config)
+    installer = contained(Path(config["root"]).resolve(), config["package_installer"])
+    env = native_environment(config)
+    env["UV_CACHE_DIR"] = str(Path(config["state"]).resolve() / "cache/uv")
+    subprocess.run([str(installer), "pip", "install", "--python", str(REPO / ".venv-linux/bin/python"),
+        "--link-mode", "copy", "-e", str(REPO) + "[dev,marl,god-validation,export]"], check=True, env=env)
+
+
 def check(config):
     import torch
     env = native_environment(config)
@@ -29,7 +39,8 @@ def check(config):
 @hydra.main(version_base="1.3", config_path="../config", config_name="linux")
 def main(cfg):
     config = OmegaConf.to_container(cfg.linux, resolve=True, throw_on_missing=True)
-    operations = {"prepare": prepare, "build": build, "test": test_native, "deploy": deploy, "check": check}
+    operations = {"prepare": prepare, "build": build, "test": test_native, "deploy": deploy,
+                  "check": check, "dependencies": dependencies}
     if cfg.operation == "services":
         from linux_runtime.services import start
         start(config)
