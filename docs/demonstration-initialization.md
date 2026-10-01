@@ -115,4 +115,20 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=6 algorithm=br \
   output=logs/training/br-superhuman-reimu-bc-adaptive-20261001
 ```
 
-从零训练对照仍在 GPU 3；两项新任务尚无完整对局效果结论。
+从零训练对照仍在 GPU 3。
+
+初始化模型的完整神 AI 评估已成功结束，4 局全负，平均对手 HP 下降 777.5，
+自身 10025，双方符卡动作进入均为 0。按座位/世界种子排序后，
+世界种子、策略种子和角色均与规则参考测评逐局相同；并行完成顺序不同不改变配对。
+动作分析在 `logs/diagnostics/clone-teacher-actions-20261001`：
+平均连续同指令 8.842 帧，重复比例 88.72%，接近教师的 8.550 帧、88.32%；
+同时按多个攻击键从自适应 PPO 的 49.96% 降到 0.009%。
+但 A/B/C 输入频率仅约 1.00%/1.17%/0.34%，教师为 1.89%/2.65%/0.68%。
+因此示范改善了指令统计，尚未产生足够的对抗能力；单独拉长指令持续时间也无法解释或解决全部差距。
+
+首个 PPO 接续任务在游戏启动前失败：Wine 日志有 `partial write 8192`，
+随后一个 th123 在 Title bootstrap 前以 0 退出，没有 PPO 更新。
+原始失败目录和错误保持不变；私有 session `d5b033206658459dba3be074b8dafdbb`
+的 worker 退出 1、stop/wait 均为 0，prefix/game 均一次清理成功。
+相同配置已在新目录 `logs/training/br-superhuman-reimu-bc-adaptive-20261001-v2` 重试，
+模型权重加载及日志初始化完成，后续采样和策略效果仍在观察。
