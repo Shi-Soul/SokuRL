@@ -1,9 +1,9 @@
 defaults:
   - train
-  - override rules: play
-  - override track: superhuman
   - _self_
   - optional local: play
+  - override rules: play
+  - override track: superhuman
 
 operation: play
 opponent: god:reimu
