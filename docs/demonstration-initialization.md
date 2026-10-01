@@ -213,4 +213,26 @@ EMA 胜率 0.05454，uniform 比例升至 0.95。最终模型与课程 sidecar S
 不能用仅到此时的结果判断难度调整后的效果，因此从 final.zip 和完整优化器/课程状态
 续训额外 131072 步，累计目标 262144。续训输出为
 `logs/training/br-superhuman-reimu-bc-adaptive-continued-20261001`，使用新训练种子 2732；
-其余 PPO 和课程参数不变。新任务尚未完成。
+其余 PPO 和课程参数不变。续训已成功完成，耗时 1791.60 秒；
+新完成 20 局为 5 胜 12 负 3 次超时，平均自身/对手 HP 下降 9532.35/7604.55，
+符卡动作进入 0.05/0.6 次每局。课程累计 40 局，EMA 为 0.16874，uniform 比例 1.00。
+最终检查点与 sidecar SHA256 再次核对一致。完整神 AI 最终评估另行保存，
+不能将本次课程内的 25% 胜率当作完整神 AI 胜率。
+
+## 第二轮学习者状态聚合
+
+`logs/demonstrations/learner-marisa-reimu-iteration2-20261001` 由第一轮聚合模型的
+`best.zip`（指纹 `a80707da…`）实际控制，在完整灵梦神 AI 对手下采样；教师仍仅标注。
+源码 `48f1b3e`、GPU 1、seed=891773，显式排除前两批全部世界种子及正式 validation/test。
+成功完成 8 局 26495 帧，耗时 447.19 秒，全部失败；
+训练 6 局 20152 帧、验证 2 局 6343 帧，教师/实际动作分歧率 50.74%。
+不同轮次的状态分布和种子不同，不能仅凭分歧率低于前轮 65.90% 声称策略变强。
+私有 session `6907e4d190f14f49b2fff994fdbb53a4` 的 worker/stop/wait 均退出 0，
+prefix/game 均一次清理成功。
+
+三批数据聚合训练输出为 `logs/pretraining/god-marisa-reimu-aggregate2-20261001`，
+从第一轮聚合 best 权重初始化，监督优化器重置，value_coef=0；各批原有整局 split 保持不变。
+总采样成本 151553 帧，训练 108877 帧、验证 42676 帧。
+首次命令在 Hydra 配置解析时失败，未开始训练；添加 `++pretraining.initial_policy` 后启动，
+两次入口日志分别保留在 `.dev/pretrain-god-marisa-reimu-aggregate2-20261001.log` 和 `-v2.log`。
+拟合与完整神 AI 测评结果仍待验证。
