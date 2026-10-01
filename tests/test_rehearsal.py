@@ -137,24 +137,28 @@ def test_joint_marl_collection_calls_the_same_rehearsal_update(pair, kind):
     env.close()
 
 
-def test_actor_rehearsal_preserves_private_critic_and_restores_learning_rate(pair):
+@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+def test_actor_rehearsal_preserves_private_critic_and_restores_learning_rate(pair, device):
+    if device == "cuda:0" and not torch.cuda.is_available():
+        pytest.skip("CUDA is unavailable for recurrent rehearsal backward verification")
     first, _, interface = pair
     env = fixture_env()
     config = fixture_config("lstm") | {"rehearsal": settings(first)}
     config["ppo"]["policy_kwargs"].update(share_features_extractor=False,
         features_extractor_class="test_recurrent_separate_features.TrainableFeatures")
     model, _ = create_ppo(ObservationContractEnv(interface), interface, config,
-        {"kind": "fresh"}, "cpu", 13)
+        {"kind": "fresh"}, device, 13)
     model.set_logger(configure(folder=None, format_strings=[]))
     # Existing critic optimizer momentum must not cause a private critic update.
-    observations = torch.ones((2, *env.single_observation_space.shape))
-    _, values, _, _ = model.policy(observations, zero_states(model.policy, 2), torch.ones(2), deterministic=True)
+    observations = torch.ones((2, *env.single_observation_space.shape), device=device)
+    _, values, _, _ = model.policy(observations, zero_states(model.policy, 2), torch.ones(2, device=device), deterministic=True)
     values.square().mean().backward()
     model.policy.optimizer.step()
     critic = [model.policy.vf_features_extractor, model.policy.lstm_critic, model.policy.value_net]
     before = list(map(parameter_hash, critic))
     rates = [group["lr"] for group in model.policy.optimizer.param_groups]
     model._rehearsal.update(model)
+    assert torch.backends.cudnn.enabled  # scoped override must not leak into PPO
     assert list(map(parameter_hash, critic)) == before
     assert [group["lr"] for group in model.policy.optimizer.param_groups] == rates
     assert model.num_timesteps == model._n_updates == 0

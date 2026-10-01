@@ -24,6 +24,8 @@ PPO 学习率；监督次数、样本数和耗时单独计数，不计入 PPO ep
 然后只对窗口反向传播。历史恢复按最多 256 帧分块，不缩短历史，不复用旧参数产生的缓存状态。
 多个窗口累积梯度后才更新，彼此不共享记忆。恢复历史和窗口均使用 eval mode，
 避免 dropout 或 BatchNorm 修改前缀状态；窗口仍启用梯度。
+cuDNN 的 eval LSTM 不支持反向传播，因此短窗口明确使用 PyTorch 原生 LSTM 路径，
+完整历史仍使用 cuDNN 推断；上下文结束后恢复原 cuDNN 开关，不修改 PPO 路径。
 这部分计算上界取决于最长对局，必须把 `burn_in_frames` 和耗时计入效率判断。
 
 检查点保存数据集 manifest/config 哈希、完整复习设置、采样随机数状态及累计计数，
@@ -53,8 +55,20 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
   +br_opponents=god_target algorithm.target.character=0 +curriculum=adaptive_noise \
   num_envs=4 algorithm.timesteps=131072 \
   '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-20261001/config.yaml}' \
-  output=logs/training/br-superhuman-reimu-recurrent-rehearsal-adaptive-20261001
+  output=logs/training/br-superhuman-reimu-recurrent-rehearsal-adaptive-20261001-v2
 ```
 
 实际总计算量和样本复用量会增加，不能把相同在线步数说成相同计算预算。
 完整神 AI 测评使用原对手，不带训练课程的 uniform 扰动。
+
+首个真实 GPU 运行（不带 `-v2`，源码 `8511fab`）在第一次复习反向传播时失败：
+`cudnn RNN backward can only be called in training mode`。CPU 单元测试没有覆盖该限制。
+原运行耗时 151.74 秒，保留失败 result、配置、源码指纹及日志，不作为完成的 PPO 对照。
+随后按上文方式限定短窗口走原生 LSTM，增加实际 CUDA 反向测试。
+相关 37 项检查通过（`.dev/pytest-rehearsal-cuda-20261001.log`）。
+另在 GPU 0 用真实原循环 BC、原教师数据和生产复习设置完成一次更新：
+256 个监督帧、12633 帧历史恢复、1.200 秒，最大分配显存 2046389760 字节。
+参数哈希改变、所有参数有限，PPO/环境计数均为零，cuDNN 开关已恢复。
+该局部检查不产生真实游戏胜率，证据见
+`logs/diagnostics/rehearsal-cuda-real-data-20261001/summary.json`。
+修复后从相同原始权重重新开始 `-v2`，不从失败运行的局部状态续接。

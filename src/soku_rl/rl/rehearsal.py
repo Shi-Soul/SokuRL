@@ -58,8 +58,12 @@ def window_distribution(model, episode, offset, length):
                 prefix = episode[first:min(first + 256, offset)]
                 packed = restore_batch([row[0] for row in prefix], model.device)
                 _, states = policy.get_distribution(packed, states, torch.zeros(len(prefix), device=model.device))
-        distribution, _ = policy.get_distribution(observations, states,
-            torch.zeros(len(rows), device=model.device))
+        # cuDNN's eval RNN forward cannot backpropagate. Use PyTorch's native
+        # LSTM for this short differentiable window; keep fast cuDNN inference
+        # for the full prefix and preserve eval-mode dropout/BN semantics.
+        with torch.backends.cudnn.flags(enabled=False):
+            distribution, _ = policy.get_distribution(observations, states,
+                torch.zeros(len(rows), device=model.device))
     else:
         distribution = policy.get_distribution(observations)
     actions = torch.as_tensor(np.asarray([row[1] for row in rows]), device=model.device)
