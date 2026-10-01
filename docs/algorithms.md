@@ -132,8 +132,13 @@ OpenSpiel 负责策略种群、响应选择和投影复制动态；PPO 负责训
 观测，减少填充零值的主机到设备传输。旧 zlib 记录仍按原格式解压；动作、回报、优势和
 小批次随机顺序不变。默认缓冲区暂不切换。11 项相关 CPU 测试通过；8×600000 元素的
 小型 CUDA 检查包含负零、NaN 载荷、稀疏及稠密记录，逐位一致，记录在
-`.dev/sparse-transfer-bit-check-20261001.json`。这尚不证明完整 PPO 更新或真实训练更快，
-完整批次的性能验证等待显存资源。此候选的配置独立保存，不应静默替换已有训练配置。
+`.dev/sparse-transfer-bit-check-20261001.json`。随后合成观测的批次 32、4 CPU 线程、
+3 轮 GPU PPO 更新均成功；预热后两轮原传输约 33–34 ms，稀疏传输约 13–16 ms，
+峰值张量显存均为 319355392 字节。记录分别位于
+`logs/diagnostics/ppo-transfer-dense-b32-20261001` 和
+`logs/diagnostics/ppo-transfer-sparse-b32-20261001`，并发训练环境下仅作诊断。
+这尚不证明实际批次 256 的真实训练提速，其性能验证等待显存资源。
+此候选的配置独立保存，不应静默替换已有训练配置。
 
 观测编码候选 `track=superhuman_numeric` 保持超人赛道的完整观测、即时控制和动作空间，
 仅将共享特征提取器改为 `NumericPrivilegedFeatures`。原始两段无损数值编码全部保留，
