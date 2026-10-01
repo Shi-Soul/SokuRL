@@ -444,3 +444,10 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=3 algorithm=br \
   num_envs=4 algorithm.timesteps=65536 \
   output=logs/training/br-superhuman-reimu-noise90-warmup-20261001
 ```
+
+上述课程运行已实际启动，首轮 8192 个决策采样耗时 93.83 秒、PPO 更新
+4.87 秒，`ppo_n_updates=10`，已保存 `checkpoints/updated_8192_steps.zip`。
+首轮尚无完整对局，不能从缺失的战斗均值推断零伤害或胜率。配置、源码身份和
+时序保存在该训练目录；训练 stdout 在
+`.dev/train-br-superhuman-reimu-noise90-warmup-20261001.log`。并发任务会影响
+墙钟速度，此结果仅确认真实游戏采样、共享 PPO 更新及保存链路正常执行。
