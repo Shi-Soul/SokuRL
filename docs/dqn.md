@@ -221,3 +221,24 @@ DQN 的逐条与批量动作一致、不同模型、规则策略状态顺序和 
 模型及回放哈希通过。启动前 GPU 0 有约 11 GiB 空闲，节点可用内存约 222 GiB、
 CPU 两秒观测约 47%，故三组评测共用 GPU 0；三组训练仍使用 GPU 1/5。
 截至 18:04 UTC，两组先启动的评测分别完成 24/64 和 14/64 局，尚不足以选型。
+
+实验条件审计保存在 `logs/diagnostics/dqn-experiment-identity-20261001/result.json`：
+四次训练尝试的原版游戏、DLL、配置资源哈希一致，观测/动作/对手/种子/依赖相同；
+五步与更多回放的 DQN 参数分别仅有 `n_steps` 和 `gradient_steps` 不同。恢复段
+额外包含日志缺测修复和异常保存，游戏/学习更新源码未变。采样重启的限制仍保留。
+后半程曲线快照为 `logs/diagnostics/dqn-curves-20261001-f/`；快照中三组完成对局
+仍全负，不能因平均 Q 值上升就宣称策略改善。
+
+本次最终 validation 使用本地队列：
+
+```bash
+bash scripts/linux.sh tools/queue_br_evaluations.py
+```
+
+`config/queue_dqn_validation.yaml` 列出三组来源和各自新输出目录。队列核对训练
+进程身份；只有原进程退出、成功结果存在、累计模型步数恰为 262144 且最终模型/
+回放哈希一致才允许入队。包括仍在运行的阶段评测在内，最多三组并行评测，启动前
+要求 GPU 0 至少 2048 MiB 空闲、节点至少 16 GiB 可用内存。每次启动的命令、PID、
+源码版本和检查点清单保存在队列目录的 `*.launch.json`，stdout 也在该目录。
+队列的 `all_evaluations_launched` 仅代表已启动，不能解释成评测完成或任务成功。
+选型和独立 test 仍在完整结果核对后进行。
