@@ -15,6 +15,15 @@ class Opponent:
     policy: dict
     script: str
 
+    def character(self, selection):
+        if selection == "opponent":
+            if len(self.characters) != 1:
+                raise ValueError(f"{self.name} needs an explicit play.ai.character from {self.characters}")
+            return self.characters[0]
+        if type(selection) is not int or selection not in self.characters:
+            raise ValueError(f"{self.name} supports these AI characters: {self.characters}")
+        return selection
+
     def configuration(self, track, character, rules):
         if track not in self.tracks:
             raise ValueError(f"{self.name} requires one of these tracks: {self.tracks}")

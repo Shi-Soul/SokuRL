@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 
 from soku_rl.env.worker_pipe import WorkerConnection
 from soku_rl.play.loader import load_play_policy, play_interface, warm_play_policy
+from soku_rl.play.menu import play_menu
 from soku_rl.play.opponents import opponent_catalog
 from soku_rl.play.realtime_session import run_session
 from soku_rl.play.settings import client_plan
@@ -22,6 +23,13 @@ def main(cfg):
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     package = ScriptPackage(config["rules"]["god"]["package"], config["rules"]["god"]["api_source"])
     catalog = opponent_catalog(config["rules"], package, config["checkpoints"])
+    overrides = list(HydraConfig.get().overrides.task)
+    if config["operation"] == "menu":
+        selected = play_menu(catalog, config["play"], input, print)
+        keys = {value.split("=", 1)[0] for value in selected}
+        overrides = [value for value in overrides if value.split("=", 1)[0] not in keys] + selected
+        cfg = hydra.compose(config_name=HydraConfig.get().job.config_name, overrides=overrides)
+        config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     if config["operation"] == "list":
         for name, opponent in catalog.items():
             tracks = "/".join("拟人" if track == "human" else "超人" for track in opponent.tracks)
@@ -29,14 +37,16 @@ def main(cfg):
             print(f"{name} | {opponent.label} | {tracks} | AI 角色编号 {characters}")
         return
     if config["operation"] not in {"play", "check"}:
-        raise ValueError("operation must be list, check or play")
+        raise ValueError("operation must be menu, list, check or play")
     if config["opponent"] not in catalog:
         raise ValueError("unknown opponent; use operation=list to list supported opponents")
+    config["play"]["ai"]["character"] = catalog[config["opponent"]].character(config["play"]["ai"]["character"])
+    cfg.play.ai.character = config["play"]["ai"]["character"]
     plan = client_plan(config["play"])
     ai = next(client for client in plan if client["realtime"])
     candidate, rules = catalog[config["opponent"]].configuration(config["track"], ai["character"], config["rules"])
     interface = play_interface(candidate, config["episode"], config["wrappers"], config["track"],
-                               HydraConfig.get().overrides.task)
+                               overrides)
     print("正在准备 AI；完成后才建立网络连接。", flush=True)
     policy = load_play_policy(candidate, interface, rules, config["device"], ai["seat"])
     warmed = warm_play_policy(policy, interface, config["seed"])

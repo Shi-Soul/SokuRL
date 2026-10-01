@@ -3,6 +3,7 @@ defaults:
   - override rules: play
   - override track: superhuman
   - _self_
+  - optional local: play
 
 operation: play
 opponent: god:reimu
@@ -11,7 +12,7 @@ device: cpu
 play:
   connection: local
   ai:
-    character: 0
+    character: opponent
     render: false
     mute_audio: true
   human:
