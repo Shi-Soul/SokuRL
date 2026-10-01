@@ -36,7 +36,7 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
   output=logs/pretraining/god-marisa-reimu-recurrent-20261001
 ```
 
-实际 GPU 拟合和完整神 AI 对局表现仍待验证。动作空间仍为完整 576 命令，
+动作空间仍为完整 576 命令，
 每帧决策、延迟和观察契约不变；启用记忆不等于强度已提升。
 
 首个真实拟合已从源码 `2c30265` 在 GPU 7 启动，输出为上述 recurrent 目录。
@@ -127,3 +127,33 @@ bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=6 rl.cpu_threads=
 另已启动 32 局原神 AI 教师示范收集 `logs/demonstrations/god-marisa-reimu-expanded-20261001`，
 两座位各 16 局，训练/验证种子排除原有三个数据集及正式评估种子。
 尚未完成的数据不能进入拟合；本项扩充与确定性推断对照分别记录。
+
+三项真实对局对照现已从源码 `9c97b32` 成功完成。每项均为两个公共验证种子 × 双座位，
+完整灵梦神 AI 对手，固定魔理沙；表中双方符卡均指动作进入次数，全部为 0。
+
+| 策略 | 胜/负/超时 | 平均自身 HP 下降 | 平均对手 HP 下降 | 秒数 |
+| --- | --- | --- | --- | --- |
+| 前馈 BC greedy | 0/0/4 | 4397.50 | 0 | 436.27 |
+| 循环 BC greedy | 0/3/1 | 9687.00 | 735.75 | 332.71 |
+| 循环 BC + 自适应 PPO 65536 步，随机采样 | 0/4/0 | 10000.00 | 396.75 | 246.97 |
+
+前两项目录为上文 `br-reimu-flat-greedy-20261001`、`br-reimu-recurrent-greedy-20261001`；
+第三项为 `logs/benchmark/br-reimu-recurrent-adaptive-65536-20261001`。
+原前馈/循环 BC 随机采样对照分别平均降低对手 HP 777.50/1403.25，也都是四局全负。
+小样本尚无强度提升证据；greedy 不替换默认策略，在线循环 PPO 暂只继续已定的 131072 步预算。
+
+五组动作回放统计在 `logs/diagnostics/greedy-action-behavior-20261001`。
+前馈 greedy 的平均相同命令连续 1200 帧、重复率 99.9305%，所有按键均未按下，
+因此四局超时不代表具备进攻能力。循环 greedy 平均连续 79.82 帧、重复率 98.772%，
+A/B/C 按下比例仅 0.2506%/0.0125%/0.0125%。
+循环 PPO 中点则平均连续 3.307 帧、重复率 69.785%，A 按下比例 14.292%，
+但按键增加没有在此次测评转化为更高的对手 HP 下降。逻辑按键不等同实际招式或命中。
+
+全部世界/策略种子、双方角色和座位配对通过；原模型哈希、greedy 派生指纹及中点课程
+sidecar 哈希均核对一致。三个私有 worker 和服务退出码为 0，前缀/游戏副本均清理成功。
+完整核对在 `.dev/audit-greedy-and-recurrent-midpoint-20261001.log`，
+结构化结果在 `logs/diagnostics/greedy-and-recurrent-midpoint-20261001/summary.json`。
+
+记录时在线循环 PPO 为 99328 步、14 局，EMA 严格胜率 0.13890；
+尚未达到 20 局预热门槛，uniform 概率仍为 0.90。
+教师扩充已完成 16/32 局、106058 帧，manifest 仍标记未完成，没有用于拟合。
