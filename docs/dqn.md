@@ -156,3 +156,15 @@ SHA256 及参数有限值通过，实际物理 GPU 5；记录为
 `logs/diagnostics/dqn-more-replay-first-update-20261001/result.json`。
 曲线修订 `logs/diagnostics/dqn-curves-20261001-d/` 补齐所有运行图例，并用
 线性轴显示平均 Q 值；缺少标量的运行不会从图例中消失。
+
+恢复运行目录为 `logs/training/br-dqn-reimu-baseline-resumed-20261001`，
+提交 `1a96b8f`，启动入口的新增初始化字段需要
+`++algorithm.initial_policy={kind:checkpoint,path:...,training_config:...}`。
+第一次命令在 Hydra 配置校验阶段拒绝新增字段，没有启动游戏，错误日志保留；
+修正后的 stdout 为 `logs/train-dqn-baseline-resumed-launch2-20261001.txt`。
+
+阶段评测计划：对每组 65536 步检查点使用完整 validation 的 32 个世界种子、
+两种座位，共 64 局，贪心策略、原神灵梦、8 环境。显式
+`require_complete=false` 仅表示评估中间检查点，不把未完成的训练记作成功。
+最终模型按相同协议比较，配置确定后才使用独立 test。五步组首先达到该节点，
+先启动其阶段评测；不因先完成而优先选择它。
