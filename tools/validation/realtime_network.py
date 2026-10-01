@@ -86,6 +86,11 @@ def validate(cfg, report):
             raise AssertionError(f"insufficient common frames or missing inputs: {len(common)}, {applied}")
         if any(frames[0][frame] != frames[1][frame] for frame in common):
             raise AssertionError("peers disagree on characters, HP or engine inputs")
+        observed = [sum(frames[0][frame][seat][2][0] * (1 if seat == 0 else -1) > 0
+                        and frames[0][frame][seat][2][2] > 0 for frame in common) for seat in (0, 1)]
+        report["engine_input_frames"] = observed
+        if not all(observed):
+            raise AssertionError("accepted input did not reach both original engines")
         before = [status(channel) for channel in channels]
         started = time.monotonic()
         time.sleep(cfg.validation.stalled_seconds)
