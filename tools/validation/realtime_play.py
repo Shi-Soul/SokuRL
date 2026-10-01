@@ -1,10 +1,10 @@
 """Measure real game pacing with active and deliberately stalled AI transport."""
-from dataclasses import asdict
 import json
 import os
 from pathlib import Path
 import sys
 import time
+import traceback
 
 import hydra
 from omegaconf import OmegaConf
@@ -41,10 +41,11 @@ def case(cfg, seat, character):
         history, channel = RealtimeHistory(process.pid), RealtimeInput(process.pid, seat)
         cursor, captures, decoded = 0, [], 0
         reader = PrivilegedReader(None)
-        started = time.monotonic()
-        first = None
-        while time.monotonic() - started < cfg.validation.observation_seconds:
+        deadline = time.monotonic() + cfg.runtime.launch_timeout
+        while not decoded or time.monotonic() < deadline:
             cursor, frames = history.read_after(cursor)
+            if not decoded and frames:
+                deadline = time.monotonic() + cfg.validation.observation_seconds
             for frame in frames:
                 reader.memory = frame.memory
                 observations = reader.observe_snapshot(frame.raw)
@@ -52,8 +53,10 @@ def case(cfg, seat, character):
                     raise AssertionError("wrong character captured")
                 captures.append(frame.capture_seconds)
                 decoded += 1
-                if first is None:
-                    first = (frame.match.frame, time.monotonic())
+            if not decoded and time.monotonic() >= deadline:
+                raise TimeoutError(f"game produced no battle frames; input status: {status(channel)}")
+            if process.poll() is not None:
+                raise RuntimeError("game exited during observation validation")
             time.sleep(.001)
         before = status(channel)
         stalled_start = time.monotonic()
@@ -78,6 +81,7 @@ def case(cfg, seat, character):
         result["success"] = True
     except Exception as error:
         result["error"] = repr(error)
+        result["traceback"] = traceback.format_exc()
     finally:
         if history is not None:
             history.close()
