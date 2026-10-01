@@ -1,6 +1,8 @@
 """Lossless common numeric observations for original Lua rules and learned policies."""
 from dataclasses import dataclass
 
+import numpy as np
+
 from .memory_schema import (FIGHTER_NAMES, FIGHTER_WIDTH, MAX_BOXES, MAX_OBJECTS,
     OBJECT_NAMES, OBJECT_WIDTH, PLAYER_WIDTH, PRIVILEGED_FEATURES, RAW_WIDTH, WORLD_NAMES)
 
@@ -25,24 +27,33 @@ def write_entity(target, offset, entity, names):
 
 
 def encode_privileged(observation):
-    import numpy as np
     if not isinstance(observation, PrivilegedObservation):
         raise TypeError("expected a complete privileged observation")
-    raw = np.zeros(RAW_WIDTH, dtype=np.float64)
-    raw[:len(WORLD_NAMES)] = [observation.world[name] for name in WORLD_NAMES]
+    if len(observation.players) != 2:
+        raise ValueError("complete privileged observations require both players")
+    result = np.zeros((RAW_WIDTH, 2), dtype=np.float32)
+    result[:len(WORLD_NAMES)] = encode_values(np.asarray([observation.world[name] for name in WORLD_NAMES], np.float64))
     for player, entity in enumerate(observation.players):
         offset = len(WORLD_NAMES) + player * PLAYER_WIDTH
-        cursor = write_entity(raw, offset, entity, FIGHTER_NAMES)
+        count = len(entity["objects"])
+        if count != entity["obj_n"] or count > MAX_OBJECTS:
+            raise ValueError("object observation exceeds declared space")
+        # Preserve the fixed tensor layout, but do no arithmetic on empty slots.
+        raw = np.zeros(FIGHTER_WIDTH + count * OBJECT_WIDTH, dtype=np.float64)
+        cursor = write_entity(raw, 0, entity, FIGHTER_NAMES)
         for name, width in (("cards", 10), ("skills", 16), ("special", 28), ("keys", 10), ("deck", 20)):
             values = entity[name]
             if len(values) != width:
                 raise ValueError(f"privileged {name} field has incorrect length")
             raw[cursor:cursor + width] = values
             cursor += width
-        if len(entity["objects"]) != entity["obj_n"] or entity["obj_n"] > MAX_OBJECTS:
-            raise ValueError("object observation exceeds declared space")
         for index, obj in enumerate(entity["objects"]):
-            write_entity(raw, offset + FIGHTER_WIDTH + index * OBJECT_WIDTH, obj, OBJECT_NAMES)
+            write_entity(raw, FIGHTER_WIDTH + index * OBJECT_WIDTH, obj, OBJECT_NAMES)
+        result[offset:offset + len(raw)] = encode_values(raw)
+    return result.reshape(-1)
+
+
+def encode_values(raw):
     if not np.isfinite(raw).all():
         raise ValueError("privileged observation contains non-finite fields")
     # Two base-65536 parts preserve uint32 flags/addresses as well as float32
@@ -52,7 +63,11 @@ def encode_privileged(observation):
     if not np.array_equal(result[:, 0].astype(np.float64) * 4294967296.
                           + result[:, 1].astype(np.float64) * 65536., raw):
         raise ValueError("privileged observation cannot be represented losslessly")
-    return result.reshape(-1)
+    return result
+
+
+def decode_values(parts):
+    return parts[:, 0].astype(np.float64) * 4294967296. + parts[:, 1].astype(np.float64) * 65536.
 
 
 def read_entity(raw, offset, names):
@@ -68,22 +83,23 @@ def read_entity(raw, offset, names):
 
 
 def decode_privileged(values):
-    import numpy as np
     if values.shape != (PRIVILEGED_FEATURES,) or not np.isfinite(values).all():
         raise ValueError("invalid privileged observation shape or values")
-    parts = values.reshape(-1, 2).astype(np.float64)
-    raw = parts[:, 0] * 4294967296. + parts[:, 1] * 65536.
+    parts = values.reshape(-1, 2)
     players = []
     for player in (0, 1):
         offset = len(WORLD_NAMES) + player * PLAYER_WIDTH
-        entity, cursor = read_entity(raw, offset, FIGHTER_NAMES)
+        raw = decode_values(parts[offset:offset + FIGHTER_WIDTH])
+        entity, cursor = read_entity(raw, 0, FIGHTER_NAMES)
         for name, width in (("cards", 10), ("skills", 16), ("special", 28), ("keys", 10), ("deck", 20)):
             entity[name] = tuple(raw[cursor:cursor + width])
             cursor += width
         count = int(entity["obj_n"])
         if not 0 <= count <= MAX_OBJECTS:
             raise ValueError("invalid encoded object count")
-        entity["objects"] = tuple(read_entity(raw, offset + FIGHTER_WIDTH + i * OBJECT_WIDTH,
+        objects = decode_values(parts[offset + FIGHTER_WIDTH:offset + FIGHTER_WIDTH + count * OBJECT_WIDTH])
+        entity["objects"] = tuple(read_entity(objects, i * OBJECT_WIDTH,
                                                OBJECT_NAMES)[0] for i in range(count))
         players.append(entity)
-    return PrivilegedObservation(dict(zip(WORLD_NAMES, raw[:len(WORLD_NAMES)], strict=True)), tuple(players))
+    world = decode_values(parts[:len(WORLD_NAMES)])
+    return PrivilegedObservation(dict(zip(WORLD_NAMES, world, strict=True)), tuple(players))
