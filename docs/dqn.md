@@ -152,7 +152,7 @@ DLL、资源、观测/动作/对手/种子/依赖身份。恢复段包含日志�
 | --- | --- | ---: | --- |
 | 三步恢复基线 | 0 / 64 / 0 | -1.000000 | 0 胜、64 负、0 超时；收益 -1 |
 | 五步 | 0 / 64 / 0 | -1.000000 | 0 胜、64 负、0 超时；收益 -1 |
-| 更多回放 | 0 / 49 / 15 | -0.765625 | 运行中 |
+| 更多回放 | 0 / 49 / 15 | -0.765625 | 0 胜、62 负、2 超时；收益 -0.96875 |
 
 阶段评测全部成功且无双 KO；更多回放的阶段收益差来自超时，不是胜利。
 三份阶段审计为 `logs/diagnostics/dqn-{baseline,five-step,more-replay}-stage-validation-audit-20261001/`。
@@ -166,8 +166,11 @@ DLL、资源、观测/动作/对手/种子/依赖身份。恢复段包含日志�
 基线最终评估同样成功，双座位各 32 负，耗时约 1977.1 秒；完整计划、模型哈希、
 64 份回放及私有进程清理检查通过，审计为
 `logs/diagnostics/dqn-baseline-final-validation-audit-20261001/result.json`。
-这两个配置均未显示出战胜规则灵梦的能力。更多回放组最终 validation、模型
-选型与独立 test 仍未完成。
+更多回放组最终评估成功，耗时约 2994.0 秒：1P 为 30 负、2 超时，2P 为 32 负，
+无双 KO。完整计划、模型哈希、64 份回放及私有进程清理检查通过，审计为
+`logs/diagnostics/dqn-more-replay-final-validation-audit-20261001/result.json`。
+三组最终评估均没有胜局。更多回放的收益优势仅来自两局超时，不能称为胜率改善；
+它在 65536 步时有 15 局超时，最终仅有 2 局，训练收益没有随预算单调改善。
 
 随后按不可能逆转的排序锁定 `rl=dqn_more_replay`：锁定时该组已完成 49 局，
 47 负、2 超时，即使剩余 15 局全部失利，最终 64 局平均收益仍至少为 -0.96875，
@@ -177,8 +180,10 @@ test”的时序；收益/胜率/更新数排序规则、模型、预算和全�
 选择不可再由 test 结果改变，超时优势也不等于胜利。
 `logs/diagnostics/dqn-final-selection-20261001/selection.json` 保存锁定时间、
 模型及训练配置哈希、锁定时原始计划/进度与逐局回放哈希、严格收益下界和 test
-配置。test 的 32 个世界种子与 validation 不重叠；最终交付仍需两项完整评测
-结束并审计通过。
+配置。test 的 32 个世界种子与 validation 不重叠。全部 validation 完成后，
+`completed-validation-comparison.json` 再次确认冻结的排序及模型哈希；独立 test
+仍在 `logs/benchmark/br-dqn-selected-final-test-20261001/` 运行，尚未完成验收。
+`test-plan-audit.json` 核对实际 64 局计划与冻结记录，test 不参与后续调参。
 
 最终评估输出依次为 `logs/benchmark/br-dqn-baseline-final-validation-20261001/`、
 `logs/benchmark/br-dqn-five-step-final-validation-direct-20261001/` 和
