@@ -335,8 +335,10 @@ BR 评测完成后也汇总学习者视角的 `combat_summary`，全局和每个
 `logs/diagnostics/ppo-combat-features-b256-20261001`。合成诊断不证明游戏强度。
 该网络已启动真实对照 `logs/training/br-superhuman-reimu-combat-context-20261001`：
 同一神 AI 灵梦、魔理沙学习者、随机座位、seed 1732、4 环境、1 CPU 线程、
-GPU 3、131072 步预算。它使用原 10 epochs；当前只有启动与采样证据，尚无
-胜率提升结论。两轮优化组在 24576 步的真实更新耗时约 0.94 秒，仍不能由此
+GPU 3、131072 步预算。它使用原 10 epochs，已正常完成：32 局训练全负，
+总耗时 1937.96 秒，对手平均 HP 减少 1587.06；最终权重独立评测在
+`logs/benchmark/br-reimu-combat-context-final-20261001` 进行。两轮优化组在
+24576 步的真实更新耗时约 0.94 秒，仍不能由此
 推断端到端训练吞吐或策略强度改善。
 
 真实采样剖析 `logs/diagnostics/br-rollout-profile-20261001` 使用原编码器、4 环境、
@@ -381,5 +383,15 @@ GPU 3、131072 步预算。它使用原 10 epochs；当前只有启动与采样�
 校验、保存恢复不叠加偏置，以及原共享 MARL 的兼容检查。该候选尚未验证强度。
 
 两轮优化组 `br-superhuman-reimu-two-epochs-20261001` 已正常完成 131072 步，
-35 局训练全负，总耗时 1927.81 秒。最终模型正在
-`logs/benchmark/br-reimu-two-epochs-final-20261001` 接受同种子双座位评测。
+35 局训练全负，总耗时 1927.81 秒。最终模型在
+`logs/benchmark/br-reimu-two-epochs-final-20261001` 的同种子双座位评测正常完成，
+4 局全负，对手平均 HP 减少 848，学习者符卡动作进入为 0；策略随机种子与
+直接训练对照逐局一致。优化器裁剪减少尚未转化为实战优势。
+
+初始按键概率候选的 CUDA batch=256 两轮合成更新正常完成，记录在
+`logs/diagnostics/ppo-button-prior-b256-20261001`；只验证执行，不验证强度。
+现有三组训练结束后，已启动正式单项对照
+`logs/training/br-superhuman-reimu-button-prior-20261001`，沿用新编码器组的
+`track=superhuman_combat`、seed 1732、随机座位、4 环境、1 CPU 线程、
+131072 步预算，唯一学习配置差异为初始动作先验。该候选还采用新版本的逐位
+等价打包实现，因此墙钟性能不能纯归因于先验；强度仍待独立评测。
