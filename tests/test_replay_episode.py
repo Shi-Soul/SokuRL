@@ -32,7 +32,7 @@ def test_recorded_knockout_requires_exact_frame_and_outcome(reason, outcome):
 
 
 @pytest.mark.parametrize("change", ({}, {"sha256": "wrong"}, {"seed": 7},
-    {"frames": -1}, {"frames": True}, {"reason": "unknown"}))
+    {"frames": -1}, {"frames": True}, {"reason": "unknown"}, {"scope": "match"}))
 def test_episode_metadata_is_bound_to_replay_bytes_and_seed(tmp_path, change):
     replay = replace(example(), matches=(replace(example().matches[0], input_words=()),))
     source = tmp_path / "episode.rep"
