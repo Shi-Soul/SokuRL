@@ -40,10 +40,12 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=0 algorithm=br \
   output=logs/training/br-reimu-numeric-rehearsal-gae95-adaptive-20261001
 ```
 
-尚未改变生产编码器的全部物体槽计算。跳过不存在物体的局部原型降低了显存，
+本轮启动时尚未改变生产编码器的全部物体槽计算。跳过不存在物体的局部原型降低了显存，
 但小批量推断更慢，不能将局部大批量前向收益当作 PPO 整体加速。
 原型源代码、旧编码器、检查点与数据身份及时间结果保留于
 `logs/diagnostics/active-object-encoding-20261001`，不把未采用的原型计为训练优化成果。
+后续已完成[选择性跳过空槽](object-encoding-efficiency.md)的独立实现与计算诊断，
+但没有替换本轮两个正在运行的进程中已载入的代码。
 
 两组已从提交 `b238e3a` 在 GPU 0/7 启动，输出分别为
 `br-reimu-numeric-rehearsal-gae95-adaptive-20261001` 和
