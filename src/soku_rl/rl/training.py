@@ -11,6 +11,7 @@ from soku_rl.rl.episode_metrics import grouped_episode_metrics, summarize_episod
 
 
 from soku_rl.rl.ppo import initialize_ppo, parameter_hash
+from soku_rl.rl.learner import save_checkpoint
 
 
 class EpisodeRecords(BaseCallback):
@@ -63,15 +64,18 @@ class EpisodeRecords(BaseCallback):
         self._write_timings("updating")
 
     def _finish_update(self):
-        self.timings[-1].update(update_seconds=time.perf_counter() - self.rollout_finished,
-                               ppo_n_updates=self.model._n_updates)
+        from soku_rl.rl.dqn import DoubleDQN
+        kind = "dqn" if isinstance(self.model, DoubleDQN) else "ppo"
+        self.timings[-1].update(update_seconds=time.perf_counter() - self.rollout_finished)
+        self.timings[-1][kind + "_n_updates"] = self.model._n_updates
+        self.timings[-1]["learner_n_updates"] = self.model._n_updates
         steps = self.model.num_timesteps
-        if (not self.last_saved_steps
+        if self.model._n_updates and (not self.last_saved_steps
                 or steps // self.checkpoint_every > self.last_saved_steps // self.checkpoint_every):
             checkpoints = self.directory / "checkpoints"
             checkpoints.mkdir(exist_ok=True)
             path = checkpoints / f"updated_{steps}_steps.zip"
-            self.model.save(path)
+            save_checkpoint(self.model, path)
             self.last_saved_steps = steps
             self.timings[-1]["updated_checkpoint"] = str(path)
         self.pending_update = False

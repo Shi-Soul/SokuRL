@@ -7,7 +7,7 @@ from stable_baselines3.common.logger import configure
 from soku_rl.policy.loader import load_policy
 from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
 from soku_rl.rl.matchup_env import MatchupMixtureVecEnv
-from soku_rl.rl.ppo import create_ppo, parameter_hash
+from soku_rl.rl.learner import create_learner, parameter_hash, learner_kind, save_checkpoint
 from soku_rl.rl.training import EpisodeRecords
 from soku_rl.policy.matchups import opponent_interface
 
@@ -42,23 +42,26 @@ def train_response(env, config, opponents, probabilities, device, seed, director
     else:
         raise ValueError("BR matchups must be fixed or sampled")
     try:
-        model, source = create_ppo(view, env.interface, config,
+        model, source = create_learner(view, env.interface, config,
             config["initial_policy"], device, seed)
         model.set_logger(configure(str(directory / "scalars"), ["csv", "stdout"]))
         initial = parameter_hash(model.policy)
         start_steps = model.num_timesteps
-        callbacks = CallbackList([
+        callbacks = [
             EpisodeRecords(directory, config["checkpoint_every"]),
             CheckpointCallback(save_freq=config["checkpoint_every"] // env.num_envs,
                 save_path=str(directory / "checkpoints"), name_prefix="ppo"),
-        ])
+        ]
+        if learner_kind(config) == "dqn":
+            callbacks = callbacks[:1]
+        callbacks = CallbackList(callbacks)
         model.learn(total_timesteps=config["timesteps"], callback=callbacks,
                     reset_num_timesteps=False)
         final = parameter_hash(model.policy)
         if initial == final:
             raise RuntimeError("BR completed without a policy update")
         path = directory / "final.zip"
-        model.save(path)
+        save_checkpoint(model, path)
         return {"steps": model.num_timesteps, "start_steps": start_steps,
             "additional_steps": model.num_timesteps - start_steps, "initial_policy": source,
             "initial_policy_hash": initial, "final_policy_hash": final,

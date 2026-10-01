@@ -15,3 +15,5 @@ response:
   ppo: ${rl.ppo}
   policy_type: ${rl.policy_type}
   timeout_payoff: ${rl.timeout_payoff}
+  learner: ${rl.learner}
+  dqn: ${rl.dqn}

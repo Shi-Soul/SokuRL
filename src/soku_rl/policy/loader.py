@@ -23,7 +23,7 @@ def load_policy(name, spec, interface, device):
         if str(device) != "cpu":
             raise ValueError("the deployment model requires device=cpu")
         return OnnxPolicy(name, spec["path"], interface)
-    if kind in {"sb3", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo"}:
+    if kind in {"sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo"}:
         from soku_rl.policy.checkpoint import load_checkpoint
         return load_checkpoint(name, spec, interface, device)
     raise ValueError(f"unsupported policy kind: {kind}")

@@ -1,3 +1,5 @@
+learner: ppo
+dqn: {}
 policy_type: mlp
 cpu_threads: 4
 timeout_payoff: zero_at_horizon

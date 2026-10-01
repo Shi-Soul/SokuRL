@@ -54,7 +54,8 @@ def main(cfg):
     candidate = "learned-br"
     if candidate in {p["name"] for p in population}:
         raise ValueError("candidate name collides with an opponent")
-    kind = {"mlp": "sb3", "lstm": "sb3_recurrent"}[algorithm["policy_type"]]
+    from soku_rl.rl.learner import artifact_kind
+    kind = artifact_kind(algorithm)
     output = Path(config["output"]).resolve()
     output.mkdir(parents=True, exist_ok=False)
     # Persist the actual source contract and opponent setups, not train defaults.

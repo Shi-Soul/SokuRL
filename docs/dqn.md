@@ -1,0 +1,65 @@
+# 共享 DQN 与 MARL
+
+`rl=dqn` 选择共享 Double DQN（双网络分工计算自举目标），可用于 `algorithm=br`、
+`ppo`（原两座位固定对手调度器）、`ippo`、`nfsp`、`psro`。MARL 只组织对手和采样，
+Q 更新全部在 `rl/dqn.py`；没有在各调度器中复制训练算法。
+
+实现基于固定依赖 Stable-Baselines3 2.9.0 的 DQN，保留其向量环境采样、Adam、
+目标网络同步和模型容器。局部更新采用 Double DQN 目标、Huber 损失与梯度裁剪，
+遇到非有限损失或梯度立即失败。在线网络选择下一动作，目标网络评价该动作。
+依据：[SB3 DQN](https://stable-baselines3.readthedocs.io/en/master/modules/dqn.html)、
+[Double DQN 原论文](https://arxiv.org/abs/1509.06461)。不宣称实现了完整 Rainbow。
+
+默认与前馈 PPO 一样使用两层 256 单元、Tanh；所有 track 配置选择的特征提取器
+通过 `rl.dqn.policy_kwargs: ${rl.ppo.policy_kwargs}` 共享。DQN 的输出是各动作 Q 值，
+PPO 的输出是策略概率及状态价值，所以输出头有必要区别。DQN 不提供 LSTM，
+仍支持现有帧历史、动作历史、数值、图像和图像/动作字典观测。NFSP 保留原来的
+前馈数值观测限制，其平均策略是同结构的分类网络，通过监督交叉熵拟合历史行为，
+不是把 Q 值当概率。该平均网络继续使用 PPO 容器保存，不执行 PPO 更新。
+
+默认配置为三步回报、131072 条经验、4096 步预热、batch 256、每 32 个向量环境
+步做 32 次梯度更新、每 2048 个转移同步目标。8 环境时每个新转移对应 0.125 次
+梯度更新（32 个样本重用），改变环境数时应同时检查这个比率。超参数统一在
+`rl.dqn` 修改。探索 epsilon 按累计转移数在 `exploration_decay_steps=131072`
+内由 1 降到 0.05，NFSP 分阶段调用和检查点续训不会重启这条进度；`weights`
+模式开始新的进度。每个并行实例独立抽探索门控；冻结策略和正式评测采用贪心动作。
+
+回放使用项目原有的逐位无损观测存储，浮点稀疏观测传到 GPU 后再还原；图像使用
+无损压缩。回报聚合及环形索引复用 SB3 `NStepReplayBuffer`。终局和有限时域超时
+都不自举；新一段训练开始新游戏时，旧经验在最后记录的下一状态截断 n-step 链，
+保留该状态的自举，避免与新游戏拼接。环形覆盖会清除旧的截断边界。
+
+`final.zip` 与已更新检查点配套保存 `.replay.pkl` 和 `.replay.json`。继续训练会
+核对模型/回放 SHA256，恢复在线/目标网络、Adam、更新计数、探索进度和经验；
+环境数、模型及优化器配置须一致。新对局和重设随机种子意味着不是游戏现场或
+随机数流逐位恢复。仅用于推理的 NFSP 冻结模型和 PSRO 种群成员不附带经验池。
+DQN 策略加载类型是 `sb3_dqn`，统一加载器、BR 评测和种群序列化都支持它。
+
+## 魔理沙对神灵梦 BR
+
+在 Linux 获准虚拟显示中运行，原神 AI 不加噪声、不改战术；每局随机学习者座位。
+共享 `superhuman_combat` 编码器与现有 PPO 对照相同，动作、逐帧控制和收益约定不变。
+
+```bash
+bash scripts/linux.sh tools/train.py algorithm=br rl=dqn \
+  rules=god wrappers=superhuman_learning track=superhuman_combat \
+  +br_opponents=god_target algorithm.target.character=0 \
+  num_envs=8 rl.cpu_threads=2 linux.cuda_devices=1 \
+  output=logs/training/br-dqn-reimu-baseline
+```
+
+调参使用独立 validation 种子，锁定配置后再用 test；均用 `tools/benchmark_br.py`，
+继承训练观测和对手，按双方座位报告胜/负/超时。仅完成单元测试或更新不能证明
+策略强度。本文件下方只登记实际完成的实机结果。
+
+## 当前证据
+
+新 worktree `SokuRL-dqn`，分支 `feat/dqn-marl`。环境检查确认 GPU 1 为
+RTX 3080 Ti，Torch 2.9.1+cu128 和 Wine 工作进程依赖可用。第一轮 DQN 专项
+13 测试通过，包括 CUDA BR 更新/恢复、回放与上游逐项一致、IPPO/NFSP/PSRO
+更新/续训；原 PPO 接口回归 30 测试通过。随后增加字典观测和截断边界覆盖测试，
+补齐本地原始神 AI 资源后，全量检查为 859 passed、12 skipped、1 deselected、
+2 subtests passed（`logs/pytest-dqn-full-resources.txt`）。后续新增配置和图像更新
+测试后，DQN 专项 21 passed（`logs/pytest-dqn-extra.txt`），相关合并回归
+47 passed（`logs/pytest-dqn-final-core.txt`）。跳过项沿用 Windows/CRT/外部回放
+限制。尚未完成真实 DQN 训练或策略强度验收。
