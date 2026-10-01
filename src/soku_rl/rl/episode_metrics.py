@@ -31,8 +31,15 @@ def grouped_episode_metrics(records):
         if "match" in context:
             character = context["match"][f"player_{1 - player}"]["character"]
             keys.update(opponent_character=character, matchup=(player, opponent, character))
+        if "selected_policy" in context.get("curriculum", {}):
+            selected = context["curriculum"]["selected_policy"]
+            if selected not in {"uniform", "original"}:
+                raise ValueError("unknown episode curriculum policy")
+            keys.update(curriculum_policy=selected, curriculum_opponent=(opponent, selected))
+            if "match" in context:
+                keys["curriculum_matchup"] = (player, opponent, character, selected)
         for name, key in keys.items():
-            groups[name].setdefault(key, []).append(record)
+            groups.setdefault(name, {}).setdefault(key, []).append(record)
     return {"overall": summarize_episodes(records), "groups": {
         name: [{"key": key, **summarize_episodes(subset)} for key, subset in sorted(values.items())]
         for name, values in groups.items()}}

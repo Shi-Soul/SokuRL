@@ -128,8 +128,9 @@ def plot_curriculum(labels, output):
     for label in labels:
         progress = json.loads((output / label / "progress.json").read_text())
         state = progress.get("curriculum", {"kind": "fixed"})
-        if state["kind"] != "adaptive_action_noise":
+        if state["kind"] not in {"adaptive_action_noise", "adaptive_episode_mixture"}:
             continue
+        episodic = state["kind"] == "adaptive_episode_mixture"
         config = OmegaConf.to_container(OmegaConf.load(output / label / "config.yaml"), resolve=True)
         timing = json.loads((output / label / "timing.json").read_text())
         start = timing["rollouts"][0]["steps"] - config["rl"]["ppo"]["n_steps"] * config["num_envs"]
@@ -157,6 +158,10 @@ def plot_curriculum(labels, output):
                         color="#2563a6", label="Probability for future games")
                     probability.scatter(x, [event["episode_random_probability"] for event in events],
                         color="#b57427", marker="x", s=28, label="Probability used in finished game", zorder=3)
+                    if episodic:
+                        probability.scatter(x, [int(event["selected_policy"] == "uniform") for event in events],
+                            color="#444444", marker="|", s=40,
+                            label="Chosen policy: uniform=1, original=0", zorder=3)
                     performance.plot(x, [event["ema_win_rate"] for event in events],
                         color="#2563a6", marker="o", markersize=3)
                 else:
@@ -180,6 +185,7 @@ def plot_curriculum(labels, output):
                     axis.grid(alpha=.2)
                     axis.spines[["top", "right"]].set_visible(False)
             figure.suptitle(f"{label}: adaptive training curriculum through {end:,} steps\n"
+                + ("Per-game strategy selection; " if episodic else "Per-decision action replacement; ") +
                 f"EMA half-life {state['config']['ema_half_life']:g} games; shaded band is controller deadband\n"
                 "Episode points are placed at completion; training win rate is not full god-AI evaluation",
                 fontsize=11)

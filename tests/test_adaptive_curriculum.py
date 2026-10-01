@@ -188,13 +188,14 @@ def test_active_episode_keeps_its_probability_when_another_episode_finishes(monk
 
 
 @pytest.mark.parametrize("checkpoint", ["final.zip", "checkpoints/updated_8_steps.zip", "checkpoints/ppo_8_steps.zip"])
-def test_actual_ppo_training_records_and_resumes_curriculum(tmp_path, checkpoint):
+@pytest.mark.parametrize("kind", ["adaptive_action_noise", "adaptive_episode_mixture"])
+def test_actual_ppo_training_records_and_resumes_curriculum(tmp_path, checkpoint, kind):
     torch.set_num_threads(1)
     env = fixture_env()
     config = fixture_config("mlp") | {"name": "br", "player": 1,
         "matchups": {"mode": "fixed"}, "timesteps": 16, "checkpoint_every": 8,
         "initial_policy": {"kind": "fresh"}, "curriculum": settings() | {
-            "warmup_episodes": 1, "update_every": 1},
+            "kind": kind, "warmup_episodes": 1, "update_every": 1},
         "opponents": [{"name": "random", "probability": 1., "policy": {"kind": "uniform"}}]}
     first, second, third = [tmp_path / name for name in ("first", "second", "weights")]
     for path in (first, second, third):

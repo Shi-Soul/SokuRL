@@ -4,7 +4,10 @@ import json
 import math
 from pathlib import Path
 
+import numpy as np
+
 from soku_rl.policy.action_noise import ActionNoisePolicy
+from soku_rl.policy.population import UniformPolicy
 
 
 class FixedOpponentSchedule:
@@ -31,11 +34,13 @@ class FixedOpponentSchedule:
 
 
 class AdaptiveActionNoise:
+    kind = "adaptive_action_noise"
+
     def __init__(self, config, opponents, probabilities, num_actions):
         fields = {"kind", "initial_random_probability", "min_random_probability",
             "max_random_probability", "target_win_rate", "deadband", "ema_half_life",
             "warmup_episodes", "update_every", "gain", "max_change"}
-        if set(config) != fields or config["kind"] != "adaptive_action_noise":
+        if set(config) != fields or config["kind"] != self.kind:
             raise ValueError("invalid adaptive action noise configuration fields")
         for key in fields - {"kind", "warmup_episodes", "update_every"}:
             if type(config[key]) not in (int, float) or not math.isfinite(config[key]):
@@ -115,7 +120,7 @@ class AdaptiveActionNoise:
             states[name] = dict(state)
             if state["episodes"]:
                 states[name]["ema_win_rate"] = state["win_numerator"] / state["ema_weight"]
-        return {"kind": "adaptive_action_noise", "schema": 1, "config": dict(self.config),
+        return {"kind": self.kind, "schema": 1, "config": dict(self.config),
             "num_actions": self.num_actions, "opponents": self.identities, "states": states}
 
     def scalar_metrics(self):
@@ -171,7 +176,34 @@ class AdaptiveActionNoise:
         self.states = restored
 
 
+class AdaptiveEpisodeMixture(AdaptiveActionNoise):
+    """Use the same feedback rule, selecting an intact policy for each game."""
+    kind = "adaptive_episode_mixture"
+
+    def spawn(self, opponent, seed):
+        state = self.states[opponent.name]
+        probability = state["random_probability"]
+        # Separate the selection stream from both possible actor streams. Keep
+        # the actor's original seed, including at the pure-policy endpoints.
+        selection_seed = np.random.SeedSequence(seed).spawn(1)[0]
+        uniform = np.random.default_rng(selection_seed).random() < probability
+        selected = UniformPolicy(opponent.name, self.num_actions) if uniform else opponent
+        identity = ["adaptive-episode-mixture-v1", opponent.fingerprint, self.num_actions, probability]
+        context = {"random_probability": probability,
+            "controller_episodes_at_start": state["episodes"],
+            "training_opponent_fingerprint": hashlib.sha256(json.dumps(identity).encode()).hexdigest(),
+            "selected_policy": "uniform" if uniform else "original",
+            "selected_policy_fingerprint": selected.fingerprint}
+        return selected.spawn(seed), {"curriculum": context}
+
+    def observe(self, context, info):
+        return super().observe(context, info) | {
+            "selected_policy": context["curriculum"]["selected_policy"]}
+
+
 def create_curriculum(config, opponents, probabilities, num_actions):
     if config == {"kind": "fixed"}:
         return FixedOpponentSchedule()
+    if "kind" in config and config["kind"] == AdaptiveEpisodeMixture.kind:
+        return AdaptiveEpisodeMixture(config, opponents, probabilities, num_actions)
     return AdaptiveActionNoise(config, opponents, probabilities, num_actions)
