@@ -3,17 +3,25 @@ import numpy as np
 
 from soku_rl.env.encoding import FRAME_FEATURES
 from soku_rl.env.observation.visible_state import STATE_FEATURES
+from soku_rl.env.observation.memory_schema import (
+    FIGHTER_NAMES, PLAYER_WIDTH, PRIVILEGED_FEATURES, WORLD_NAMES)
+from soku_rl.env.observation.privileged import decode_values
 
 
 RELATIVE_FEATURES = 37
+HP_INDICES = np.asarray([len(WORLD_NAMES) + seat * PLAYER_WIDTH + FIGHTER_NAMES.index("hp")
+                        for seat in (0, 1)])
 
 
 def health_potential(observation, mode):
     if mode == "privileged_state":
-        from soku_rl.env.observation.privileged import decode_privileged
-        from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
-        players = decode_privileged(observation[-PRIVILEGED_FEATURES:]).players
-        return (players[0]["hp"] - players[1]["hp"]) / 10000.
+        last = observation[-PRIVILEGED_FEATURES:]
+        if last.shape != (PRIVILEGED_FEATURES,) or not np.isfinite(last).all():
+            raise ValueError("invalid privileged observation shape or values")
+        # Decode both base-65536 parts in float64, as the full decoder does.
+        # Reward shaping does not need object dictionaries or collision boxes.
+        hp = decode_values(last.reshape(-1, 2)[HP_INDICES])
+        return float((hp[0] - hp[1]) / 10000.)
     if mode == "state":
         last = observation[-STATE_FEATURES:]
         return float(last[5] - last[13])
