@@ -138,6 +138,14 @@ bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=3 rl.cpu_threads=
 自适应 PPO 的 65536 步检查点及课程 sidecar 哈希已核对，累计 3 胜 8 负，
 EMA 胜率约 0.2712；11 局仍处于预热期，uniform 概率保持 0.90。正式长训练继续运行。
 
+首次实际课程调节已发生：131072 步的 sidecar 有 23 局，EMA 胜率 0.30423，
+uniform 概率由 0.90 调到 0.93017。147456 步时完成 26 局、7 胜，
+EMA 为 0.26328，尚未达到下一次 30 局更新点，uniform 概率保持 0.93017。
+最近 10 局平均自身 HP 下降 9045.6、对手 7403.3；自身符卡动作进入 0.2 次/局，对手 0.5 次/局。
+这些是掺随机动作对手的课程内指标。131072 步的完整神 AI 配对评估已另行启动，结果尚未完成。
+曲线和源数据快照在 `logs/diagnostics/br-adaptive-curves-20261001-d`；
+`curriculum-adaptive-1.png` 已核对实际对局概率、新局概率与 EMA 曲线。
+
 固定两阶段课程保留为历史证据，不再作为后续课程方案：
 `br-superhuman-noise90-to-reimu-20261001` 完成额外 65536 步（连同 warmup 总计 131072），
 训练 16 局全负。`br-noise90-to-reimu-final-20261001` 在完整灵梦神 AI、

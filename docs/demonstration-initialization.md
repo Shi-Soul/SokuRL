@@ -55,4 +55,6 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=3 \
 课程仍从自适应配置开始，不延续监督优化器的状态。
 
 21 项采样、监督初始化和共享 PPO 测试通过，日志 `.dev/pytest-behavior-cloning-20261001.log`。
+切换到既有稀疏传输后，17 项监督初始化及存储测试通过，
+日志 `.dev/pytest-behavior-cloning-sparse-20261001-v2.log`。
 监督拟合真实效果和后续 PPO 保持能力仍待独立对局验证；动作准确率不能替代游戏胜率。
