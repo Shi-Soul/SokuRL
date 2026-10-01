@@ -15,7 +15,7 @@ sys.path.insert(0, str(TOOLS))
 def batch(monkeypatch):
     game = SimpleNamespace(shutdown=Mock())
     monkeypatch.setitem(sys.modules, "sokurl", game)
-    spec = importlib.util.spec_from_file_location("reset_batch_under_test", TOOLS / "game_batch.py")
+    spec = importlib.util.spec_from_file_location("reset_batch_under_test", TOOLS / "game_runtime" / "batch.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     result = module.SokuGameBatch(180.0)

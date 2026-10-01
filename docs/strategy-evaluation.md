@@ -84,7 +84,7 @@ u(A,B)\in\left[\frac{W-L-T}{N},\frac{W-L+T}{N}\right].
 | `src/soku_rl/strategies.py` | 根据配置创建策略，生成配置与实现指纹。 |
 | `src/soku_rl/community_rules.py` | 有记忆的社区规则子集。 |
 | `src/soku_rl/evaluation.py` | 生成对局计划、运行策略、统计配对结果。 |
-| `tools/game_batch.py` | 复用已验证的启动和同步代码，管理自己创建的游戏进程。 |
+| `tools/game_runtime/batch.py` | 复用已验证的启动和同步代码，管理自己创建的游戏进程。 |
 | `tools/evaluate.py` | Hydra 入口、运行文件指纹、结果持久化。 |
 | `config/evaluation.yaml` | 继承已有策略配置的正式对战配置。 |
 

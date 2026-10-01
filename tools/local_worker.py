@@ -4,7 +4,7 @@ import traceback
 
 from game_runtime.local_match import LocalMatch
 from game_runtime.startup import configure_game
-from runtime_identity import fingerprints
+from game_runtime.identity import fingerprints
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.worker_pipe import PROTOCOL, receive, send
 

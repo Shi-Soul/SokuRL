@@ -11,7 +11,7 @@ Python 训练代码分为 Env、RL、MARL 三层。Policy 定义可运行的策�
 | `src/soku_rl/evaluation/` | 对战收益采样、基准评测和结果统计。 |
 | `src/soku_rl/play/` | 实时对局、逐局策略状态和比赛生命周期。 |
 | `src/soku_rl/replay/` | 官方回放格式、游戏记录读取和环境轨迹归档。 |
-| `tools/game_runtime/` | 游戏启动、原游戏回放播放，以及环境和回放共用的观测读取器。 |
+| `tools/game_runtime/` | 游戏启动与批量步进、运行文件指纹、原游戏回放播放，以及环境和回放共用的观测读取器。 |
 | `tools/network_runtime/` | 网络游戏进程管理、双方启动顺序、共享内存状态与输入通信。 |
 | `tools/` | Hydra 命令入口、Windows 游戏工作进程和原生通信。目前该目录仍需按运行与验证职责进一步整理。 |
 | `native/SokuRLBridge/` | MSVC x86 DLL：在原游戏输入和战斗更新位置控制步进、读取状态。 |

@@ -7,7 +7,7 @@ import pytest
 if sys.platform != "win32":
     pytest.skip("Windows runtime identity", allow_module_level=True)
 
-import runtime_identity
+from game_runtime import identity as runtime_identity
 
 
 def test_nested_runtime_change_changes_implementation_identity(tmp_path, monkeypatch):

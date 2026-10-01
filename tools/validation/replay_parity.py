@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 from bridge_shared import calculate_state_hash
 from frame_validation import copy_state, state_diff
-from game_batch import SokuGameBatch
+from game_runtime.batch import SokuGameBatch
 from replay_validation import launch_replay_checkpoint
 import sokurl
 from soku_rl.env import EpisodeConfig

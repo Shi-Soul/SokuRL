@@ -9,8 +9,8 @@ from omegaconf import DictConfig, OmegaConf
 
 from soku_rl.evaluation.tournament import make_plan, run_batch, summarize
 from soku_rl.policy.rules.strategies import strategy_from_config
-from game_batch import SokuGameBatch
-from runtime_identity import fingerprints
+from game_runtime.batch import SokuGameBatch
+from game_runtime.identity import fingerprints
 import sokurl
 
 

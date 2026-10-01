@@ -26,7 +26,7 @@ flowchart TD
 | 模块 | 职责 |
 | --- | --- |
 | `native/SokuRLBridge` | 执行原生按键、同步模拟帧、采集对应状态和可选图像 |
-| `tools/game_batch.py` | 启动、重置、步进和关闭本工作进程拥有的游戏 |
+| `tools/game_runtime/batch.py` | 启动、重置、步进和关闭本工作进程拥有的游戏 |
 | `visibility.py`、`contours.py` | 屏幕投影、量化、透明度和粗略遮挡 |
 | `visible_state.py` | 把过滤后的信息编码为双方各自的向量 |
 | `env/control.py` | 决策间隔和延迟按键队列 |

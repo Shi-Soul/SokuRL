@@ -13,7 +13,7 @@ from omegaconf import OmegaConf
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "tests")]
-from game_batch import SokuGameBatch
+from game_runtime.batch import SokuGameBatch
 import sokurl
 from god_reference.compare import players_equal
 from god_reference.reader import Reference

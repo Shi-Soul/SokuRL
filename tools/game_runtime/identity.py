@@ -5,7 +5,7 @@ import ctypes
 from pathlib import Path
 import sokurl
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 def fingerprints():
     sources = sorted((ROOT / "src/soku_rl").rglob("*.py")) + sorted((ROOT / "tools").rglob("*.py"))
