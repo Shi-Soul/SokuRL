@@ -3,6 +3,8 @@
 #include <cstddef>
 
 namespace SokuRLBridge {
+BridgeMapping *openFrameMapping();
+void closeFrameMapping();
 std::uint32_t load32(const volatile std::uint32_t *value);
 void store32(volatile std::uint32_t *target, std::uint32_t value);
 void beginStatusWrite(ControlBlock *control);

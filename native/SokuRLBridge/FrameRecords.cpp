@@ -1,8 +1,55 @@
 #include "FrameRecords.hpp"
 #include "FrameState.hpp"
 #include <Windows.h>
+#include <cwchar>
+#include <cstring>
 
 namespace SokuRLBridge {
+namespace {
+HANDLE g_fileMapping = nullptr;
+BridgeMapping *g_mapping = nullptr;
+}
+
+BridgeMapping *openFrameMapping()
+{
+    wchar_t mappingName[64]{};
+    if (swprintf_s(mappingName, SokuRLBridge::MAPPING_NAME_FORMAT, GetCurrentProcessId()) < 0)
+        return nullptr;
+    g_fileMapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0,
+        sizeof(SokuRLBridge::BridgeMapping), mappingName);
+    if (!g_fileMapping)
+        return nullptr;
+    g_mapping = static_cast<SokuRLBridge::BridgeMapping *>(MapViewOfFile(
+        g_fileMapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SokuRLBridge::BridgeMapping)));
+    if (!g_mapping) {
+        CloseHandle(g_fileMapping);
+        g_fileMapping = nullptr;
+        return nullptr;
+    }
+    std::memset(g_mapping, 0, sizeof(*g_mapping));
+    auto *control = &g_mapping->control;
+    control->magic = SokuRLBridge::CONTROL_MAGIC;
+    control->version = SokuRLBridge::CONTROL_VERSION;
+    control->structSize = sizeof(SokuRLBridge::ControlBlock);
+    control->mappingSize = sizeof(SokuRLBridge::BridgeMapping);
+    control->ringCapacity = SokuRLBridge::FRAME_RING_CAPACITY;
+    control->lastVerifiedFrame = SokuRLBridge::NO_FRAME;
+    control->firstDivergentFrame = SokuRLBridge::NO_FRAME;
+    control->connected = 1;
+    return g_mapping;
+}
+
+void closeFrameMapping()
+{
+    if (g_mapping) {
+        store32(&g_mapping->control.connected, 0);
+        UnmapViewOfFile(g_mapping);
+    }
+    if (g_fileMapping) CloseHandle(g_fileMapping);
+    g_mapping = nullptr;
+    g_fileMapping = nullptr;
+}
+
 std::uint32_t load32(const volatile std::uint32_t *value)
 {
     return static_cast<std::uint32_t>(InterlockedCompareExchange(

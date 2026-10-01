@@ -61,8 +61,6 @@ constexpr DWORD P1_KEYMAP_MANAGER_PTR = 0x008989A0;
 constexpr DWORD P2_KEYMAP_MANAGER_PTR = 0x0089918C;
 constexpr DWORD FALLBACK_KEY_MANAGER = 0x008986A8;
 
-HANDLE g_fileMapping = nullptr;
-SokuRLBridge::BridgeMapping *g_mapping = nullptr;
 SokuRLBridge::ControlBlock *g_control = nullptr;
 SetInputsMethod g_originalSetInputs = nullptr;
 SetInputsMethod g_originalClusterInputs = nullptr;
@@ -499,31 +497,10 @@ int __fastcall battleOnRender(SokuLib::Battle *battle)
 
 bool createMapping()
 {
-    wchar_t mappingName[64]{};
-    if (swprintf_s(mappingName, SokuRLBridge::MAPPING_NAME_FORMAT, GetCurrentProcessId()) < 0)
-        return false;
-    g_fileMapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0,
-        sizeof(SokuRLBridge::BridgeMapping), mappingName);
-    if (!g_fileMapping)
-        return false;
-    g_mapping = static_cast<SokuRLBridge::BridgeMapping *>(MapViewOfFile(
-        g_fileMapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SokuRLBridge::BridgeMapping)));
-    if (!g_mapping) {
-        CloseHandle(g_fileMapping);
-        g_fileMapping = nullptr;
-        return false;
-    }
-    std::memset(g_mapping, 0, sizeof(*g_mapping));
-    g_control = &g_mapping->control;
-    g_records.emplace(*g_mapping);
-    g_control->magic = SokuRLBridge::CONTROL_MAGIC;
-    g_control->version = SokuRLBridge::CONTROL_VERSION;
-    g_control->structSize = sizeof(SokuRLBridge::ControlBlock);
-    g_control->mappingSize = sizeof(SokuRLBridge::BridgeMapping);
-    g_control->ringCapacity = SokuRLBridge::FRAME_RING_CAPACITY;
-    g_control->lastVerifiedFrame = SokuRLBridge::NO_FRAME;
-    g_control->firstDivergentFrame = SokuRLBridge::NO_FRAME;
-    g_control->connected = 1;
+    auto *mapping = SokuRLBridge::openFrameMapping();
+    if (!mapping) return false;
+    g_control = &mapping->control;
+    g_records.emplace(*mapping);
     return true;
 }
 
@@ -532,16 +509,9 @@ void closeMapping()
     SokuRLBridge::closeNetworkState();
     SokuRLBridge::closeNetworkInput();
     SokuRLBridge::closeImageCapture();
-    if (g_control)
-        store32(&g_control->connected, 0);
     g_records.reset();
-    if (g_mapping)
-        UnmapViewOfFile(g_mapping);
-    if (g_fileMapping)
-        CloseHandle(g_fileMapping);
-    g_mapping = nullptr;
+    SokuRLBridge::closeFrameMapping();
     g_control = nullptr;
-    g_fileMapping = nullptr;
 }
 
 bool installHooks()
