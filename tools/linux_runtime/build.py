@@ -33,18 +33,15 @@ def prepare(config):
             raise ValueError(f"{source_key} and {target_key} must be separate")
         if target.exists():
             continue
-        # Original game assets are immutable; only these four files share storage.
-        def copy(source_file, target_file):
-            if Path(source_file).name in {"th123.exe", "th123a.dat", "th123b.dat", "th123c.dat"}:
-                import os
-                os.link(source_file, target_file)
-                return target_file
-            return shutil.copy2(source_file, target_file)
-        shutil.copytree(source, target, symlinks=True, copy_function=copy)
+        # A complete copy also works when the source and destination mounts differ.
+        shutil.copytree(source, target, symlinks=True)
     mods = REPO / "third_party/SokuMods"
     if not mods.exists():
         shutil.copytree(Path(config["toolchain"]) / "SokuMods", mods)
     game = Path(config["game"])
+    for name in ("th123.exe", "th123a.dat", "th123b.dat", "th123c.dat"):
+        if not (game / name).is_file():
+            raise FileNotFoundError(f"incomplete game runtime: {game / name}")
     if hashlib.md5((game / "th123.exe").read_bytes()).hexdigest() != "df35d1fbc7b583317adabe8cd9f53b2e":
         raise RuntimeError("game executable is not the supported 1.10a build")
 

@@ -1,3 +1,1 @@
-# Auto detect text files and perform LF normalization
-* text=auto
-patches/*.patch text eol=lf whitespace=-blank-at-eol
+*.sh text eol=lf

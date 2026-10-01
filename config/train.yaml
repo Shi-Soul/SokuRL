@@ -5,6 +5,7 @@ defaults:
   - wrappers: raw
   - _self_
   - track: human
+  - optional local: runtime
 
 seed: 1732
 device: cuda:0

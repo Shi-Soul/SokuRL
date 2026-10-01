@@ -1,373 +1,64 @@
-# AGENTS.md
-
-## Project
-
-This repository is `SokuRL`, an RL environment for Touhou Hisoutensoku (th123).
-
-Project root:
-
-```text
-D:\github\SokuRL
-```
-
-Unless explicitly requested otherwise, run project commands from this directory.
-
----
-
-## Python Environment
-
-This project uses the local Python environment:
-
-```text
-D:\github\SokuRL\.venv
-```
-
-Always use this environment for Python commands.
-
-Preferred commands:
-
-```powershell
-.\.venv\python.exe <script>
-.\.venv\python.exe -m pip <args>
-```
-
-Examples:
-
-```powershell
-.\.venv\python.exe scripts\00_check_game.py
-.\.venv\python.exe -m pip list
-```
-
-Do not use:
-
-- system Python
-- the Conda `base` environment
-- another global Python installation
-- bare `pip` when `python -m pip` can be used instead
-
-The environment currently uses Python 3.11 x64.
-
-Note that the Python process is 64-bit while the target game is 32-bit. This is acceptable for external process control and `ReadProcessMemory`, but target-process pointer fields must be treated as 32-bit values when reconstructing game data structures.
-
-For example, do not assume that a pointer inside th123 memory has the same width as Python's `ctypes.c_void_p`. Use an explicit 32-bit representation such as `ctypes.c_uint32` when appropriate.
-
----
-
-## Touhou Hisoutensoku
-
-The target executable is:
-
-```text
-D:\github\SokuRL\th123_jp\th123.exe
-```
-
-The supported game version is Touhou Hisoutensoku 1.10a.
-
-Expected MD5:
-
-```text
-DF35D1FBC7B583317ADABE8CD9F53B2E
-```
-
-`th123.exe` is a 32-bit Windows executable.
-
-Any native code, DLL, SokuMods module, or injected component intended to run inside th123 must therefore be built for:
-
-```text
-Win32 / x86
-```
-
-Never build th123 modules as x64.
-
-Protected original game files include at least:
-
-```text
-th123.exe
-th123a.dat
-th123b.dat
-th123c.dat
-```
-
-Do not patch, replace, delete, rename, or overwrite these files unless explicitly requested.
-
-Adding separate mod files such as `d3d9.dll`, `SWRSToys.ini`, or files under `modules\` is allowed only when the task explicitly requires it.
-
----
-
-## Visual C++ / MSVC Environment
-
-Visual Studio Build Tools / Visual Studio is installed at:
-
-```text
-T:\VisualStudio
-```
-
-The Visual Studio developer environment initializer is:
-
-```text
-T:\VisualStudio\Common7\Tools\VsDevCmd.bat
-```
-
-For th123-related native builds, initialize it for x86:
-
-```cmd
-call "T:\VisualStudio\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
-```
-
-After initialization, `cl` and `cmake` are available.
-
-Verified MSVC target:
-
-```text
-x86
-```
-
-Do not manually add MSVC compiler, SDK, INCLUDE, LIB, or LIBPATH directories to permanent system environment variables. Prefer `VsDevCmd.bat`.
-
----
-
-## CMake
-
-Visual Studio's CMake executable is located at:
-
-```text
-T:\VisualStudio\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe
-```
-
-Verified version:
-
-```text
-cmake 4.3.1-msvc1
-```
-
-A normal PowerShell session may not have `cmake` in `PATH`.
-
-Either initialize the Visual Studio developer environment first or invoke CMake by its absolute path.
-
-For SokuMods / th123 native code, always configure for Win32:
-
-```cmd
-cmake -S . -B build -A Win32
-```
-
-Typical build:
-
-```cmd
-cmake --build build --config Release
-```
-
-Typical build and install:
-
-```cmd
-cmake --build build --config Release --target install
-```
-
-If the current default MSVC toolset causes compatibility problems, a VS 2022 v143 toolset is also installed and may be tried explicitly:
-
-```cmd
-cmake -S . -B build -A Win32 -T v143
-```
-
-Do not switch toolsets unless there is an actual build issue.
-
-Do not use MinGW or Cygwin for SokuMods.
-
----
-
-## SokuMods
-
-The preferred source/build location for SokuMods is:
-
-```text
-D:\github\SokuMods
-```
-
-Do not place SokuMods build artifacts inside the SokuRL Python environment.
-
-Keep CMake build artifacts under the SokuMods workspace, for example:
-
-```text
-D:\github\SokuMods\build
-```
-
-The intended SWRSToys / WindowResizer build target is Win32/x86.
-
-Expected installed SWRSToys files include:
-
-```text
-SWRSToys\d3d9.dll
-SWRSToys\SWRSToys.ini
-SWRSToys\modules\WindowResizer\WindowResizer.dll
-SWRSToys\modules\WindowResizer\WindowResizer.ini
-```
-
-Before copying generated native files into the game directory, show exactly which files will be copied and what existing files, if any, would be overwritten.
-
----
-
-## Network and Proxy
-
-The host machine runs a local Xray proxy.
-
-Available local proxy endpoints:
-
-```text
-SOCKS5:
-127.0.0.1:10808
-
-HTTP:
-127.0.0.1:10809
-```
-
-Both ports have been verified to work.
-
-Prefer the HTTP proxy for Git/HTTPS commands:
-
-```text
-http://127.0.0.1:10809
-```
-
-The host Git configuration currently has no persistent `http.proxy` or `https.proxy` setting.
-
-Do not add a permanent Git proxy configuration unless explicitly requested.
-
-For one-off Git operations, prefer command-scoped proxy configuration:
-
-```powershell
-git -c http.proxy=http://127.0.0.1:10809 `
-    -c https.proxy=http://127.0.0.1:10809 `
-    <git command>
-```
-
-Example:
-
-```powershell
-git -c http.proxy=http://127.0.0.1:10809 `
-    -c https.proxy=http://127.0.0.1:10809 `
-    ls-remote https://github.com/SokuDev/SokuMods.git HEAD
-```
-
-For curl:
-
-```powershell
-curl.exe --proxy http://127.0.0.1:10809 https://github.com
-```
-
-or via SOCKS:
-
-```powershell
-curl.exe --proxy socks5h://127.0.0.1:10808 https://github.com
-```
-
-### Important: Codex sandbox proxy variables
-
-The Codex restricted execution environment may inject isolation variables such as:
-
-```text
-ALL_PROXY=http://127.0.0.1:9
-GIT_HTTP_PROXY=http://127.0.0.1:9
-GIT_HTTPS_PROXY=http://127.0.0.1:9
-HTTP_PROXY=http://127.0.0.1:9
-HTTPS_PROXY=http://127.0.0.1:9
-```
-
-Port `127.0.0.1:9` is not the user's real proxy.
-
-If a network command unexpectedly tries to connect to `127.0.0.1:9`, do not conclude that GitHub or the host proxy is unavailable.
-
-For commands where the execution environment permits access to the host proxy, explicitly override the proxy for that command with:
-
-```text
-http://127.0.0.1:10809
-```
-
-or:
-
-```text
-socks5h://127.0.0.1:10808
-```
-
-Do not silently modify the user's global proxy configuration.
-
----
-
-## Git
-
-Before assuming Git/network failure, test with:
-
-```powershell
-git --version
-```
-
-and:
-
-```powershell
-git -c http.proxy=http://127.0.0.1:10809 `
-    -c https.proxy=http://127.0.0.1:10809 `
-    ls-remote https://github.com/SokuDev/SokuMods.git HEAD
-```
-
-This command has previously succeeded when using the HTTP proxy explicitly.
-
-For repositories with submodules, use recursive cloning:
-
-```powershell
-git clone --recursive <repository>
-```
-
-or, for an existing checkout:
-
-```powershell
-git submodule update --init --recursive
-```
-
----
-
-## Development Rules
-
-Prefer small, independently verifiable milestones.
-
-For the RL environment, the intended progression is approximately:
-
-1. Verify game executable/version/process.
-2. Verify external input control.
-3. Verify reading one known game-state value.
-4. Build a live state reader.
-5. Build the Gymnasium environment.
-6. Add frame synchronization.
-7. Begin RL experiments.
-
-Do not prematurely combine input injection, memory reading, frame synchronization, reset logic, and RL training into one large implementation.
-
-When debugging Windows process interaction, preserve the distinction between:
-
-- executable on disk
-- running process
-- PID
-- process handle
-- target memory address
-- module-relative address
-- 32-bit target pointers
-
-Prefer explicit diagnostics over speculative fixes.
-
----
-
-## Safety Around the Game Installation
-
-The game installation is treated as an external runtime dependency, not as disposable build output.
-
-Before modifying anything under:
-
-```text
-D:\github\SokuRL\th123_jp
-```
-
-check whether the change is:
-
-- adding a new mod/configuration file, or
-- modifying an original game file.
-
-Original game files should remain untouched unless the user explicitly authorizes modification.
-
-Do not regenerate, replace, or patch `th123.exe` merely to make tooling easier.
+# SokuRL 开发说明
+
+## 先读这些约束
+
+本项目只有一个开发仓库 `SokuRL`。Windows 和 Linux 使用同一套源码、Git 历史与 Hydra 配置。
+不要另建按平台命名的源码仓库，也不要复制一套训练算法。机器配置放在忽略提交的 `config/local/`。
+
+当前优先任务是完成独立 Linux 开发、DLL 构建、测试、GPU 训练、恢复训练和测评流程。
+用户明确要求：之后即使无法访问 Windows 机器，也能在 Linux 继续工作。
+人机游玩的未完成事项保存在 `docs/development-plan.md`，不能取消或记为已完成。
+
+用户禁止在本机自行启动游戏或弹出窗口。真实游戏测试在获准的 Linux 虚拟显示中运行。
+只操作本任务创建的进程和数据，不能终止其他用户或其他任务的游戏、Wine、显示或训练进程。
+不要使用 `pkill wine`、`killall` 或停止共享 wineserver。先查进程身份，再处理具体 PID。
+
+## Linux 上从哪里开始
+
+1. 在现有 `SokuRL` 仓库中执行 `git status --short`，保留已有未提交改动。
+2. 阅读 `docs/linux-development.md`。机器实际路径见 `config/local/linux.yaml`，游戏工作进程配置见 `config/local/runtime.yaml`。
+3. 使用仓库 `.venv-linux`，不使用系统 Python 或 Conda base。`scripts/linux.sh` 设置缓存、临时目录、CUDA 可见设备与文件写入范围。
+4. 执行 `bash scripts/linux.sh tools/linux.py operation=check` 检查已准备的环境。
+5. 构建：`bash scripts/linux.sh tools/linux.py operation=build`；原生测试：`operation=test`；部署：`operation=deploy`。
+6. Python 检查：`bash scripts/linux.sh -m pytest -q`。真实环境、训练、恢复与测评命令见 Linux 文档。
+
+`linux.root` 是允许写入任务文件的范围。缓存、日志、Wine 前缀、显示授权、模型与临时文件均须放在此范围内。
+在 gpu41 上，该范围由用户限定为 `~/wjxie/rl/th123-Sudo`；不能写入该目录以外的 home、`/tmp` 或 `/dev/shm`。
+系统程序、驱动与库可读取；GPU 设备访问不等于存储目录权限。需要额外空间时使用任务目录下的空间。
+
+Linux 原生 Python 运行 PyTorch/CUDA 与 RL/MARL；Wine 中的 Windows Python 控制原版游戏。
+`runtime.command` 指向 `scripts/wine-python.sh tools/rollout_worker.py`，不是远程 Windows 服务。
+原生 DLL 通过 Linux 上的 Wine、MSVC 与 Windows SDK 编译。私有工具链存储在 `linux.toolchain`，不提交工具链二进制。
+构建产物、编译器身份与 DLL 哈希见 `build/linux/artifacts.json`；部署记录见 `linux.state/deployed.json`。
+
+## 源码和接口
+
+- `src/soku_rl/env`：环境、观测、动作与工作进程协议。
+- `src/soku_rl/rl`：共享 PPO 实现。
+- `src/soku_rl/marl`：博弈算法；复用 RL 层，不能另维护底层 PPO。
+- `src/soku_rl/policy`：规则与学习策略、加载与产物约定。
+- `src/soku_rl/play`、`src/soku_rl/evaluation`：游玩和测评。
+- `tools`：入口及游戏控制；`tools/linux_runtime` 管理 Linux 开发环境。
+- `native/SokuRLBridge`：注入游戏的桥接 DLL；`native/RuntimeModules` 构建依赖模块。
+- `config`：唯一配置空间，使用 Hydra YAML。不要新增 argparse 配置系统。
+
+修改前阅读对应设计和验收记录。没有实际验证的能力不得写成已经完成。
+神 AI 迁移优先保持原策略行为；不通过修改战术、静默跳帧或替代观测来强行通过验证。
+
+## 原生代码与游戏保护
+
+游戏为《东方非想天则》1.10a，`th123.exe` MD5 必须为 `DF35D1FBC7B583317ADABE8CD9F53B2E`。
+游戏是 Win32/x86，所有注入 DLL 必须为 x86；Python 可以是 x64。游戏内指针按 32 位处理。
+使用 MSVC，不用 MinGW/Cygwin 编译 SokuMods。上游依赖身份和补丁见 `config/dependencies.lock.json`。
+不得修改、替换或删除原始 `th123.exe`、`th123a.dat`、`th123b.dat`、`th123c.dat`。
+部署前确认目标目录没有本任务的活跃游戏，列明将替换的模块并备份。不要修改冻结的试玩目录。
+
+## 工作与交付
+
+使用清晰中文；技术词首次出现时解释含义。不要使用含糊的完成声明。
+代码按职责分层，单文件不超过 600 行，不创建名为 common、util、tool 的含糊模块。
+输入不合规应尽早报错，不静默改用其他设备、模型或参数。不要给新函数添加默认参数或 None 回退。
+先提交小范围可审查修改，再进行长实验。完整实验使用 GPU；只有定位故障时允许短测试。
+测试和实验使用项目入口，保留源码版本、配置、依赖与原始结果。单元测试不能代替真实游戏验证。
+交付前清理本任务临时传输文件、废弃脚本和失效说明；保留正式成功与失败证据。
+不要自行启动子代理。
