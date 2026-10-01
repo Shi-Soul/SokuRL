@@ -212,7 +212,7 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=1 algorithm=br \
 ```
 
 预训练不算目标神 AI 的成功。先确认独立对局能对静止对手造成有效伤害，再以
-`algorithm.initial_policy={kind:weights,path:...,training_config:...}` 初始化目标
+`++algorithm.initial_policy={kind:weights,path:...,training_config:...}` 初始化目标
 神 AI BR，保留相同网络、逐帧时序和随机座位。权重初始化重置优化器，源步数与
 预训练预算必须单独计入；比较直接训练和课程时同时报告总环境步数。需要不同
 弱策略时显式选择 `rush`、`zoning` 或 `counter`，不能在训练中静默改动原神 AI。
