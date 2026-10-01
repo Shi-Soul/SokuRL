@@ -75,6 +75,19 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=3 algorithm=br \
 上下限、换边归属、并行局的难度冻结、检查点恢复及实际共享 PPO 的短训练。
 这不替代真实游戏验证或完整神 AI 强度评估。
 
+真实 CUDA 诊断 `logs/diagnostics/br-adaptive-game-20261001` 成功完成 8192 步，
+总耗时 423.59 秒。诊断单独设置 512 帧上限、warmup=4、update_every=2、
+n_steps=1024、n_epochs=1，使反馈在短预算内可观察；其余使用完整超人输入和 576 动作。
+16 局覆盖双座位，全部超时；第 4/6 局将 uniform 概率从 0.90 提到 0.95/1.00，
+逐局开局概率实际覆盖这三个值，已完成更新的检查点 sidecar 与模型 SHA256 一致。
+worker、私有服务 stop/wait 均退出 0，清理各用 1 次尝试。
+这里的超时与概率变化只验证控制机制，不代表战斗能力。
+
+正式运行 `logs/training/br-superhuman-reimu-adaptive-20261001` 已从源码 `2542c5f` 启动：
+GPU 3、4 环境、seed=1732、固定魔理沙、随机座位、原灵梦神 AI，使用本页默认课程参数，
+7200 帧上限和原 sparse-transfer PPO（n_steps=2048、n_epochs=10），预算 1048576 步。
+运行中的结果仍待评估；后续使用完整神 AI 和公共验证种子评价保存的模型。
+
 固定两阶段课程保留为历史证据，不再作为后续课程方案：
 `br-superhuman-noise90-to-reimu-20261001` 完成额外 65536 步（连同 warmup 总计 131072），
 训练 16 局全负。`br-noise90-to-reimu-final-20261001` 在完整灵梦神 AI、
@@ -90,3 +103,10 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=3 algorithm=br \
 总耗时 252.76 秒。前一个吞吐探针的失败证据仍保留；该短验证不作为策略强度证据。
 私有 session `12228944f1ab45dbb39771e1e596d1a6` 的 worker、服务 stop/wait 均退出 0，
 prefix/game 均已删除，各用 1 次清理尝试。
+
+动作持续性候选 `br-superhuman-reimu-persistent-20261001` 成功完成 131072 步，
+35 局训练全部失败，平均对手 HP 下降 1231.09、自身 10012.71。
+`br-reimu-persistent-final-20261001` 的配对完整神 AI 测评成功完成 4 局，全部失败；
+对手 HP 下降分别为 805、0、0、950，平均 438.75，自身平均 10000，双方符卡动作进入均为 0。
+世界种子、双方策略种子与 button-prior 最终测评逐局相同。当前证据未显示持续性候选带来强度收益，
+正式自适应课程先使用原 combat-context 网络。
