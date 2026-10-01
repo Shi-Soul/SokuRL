@@ -10,6 +10,7 @@ from soku_rl.env.observation.privileged import decode_privileged
 from soku_rl.policy.base import PlayActor, RulePolicy
 from .api import ScriptAPI
 from .package import ScriptPackage
+from .random_logs import install_random_logs
 
 
 SCHEDULER = b"""
@@ -98,6 +99,7 @@ class GodActor:
     def __init__(self, policy, seed):
         self.policy = policy
         self.lua = LuaRuntime(encoding=None, unpack_returned_tuples=True)
+        self.random_logs = install_random_logs(self.lua)
         self.api = ScriptAPI(self.lua, seed)
         self.logs = []
         self.failures = []
