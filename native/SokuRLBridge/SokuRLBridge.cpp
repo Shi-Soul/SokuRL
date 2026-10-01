@@ -35,6 +35,9 @@
 namespace
 {
 using SokuRLBridge::stateHash;
+using SokuRLBridge::isPracticeGameplay;
+using SokuRLBridge::isLocalVersusGameplay;
+using SokuRLBridge::isSupportedGameplay;
 using SokuRLBridge::isValidInput;
 using SokuRLBridge::environmentValue;
 using SokuRLBridge::captureState;
@@ -57,7 +60,6 @@ constexpr DWORD INPUT_CLUSTER_UPDATE_HOOK = 0x0043E55F;
 constexpr DWORD P1_KEYMAP_MANAGER_PTR = 0x008989A0;
 constexpr DWORD P2_KEYMAP_MANAGER_PTR = 0x0089918C;
 constexpr DWORD FALLBACK_KEY_MANAGER = 0x008986A8;
-constexpr std::uint32_t LOCAL_BATTLE_SCENE = 5;
 
 HANDLE g_fileMapping = nullptr;
 SokuRLBridge::BridgeMapping *g_mapping = nullptr;
@@ -91,44 +93,8 @@ bool g_headlessRender = false;
 bool g_unlimitedPacing = false;
 SokuRLBridge::LocalStart g_localStart;
 
-struct CheckpointIdentity {
-    std::uint32_t leftCharacter;
-    std::uint32_t rightCharacter;
-    std::uint32_t stage;
-    std::uint32_t randomSeed;
-    std::uint32_t practiceWeather;
-    std::uint32_t dummyState;
-    std::uint32_t position;
-    std::uint32_t guard;
-    std::uint32_t counter;
-    std::uint32_t airtech;
-};
-
-CheckpointIdentity g_checkpoint{};
+SokuRLBridge::CheckpointIdentity g_checkpoint{};
 std::optional<SokuRLBridge::FrameRecords> g_records;
-
-bool isPracticeGameplay()
-{
-    return *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID) == LOCAL_BATTLE_SCENE &&
-        SokuLib::mainMode == SokuLib::BATTLE_MODE_PRACTICE;
-}
-
-bool isReplayGameplay()
-{
-    return *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID) == LOCAL_BATTLE_SCENE &&
-        SokuLib::subMode == SokuLib::BATTLE_SUBMODE_REPLAY;
-}
-
-bool isLocalVersusGameplay()
-{
-    return *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID) == LOCAL_BATTLE_SCENE &&
-        SokuLib::mainMode == SokuLib::BATTLE_MODE_VSPLAYER;
-}
-
-bool isSupportedGameplay()
-{
-    return isPracticeGameplay() || isLocalVersusGameplay() || isReplayGameplay();
-}
 
 SokuRLBridge::LogicalInput toLogicalInput(const SokuLib::KeyInput &input)
 {
@@ -151,30 +117,6 @@ void acknowledge(std::uint32_t sequence)
 {
     MemoryBarrier();
     store32(&g_control->ackSeq, sequence);
-}
-
-CheckpointIdentity readIdentity()
-{
-    CheckpointIdentity identity{};
-    identity.leftCharacter = static_cast<std::uint32_t>(SokuLib::gameParams.leftPlayerInfo.character);
-    identity.rightCharacter = static_cast<std::uint32_t>(SokuLib::gameParams.rightPlayerInfo.character);
-    identity.stage = SokuLib::gameParams.stageId;
-    identity.randomSeed = SokuLib::gameParams.randomSeed;
-    if (SokuLib::practiceSettings) {
-        identity.practiceWeather = static_cast<std::uint32_t>(SokuLib::practiceSettings->weather);
-        identity.dummyState = static_cast<std::uint32_t>(SokuLib::practiceSettings->state);
-        identity.position = SokuLib::practiceSettings->position;
-        identity.guard = static_cast<std::uint32_t>(SokuLib::practiceSettings->guard);
-        identity.counter = static_cast<std::uint32_t>(SokuLib::practiceSettings->counter);
-        identity.airtech = static_cast<std::uint32_t>(SokuLib::practiceSettings->airtech);
-    }
-    return identity;
-}
-
-bool identityMatchesCheckpoint()
-{
-    const auto current = readIdentity();
-    return std::memcmp(&current, &g_checkpoint, sizeof(current)) == 0;
 }
 
 void clearControlledInput(SokuRLBridge::ResultCode result, bool neutral)
@@ -420,7 +362,7 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         if (g_checkpointArmed) {
             g_checkpointArmed = false;
             g_checkpointSeedRequested = false;
-            g_checkpoint = readIdentity();
+            g_checkpoint = SokuRLBridge::readCheckpointIdentity();
             g_records->recordInitial(initial);
             g_paused = true;
             store32(&g_control->validationState,
@@ -437,7 +379,7 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         g_records->publishLatest(initial, g_stepsRemaining);
         g_records->pushRing(initial);
     }
-    if (load32(&g_control->checkpointValid) && !identityMatchesCheckpoint())
+    if (load32(&g_control->checkpointValid) && !SokuRLBridge::identityMatchesCheckpoint(g_checkpoint))
         g_records->invalidateCheckpoint(SokuRLBridge::ResultCode::CheckpointInvalidated);
     if (g_paused && !g_stepsRemaining) {
         store32(&g_control->runState, static_cast<std::uint32_t>(SokuRLBridge::RunState::Paused));

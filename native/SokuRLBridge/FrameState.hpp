@@ -4,6 +4,26 @@
 namespace SokuLib { struct BattleManager; }
 
 namespace SokuRLBridge {
+struct CheckpointIdentity {
+    std::uint32_t leftCharacter;
+    std::uint32_t rightCharacter;
+    std::uint32_t stage;
+    std::uint32_t randomSeed;
+    std::uint32_t practiceWeather;
+    std::uint32_t dummyState;
+    std::uint32_t position;
+    std::uint32_t guard;
+    std::uint32_t counter;
+    std::uint32_t airtech;
+};
+
+CheckpointIdentity readCheckpointIdentity();
+bool identityMatchesCheckpoint(const CheckpointIdentity &checkpoint);
+bool isPracticeGameplay();
+bool isReplayGameplay();
+bool isLocalVersusGameplay();
+bool isSupportedGameplay();
+
 SimpleStatePatch simplePatchFrom(const RawFrameState &state);
 bool isValidSimplePlayerState(const SimplePlayerState &state);
 void applySimpleState(SokuLib::BattleManager &manager, const SimpleStatePatch &state);

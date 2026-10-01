@@ -4,12 +4,14 @@
 #include <Character.hpp>
 #include <SokuAddresses.hpp>
 #include <Weather.hpp>
+#include <PracticeSettings.hpp>
 #include <algorithm>
 #include <cstring>
 #include <iterator>
 #include <limits>
 
 namespace {
+constexpr std::uint32_t LOCAL_BATTLE_SCENE = 5;
 void applySimplePlayerState(SokuLib::CharacterManager &manager,
     const SokuRLBridge::SimplePlayerState &state)
 {
@@ -137,6 +139,53 @@ void capturePlayer(const SokuLib::CharacterManager &manager, const SokuRLBridge:
 }
 
 namespace SokuRLBridge {
+bool isPracticeGameplay()
+{
+    return *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID) == LOCAL_BATTLE_SCENE &&
+        SokuLib::mainMode == SokuLib::BATTLE_MODE_PRACTICE;
+}
+
+bool isReplayGameplay()
+{
+    return *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID) == LOCAL_BATTLE_SCENE &&
+        SokuLib::subMode == SokuLib::BATTLE_SUBMODE_REPLAY;
+}
+
+bool isLocalVersusGameplay()
+{
+    return *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID) == LOCAL_BATTLE_SCENE &&
+        SokuLib::mainMode == SokuLib::BATTLE_MODE_VSPLAYER;
+}
+
+bool isSupportedGameplay()
+{
+    return isPracticeGameplay() || isLocalVersusGameplay() || isReplayGameplay();
+}
+
+CheckpointIdentity readCheckpointIdentity()
+{
+    CheckpointIdentity identity{};
+    identity.leftCharacter = static_cast<std::uint32_t>(SokuLib::gameParams.leftPlayerInfo.character);
+    identity.rightCharacter = static_cast<std::uint32_t>(SokuLib::gameParams.rightPlayerInfo.character);
+    identity.stage = SokuLib::gameParams.stageId;
+    identity.randomSeed = SokuLib::gameParams.randomSeed;
+    if (SokuLib::practiceSettings) {
+        identity.practiceWeather = static_cast<std::uint32_t>(SokuLib::practiceSettings->weather);
+        identity.dummyState = static_cast<std::uint32_t>(SokuLib::practiceSettings->state);
+        identity.position = SokuLib::practiceSettings->position;
+        identity.guard = static_cast<std::uint32_t>(SokuLib::practiceSettings->guard);
+        identity.counter = static_cast<std::uint32_t>(SokuLib::practiceSettings->counter);
+        identity.airtech = static_cast<std::uint32_t>(SokuLib::practiceSettings->airtech);
+    }
+    return identity;
+}
+
+bool identityMatchesCheckpoint(const CheckpointIdentity &checkpoint)
+{
+    const auto current = readCheckpointIdentity();
+    return std::memcmp(&current, &checkpoint, sizeof(current)) == 0;
+}
+
 SokuRLBridge::SimpleStatePatch simplePatchFrom(const SokuRLBridge::RawFrameState &state)
 {
     SokuRLBridge::SimpleStatePatch patch{};
