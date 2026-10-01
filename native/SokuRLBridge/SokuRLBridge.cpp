@@ -80,16 +80,10 @@ std::uint64_t g_currentFrame = 0;
 std::uint32_t g_stepsRemaining = 0;
 bool g_paused = false;
 bool g_inSimulationUpdate = false;
-bool g_reconstructing = false;
 bool g_battleActive = false;
 bool g_checkpointArmed = false;
 bool g_checkpointSeedRequested = false;
 std::uint32_t g_requestedCheckpointSeed = 0;
-bool g_restartRequested = false;
-bool g_awaitingRestart = false;
-bool g_establishAfterRestart = false;
-std::uint64_t g_reconstructionTarget = 0;
-std::uint64_t g_replayInputFrame = 0;
 
 SokuRLBridge::LogicalInput g_effectiveInputs[2]{};
 SokuRLBridge::LogicalInput g_simulatedInputs[2]{};
@@ -830,12 +824,7 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
         return;
     }
 
-    if (g_reconstructing && g_replayInputFrame < g_history.size()) {
-        const auto replayIndex = static_cast<std::size_t>(g_replayInputFrame);
-        const auto &recorded = player == 0 ? g_history[replayIndex].p1.input :
-            g_history[replayIndex].p2.input;
-        self->input = toKeyInput(recorded);
-    } else if (g_activeInputEnabled && (g_activeInputMask & (1U << player)) &&
+    if (g_activeInputEnabled && (g_activeInputMask & (1U << player)) &&
         g_activeInputFrames) {
         g_simulatedInputs[player] = SokuRLBridge::advanceHeldInput(
             g_simulatedInputs[player], toLogicalInput(g_activeInputs[player]));
@@ -850,46 +839,18 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
     g_simulatedInputs[player] = g_effectiveInputs[player];
 }
 
-void applySimulationInputs(SokuLib::BattleManager *manager)
-{
-    SokuLib::KeyInput inputs[2]{};
-    std::uint32_t mask = 0;
-    if (g_reconstructing && g_replayInputFrame < g_history.size()) {
-        const auto &recorded = g_history[static_cast<std::size_t>(g_replayInputFrame)];
-        inputs[0] = toKeyInput(recorded.p1.input);
-        inputs[1] = toKeyInput(recorded.p2.input);
-        mask = 3;
-    }
-    if (!mask)
-        return;
-
-    SokuLib::CharacterManager *characters[2] = {
-        &manager->leftCharacterManager, &manager->rightCharacterManager};
-    for (int player = 0; player < 2; ++player) {
-        if (!(mask & (1U << player)))
-            continue;
-        auto *character = characters[player];
-        character->keyMap = inputs[player];
-        if (character->keyManager && character->keyManager->keymapManager)
-            character->keyManager->keymapManager->input = inputs[player];
-        g_effectiveInputs[player] = toLogicalInput(inputs[player]);
-        g_simulatedInputs[player] = g_effectiveInputs[player];
-    }
-}
-
 int callSimulationUpdate(SokuLib::BattleManager *manager)
 {
     if (isPracticeGameplay() && SokuLib::practiceSettings)
         SokuLib::practiceSettings->state = SokuLib::DUMMY_STATE_2P_CONTROL;
     g_effectiveInputs[0] = {};
     g_effectiveInputs[1] = {};
-    applySimulationInputs(manager);
     g_inSimulationUpdate = true;
     const auto result = (manager->*g_originalBattleManagerProcess)();
     g_inSimulationUpdate = false;
     g_effectiveInputs[0] = toLogicalInput(manager->leftCharacterManager.keyMap);
     g_effectiveInputs[1] = toLogicalInput(manager->rightCharacterManager.keyMap);
-    if (!g_reconstructing && g_activeInputEnabled && g_activeInputFrames) {
+    if (g_activeInputEnabled && g_activeInputFrames) {
         --g_activeInputFrames;
         store32(&g_control->inputFramesRemaining, g_activeInputFrames);
         if (!g_activeInputFrames) {
@@ -900,79 +861,6 @@ int callSimulationUpdate(SokuLib::BattleManager *manager)
         }
     }
     return result;
-}
-
-bool initializeRestartedBattle(SokuLib::BattleManager *manager)
-{
-    if (!g_awaitingRestart)
-        return false;
-    g_awaitingRestart = false;
-    ++g_segmentId;
-    g_currentFrame = 0;
-    g_stepsRemaining = 0;
-    g_paused = true;
-    g_effectiveInputs[0] = {};
-    g_effectiveInputs[1] = {};
-    g_simulatedInputs[0] = {};
-    g_simulatedInputs[1] = {};
-    auto initial = captureState(manager, 0);
-
-    if (g_establishAfterRestart) {
-        g_history.clear();
-        g_history.push_back(initial);
-        publishReconstructionFrame(initial);
-        setCheckpointValid(true);
-        store32(&g_control->validationState,
-            static_cast<std::uint32_t>(SokuRLBridge::ValidationState::Unknown));
-        g_control->lastVerifiedFrame = SokuRLBridge::NO_FRAME;
-        g_control->firstDivergentFrame = SokuRLBridge::NO_FRAME;
-        publishLatest(initial);
-        pushRing(initial);
-        publishResult(SokuRLBridge::ResultCode::Complete);
-        return true;
-    }
-
-    g_reconstructing = true;
-    store32(&g_control->reconstructing, 1);
-    store32(&g_control->runState, static_cast<std::uint32_t>(SokuRLBridge::RunState::Reconstructing));
-    std::uint64_t lastVerified = SokuRLBridge::NO_FRAME;
-    std::uint64_t firstDivergent = SokuRLBridge::NO_FRAME;
-    if (g_history.empty() || initial.stateHash != g_history[0].stateHash) {
-        firstDivergent = 0;
-    } else {
-        lastVerified = 0;
-        for (std::uint64_t frame = 1; frame <= g_reconstructionTarget; ++frame) {
-            g_replayInputFrame = frame;
-            const auto result = callSimulationUpdate(manager);
-            g_currentFrame = frame;
-            auto reconstructed = captureState(manager, frame);
-            publishLatest(reconstructed);
-            const auto historyIndex = static_cast<std::size_t>(frame);
-            if (reconstructed.stateHash != g_history[historyIndex].stateHash) {
-                firstDivergent = frame;
-                break;
-            }
-            lastVerified = frame;
-            if (result > 0 && result < 4 && frame != g_reconstructionTarget) {
-                firstDivergent = frame;
-                break;
-            }
-        }
-    }
-    g_reconstructing = false;
-    store32(&g_control->reconstructing, 0);
-    g_control->lastVerifiedFrame = lastVerified;
-    g_control->firstDivergentFrame = firstDivergent;
-    if (firstDivergent != SokuRLBridge::NO_FRAME) {
-        store32(&g_control->validationState,
-            static_cast<std::uint32_t>(SokuRLBridge::ValidationState::Diverged));
-        publishResult(SokuRLBridge::ResultCode::Diverged);
-    } else {
-        store32(&g_control->validationState,
-            static_cast<std::uint32_t>(SokuRLBridge::ValidationState::Deterministic));
-        publishResult(SokuRLBridge::ResultCode::Complete);
-    }
-    return true;
 }
 
 int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
@@ -1042,10 +930,6 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         }
         publishLatest(initial);
         pushRing(initial);
-    }
-    if (initializeRestartedBattle(manager) || g_restartRequested) {
-        store32(&g_control->runState, static_cast<std::uint32_t>(SokuRLBridge::RunState::Paused));
-        return 0;
     }
     if (load32(&g_control->checkpointValid) && !identityMatchesCheckpoint())
         invalidateCheckpoint(SokuRLBridge::ResultCode::CheckpointInvalidated);
@@ -1142,9 +1026,6 @@ int __fastcall battleOnProcess(SokuLib::Battle *battle)
         g_battleActive = false;
         g_checkpointArmed = false;
         g_checkpointSeedRequested = false;
-        g_restartRequested = false;
-        g_awaitingRestart = false;
-        g_reconstructing = false;
         g_currentFrame = 0;
         ++g_segmentId;
         g_history.clear();
@@ -1170,12 +1051,7 @@ int __fastcall battleOnProcess(SokuLib::Battle *battle)
     }
     if (g_captureStateOnly && g_battleActive && g_control && isSupportedGameplay())
         SokuRLBridge::captureImage(g_currentFrame);
-    if (!g_restartRequested)
-        return result;
-    g_restartRequested = false;
-    g_awaitingRestart = true;
-    SokuLib::gameParams.randomSeed = g_checkpoint.randomSeed;
-    return SokuLib::SCENE_LOADING;
+    return result;
 }
 
 int __fastcall battleOnRender(SokuLib::Battle *battle)
