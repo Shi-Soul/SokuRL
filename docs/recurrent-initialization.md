@@ -38,3 +38,8 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 
 实际 GPU 拟合和完整神 AI 对局表现仍待验证。动作空间仍为完整 576 命令，
 每帧决策、延迟和观察契约不变；启用记忆不等于强度已提升。
+
+首个真实拟合已从源码 `2c30265` 在 GPU 7 启动，输出为上述 recurrent 目录。
+实际解析配置确认双层 256 MLP、独立 actor/critic LSTM 和 combat-context 特征。
+首轮完成 339 次监督更新，验证 NLL 1.28543、准确率 74.448%、变化帧准确率 22.076%，
+每轮约 10 秒，观察到 GPU 占用约 2.3 GiB；尚不能据早期指标判断最终效果。
