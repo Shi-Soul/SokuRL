@@ -47,9 +47,19 @@ def parameter_hash(policy):
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
     validate_payoff(interface, config)
     parameters = dict(config["ppo"])
+    if "action_persistence" in parameters:
+        from soku_rl.rl.persistent_policy import PersistentActorCriticPolicy
+        persistence = parameters.pop("action_persistence")
+        if (algorithm is not PPO or interface.commands != tuple(range(576))
+                or interface.config.action_history < 1
+                or set(persistence) != {"repeat_probability"}):
+            raise ValueError("action persistence requires feedforward PPO, full commands and action history")
+        policy_type = PersistentActorCriticPolicy
     if "initial_action_prior" in parameters:
         prior_logits = logical_action_prior(interface, parameters.pop("initial_action_prior"))
     architecture = dict(parameters["policy_kwargs"])
+    if "action_persistence" in config["ppo"]:
+        architecture["repeat_probability"] = persistence["repeat_probability"]
     if "features_extractor_class" in architecture:
         architecture["features_extractor_class"] = get_class(architecture["features_extractor_class"])
     parameters["policy_kwargs"] = architecture
@@ -73,7 +83,8 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         raise ValueError("continued PPO must retain its algorithm and optimizer configuration")
     path = Path(source["path"]).resolve(strict=True)
     if source["kind"] == "weights":
-        if previous["ppo"]["policy_kwargs"] != config["ppo"]["policy_kwargs"]:
+        if (previous["ppo"]["policy_kwargs"] != config["ppo"]["policy_kwargs"]
+                or previous["ppo"].get("action_persistence") != config["ppo"].get("action_persistence")):
             raise ValueError("policy weights require the same network architecture")
         initial = algorithm.load(path, device=device)
         source_steps = initial.num_timesteps

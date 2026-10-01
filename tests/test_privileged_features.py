@@ -11,10 +11,12 @@ from soku_rl.env.observation.memory_schema import (
     PRIVILEGED_FEATURES, WORLD_NAMES)
 from soku_rl.rl.features import PrivilegedFeatures, NumericPrivilegedFeatures
 from soku_rl.rl.combat_features import CombatPrivilegedFeatures, FIGHTER_SCALES
+from soku_rl.rl.persistent_policy import ActionContextFeatures
 from soku_rl.env.observation.privileged import encode_values
 
 
-@pytest.mark.parametrize("encoder_type", [PrivilegedFeatures, NumericPrivilegedFeatures, CombatPrivilegedFeatures])
+@pytest.mark.parametrize("encoder_type", [PrivilegedFeatures, NumericPrivilegedFeatures, CombatPrivilegedFeatures,
+                                         ActionContextFeatures])
 def test_every_object_position_affects_features_and_padding_is_ignored(encoder_type):
     torch.set_num_threads(1)
     torch.manual_seed(17)
