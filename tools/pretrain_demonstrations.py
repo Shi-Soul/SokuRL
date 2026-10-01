@@ -41,7 +41,8 @@ def main(cfg):
     identity = {"source_hashes": {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
         for folder in (root / "src/soku_rl", root / "tools") for p in sorted(folder.rglob("*.py"))},
         "datasets": datasets, "teacher_fingerprint": datasets[0]["teacher_fingerprint"],
-        "packages": {name: version(name) for name in ("torch", "numpy", "gymnasium", "stable-baselines3")},
+        "packages": {name: version(name) for name in ["torch", "numpy", "gymnasium", "stable-baselines3",
+            *(["sb3-contrib"] if config["rl"]["policy_type"] == "lstm" else [])]},
         "device": config["device"], "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "gpu": torch.cuda.get_device_name(config["device"]) if str(config["device"]).startswith("cuda") else "cpu"}
     (destination / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")

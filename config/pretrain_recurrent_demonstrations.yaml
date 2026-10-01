@@ -1,0 +1,13 @@
+defaults:
+  - pretrain_demonstrations
+  - override rl: recurrent_ppo
+  - _self_
+
+pretraining:
+  # batch_size counts padded frames; 256 / 64 = four concurrent episodes.
+  sequence_length: 64
+rl:
+  ppo:
+    policy_kwargs:
+      net_arch: [256, 256]
+output: logs/pretraining/god-recurrent-bc-${now:%Y%m%d-%H%M%S}

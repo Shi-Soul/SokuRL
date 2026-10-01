@@ -147,9 +147,18 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         if type(config[key]) is not int or config[key] < 1:
             raise ValueError(f"pretraining {key} must be a positive integer")
     if (type(config["value_coef"]) not in (int, float) or not math.isfinite(config["value_coef"])
-            or config["value_coef"] < 0 or algorithm["policy_type"] != "mlp"
+            or config["value_coef"] < 0 or algorithm["policy_type"] not in {"mlp", "lstm"}
             or algorithm["ppo"]["gamma"] != 1. or any(not rows for rows in samples.values())):
-        raise ValueError("pretraining requires nonempty numeric samples, feedforward PPO and gamma=1")
+        raise ValueError("pretraining requires nonempty numeric samples, shared PPO and gamma=1")
+    recurrent = algorithm["policy_type"] == "lstm"
+    if recurrent:
+        from soku_rl.rl.recurrent_cloning import demonstration_episodes, sequence_epoch
+        if ("sequence_length" not in config or type(config["sequence_length"]) is not int
+                or config["sequence_length"] < 1 or config["batch_size"] % config["sequence_length"]):
+            raise ValueError("recurrent batch_size must be a positive multiple of sequence_length")
+        episodes = {split: demonstration_episodes(rows) for split, rows in samples.items()}
+    elif "sequence_length" in config:
+        raise ValueError("sequence_length requires a recurrent policy")
     view = ObservationContractEnv(interface)
     if config["initial_policy"]["kind"] not in {"fresh", "weights"}:
         raise ValueError("supervised initialization requires fresh or weights with a fresh optimizer")
@@ -169,7 +178,13 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         repeat_baselines[split] = {"transitions": int(transitions)}
         if transitions:
             repeat_baselines[split]["accuracy"] = float(sum(row[3] == 0 for row in rows) / transitions)
-    validation = score_samples(model, samples["validation"], config["batch_size"])
+    def validation_score():
+        if recurrent:
+            return sequence_epoch(model, episodes["validation"], np.arange(len(episodes["validation"])),
+                config["batch_size"], config["sequence_length"], config["value_coef"], False)[0]
+        return score_samples(model, samples["validation"], config["batch_size"])
+
+    validation = validation_score()
     history = [{"epoch": 0, "validation": validation}]
     best, best_epoch = validation["nll"], 0
     model.save(directory / "initial.zip")
@@ -177,27 +192,34 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
     started = time.perf_counter()
     updates = 0
     for epoch in range(1, config["epochs"] + 1):
-        model.policy.set_training_mode(True)
-        total_loss = 0.
-        order = rng.permutation(len(samples["train"]))
-        for first in range(0, len(order), config["batch_size"]):
-            batch = [samples["train"][int(i)] for i in order[first:first + config["batch_size"]]]
-            observations, actions, returns = sample_tensors(model, batch)
-            values, log_probs, _ = model.policy.evaluate_actions(observations, actions)
-            loss = -log_probs.mean() + config["value_coef"] * ((values.flatten() - returns) ** 2).mean()
-            if not torch.isfinite(loss):
-                raise RuntimeError("non-finite behavior-cloning loss")
-            model.policy.optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.policy.parameters(), model.max_grad_norm)
-            model.policy.optimizer.step()
-            updates += 1
-            total_loss += float(loss.detach()) * len(batch)
-        validation = score_samples(model, samples["validation"], config["batch_size"])
+        if recurrent:
+            _, train_loss, epoch_updates = sequence_epoch(model, episodes["train"],
+                rng.permutation(len(episodes["train"])), config["batch_size"], config["sequence_length"],
+                config["value_coef"], True)
+            updates += epoch_updates
+        else:
+            model.policy.set_training_mode(True)
+            total_loss = 0.
+            order = rng.permutation(len(samples["train"]))
+            for first in range(0, len(order), config["batch_size"]):
+                batch = [samples["train"][int(i)] for i in order[first:first + config["batch_size"]]]
+                observations, actions, returns = sample_tensors(model, batch)
+                values, log_probs, _ = model.policy.evaluate_actions(observations, actions)
+                loss = -log_probs.mean() + config["value_coef"] * ((values.flatten() - returns) ** 2).mean()
+                if not torch.isfinite(loss):
+                    raise RuntimeError("non-finite behavior-cloning loss")
+                model.policy.optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.policy.parameters(), model.max_grad_norm)
+                model.policy.optimizer.step()
+                updates += 1
+                total_loss += float(loss.detach()) * len(batch)
+            train_loss = total_loss / len(order)
+        validation = validation_score()
         if validation["nll"] < best:
             best, best_epoch = validation["nll"], epoch
             model.save(directory / "best.zip")
-        row = {"epoch": epoch, "train_loss": total_loss / len(order), "validation": validation,
+        row = {"epoch": epoch, "train_loss": train_loss, "validation": validation,
             "updates": updates, "seconds": time.perf_counter() - started}
         history.append(row)
         print(json.dumps(row), flush=True)
@@ -213,4 +235,7 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         "initial_policy_hash": initial, "final_policy_hash": final,
         "constant_action_baseline": baseline,
         "copy_previous_action_baseline": repeat_baselines,
+        **({"sequence_training": {"sequence_length": config["sequence_length"],
+            "episodes_per_batch": config["batch_size"] // config["sequence_length"],
+            "state_reset": "each_episode", "gradient_truncation": "each_chunk"}} if recurrent else {}),
         "train_frames": len(samples["train"]), "validation_frames": len(samples["validation"]), "history": history}
