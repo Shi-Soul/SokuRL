@@ -4,6 +4,7 @@ import torch
 from sb3_contrib.common.recurrent.type_aliases import RNNStates
 
 from soku_rl.rl.sparse_transfer import restore_batch
+from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
 
 
 def demonstration_episodes(samples):
@@ -55,6 +56,7 @@ def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_co
     totals = dict(nll=0., accuracy=0., value_mse=0., entropy=0.)
     count, changed_count, changed_correct, changed_nll = 0, 0, 0., 0.
     updates, total_loss = 0, 0.
+    command_totals = {}
     with torch.set_grad_enabled(training):
         for chunk in episode_chunks(episodes, order, sequence_length, batch_size // sequence_length):
             if chunk["new_group"]:
@@ -99,10 +101,16 @@ def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_co
             changed_count += int(changed.sum())
             changed_correct += float(correct[changed].sum())
             changed_nll += float(nll[changed].detach().sum())
+            if not training and model.action_space.n == 576:
+                diagnostics = command_group_totals(distribution, actions, valid)
+                for key, value in diagnostics.items():
+                    command_totals[key] = command_totals.get(key, 0) + value
     result = {key: value / count for key, value in totals.items()}
     result["changed_samples"] = changed_count
     if changed_count:
         result.update(changed_accuracy=changed_correct / changed_count, changed_nll=changed_nll / changed_count)
+    if command_totals:
+        result.update(summarize_command_groups(command_totals))
     if not all(np.isfinite(value) for value in result.values()):
         raise RuntimeError("non-finite recurrent cloning metrics")
     return result, total_loss / count, updates

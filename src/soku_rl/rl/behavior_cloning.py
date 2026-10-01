@@ -13,6 +13,7 @@ from soku_rl.policy.contract import read_training_contract
 from soku_rl.rl.ppo import create_ppo, parameter_hash
 from soku_rl.rl.sparse_transfer import restore_batch
 from soku_rl.rl.storage import PackedObservation
+from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
 
 
 class ObservationContractEnv(Env):
@@ -111,6 +112,7 @@ def score_samples(model, samples, batch_size):
     model.policy.set_training_mode(False)
     totals = dict(nll=0., accuracy=0., value_mse=0., entropy=0.)
     changed_count, changed_correct, changed_nll = 0, 0., 0.
+    command_totals = {}
     with torch.no_grad():
         for first in range(0, len(samples), batch_size):
             batch = samples[first:first + batch_size]
@@ -127,10 +129,16 @@ def score_samples(model, samples, batch_size):
             changed_count += int(changed.sum())
             changed_correct += float(correct[changed].sum())
             changed_nll += float(nll[changed].sum())
+            if model.action_space.n == 576:
+                diagnostics = command_group_totals(distribution, actions, torch.ones_like(actions, dtype=torch.bool))
+                for key, value in diagnostics.items():
+                    command_totals[key] = command_totals.get(key, 0) + value
     result = {key: value / len(samples) for key, value in totals.items()}
     result["changed_samples"] = changed_count
     if changed_count:
         result.update(changed_accuracy=changed_correct / changed_count, changed_nll=changed_nll / changed_count)
+    if command_totals:
+        result.update(summarize_command_groups(command_totals))
     if not all(math.isfinite(value) for value in result.values()):
         raise RuntimeError("non-finite behavior-cloning validation metrics")
     return result
