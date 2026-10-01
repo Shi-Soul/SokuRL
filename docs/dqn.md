@@ -242,3 +242,10 @@ bash scripts/linux.sh tools/queue_br_evaluations.py
 源码版本和检查点清单保存在队列目录的 `*.launch.json`，stdout 也在该目录。
 队列的 `all_evaluations_launched` 仅代表已启动，不能解释成评测完成或任务成功。
 选型和独立 test 仍在完整结果核对后进行。
+
+同步主仓库 `b44c075` 的私有 Wine 清理修复及测试：确认专属服务已退出后，
+对 NAS 目录删除的 `ENOTEMPTY` / `EBUSY` / 并发 `ENOENT` 作有界重试，权限
+错误立即抛出，始终保存清理结果。7 项测试通过，日志为
+`logs/pytest-dqn-worker-cleanup-20261001.txt`。该问题在主仓库的真实 16 实例
+诊断中已出现；本分支未修改游戏或学习算法。修复用于后续启动的最终评测，
+当前已加载旧代码的六个任务保持运行。没有停止共享 Wine 服务或其他任务。
