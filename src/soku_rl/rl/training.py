@@ -66,7 +66,8 @@ class EpisodeRecords(BaseCallback):
         self.timings[-1].update(update_seconds=time.perf_counter() - self.rollout_finished,
                                ppo_n_updates=self.model._n_updates)
         steps = self.model.num_timesteps
-        if not self.last_saved_steps or steps - self.last_saved_steps >= self.checkpoint_every:
+        if (not self.last_saved_steps
+                or steps // self.checkpoint_every > self.last_saved_steps // self.checkpoint_every):
             checkpoints = self.directory / "checkpoints"
             checkpoints.mkdir(exist_ok=True)
             path = checkpoints / f"updated_{steps}_steps.zip"

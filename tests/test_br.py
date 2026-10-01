@@ -60,3 +60,32 @@ def test_invalid_br_distribution_fails_before_loading(tmp_path, probabilities):
                 for index, probability in enumerate(probabilities)]}, "cpu", 1, tmp_path)
     finally:
         env.close()
+
+
+def test_updated_checkpoints_follow_global_step_boundaries_after_resuming(tmp_path):
+    torch.set_num_threads(1)
+    env = fixture_env()
+    config = fixture_config("mlp") | {"name": "br", "player": 0,
+        "matchups": {"mode": "fixed"}, "timesteps": 32, "checkpoint_every": 16,
+        "initial_policy": {"kind": "fresh"},
+        "opponents": [{"name": "random", "probability": 1., "policy": {"kind": "uniform"}}]}
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    try:
+        train_br(env, config, "cpu", 13, first)
+        contract = save_contract(first, env, config)
+        config["timesteps"] = 24
+        config["initial_policy"] = {"kind": "checkpoint", "training_config": contract,
+            "path": str(first / "checkpoints" / "updated_16_steps.zip")}
+        train_br(env, config, "cpu", 14, second)
+        for directory, expected in ((first, [8, 16, 32]), (second, [24, 32])):
+            timing = json.loads((directory / "timing.json").read_text())
+            saved = [row for row in timing["rollouts"] if "updated_checkpoint" in row]
+            assert [row["steps"] for row in saved] == expected
+            for row in saved:
+                model = algorithm_type("mlp").load(row["updated_checkpoint"], device="cpu")
+                assert model.num_timesteps == row["steps"]
+                assert model._n_updates == row["ppo_n_updates"]
+    finally:
+        env.close()
