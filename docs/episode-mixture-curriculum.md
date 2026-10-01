@@ -43,12 +43,40 @@ p=0 时原策略动作及内部状态推进与直接使用原策略一致；p=1 
 以及 Hydra 继承和完整神 AI 独立测评配置。
 42 项相关检查通过，日志 `.dev/pytest-episode-curriculum-20261001-v2.log`；
 包含实际共享 PPO 的短训练、各类检查点恢复，以及图中概率和实际选择的区分。
-真实 Linux 游戏诊断和后续强度实验的结果需另行记录，单元检查不代表提升已经成立。
+全量检查为 1033 passed、12 skipped、1 deselected、2 subtests passed；
+日志 `.dev/pytest-episode-curriculum-full-20261001.log`。
+
+提交 `0172818` 的真实 Linux 机制诊断完成 4096 步、8 个 PPO epoch，耗时 285.54 秒。
+为快速验证反馈，诊断使用 256 帧上限、4 局预热、每 2 局反馈，16 局全部超时；
+这不是策略强度实验。实际选择为 4 局完整神 AI、12 局 uniform，两个分支均覆盖双座位。
+长期严格胜率为 0，未来 uniform 概率从 0.5 自动升到 0.85；
+已结束对局使用的开局概率为 0.5、0.55、0.65、0.75，进行中的 actor 不被反馈替换。
+选择随机流、实际策略指纹、分支战斗均值、模型/课程检查点哈希均核对通过，
+私有 worker 正常退出，游戏及前缀已清理。
+证据 `logs/diagnostics/episode-mixture-game-audit-20261001/summary.json`，
+原始运行 `logs/diagnostics/br-episode-mixture-game-20261001`，
+日志 `.dev/audit-episode-mixture-game-20261001.log`。
+`logs/diagnostics/episode-mixture-mechanism-curves-20261001` 的三张 PNG 已目视检查，
+课程图明确区分概率与实际分支；PDF 为同源导出，未另作目视验收。
 
 候选长实验从同一数值 BC best 开始，使用 GAE=0.95、两个教师训练集复习、
 固定魔理沙、随机座位、原灵梦神 AI，仍保持完整 576 动作和 7200 帧上限。
-初始 uniform 选择概率拟设为 0.5，以便从开始就持续接触完整神 AI 轨迹；
+初始 uniform 选择概率设为 0.5，以便从开始就接触完整神 AI 轨迹；
 其余反馈参数保留半衰期 50 局、20 局预热、每 10 局更新。
 这与旧运行同时改变了混合粒度和起始概率，并使用后续数值编码优化，
 属于寻找可用配置的候选，不是严格单因素因果对照，也不证明上述数值最优。
 必须先提交实现并通过实机机制诊断，再启动新预算；不改写正在运行的 GAE 对照。
+命令的 Hydra 配置已与旧 GAE=0.95 逐项核对，共享 PPO、初始化、复习数据与对局契约一致；
+课程差别为 kind 与初始概率，记录 `.dev/audit-episode-mixture-candidate-config-20261001-v2.log`。
+
+```bash
+bash scripts/linux.sh tools/train.py linux.cuda_devices=1 algorithm=br \
+  rl=recurrent_rehearsal rl.cpu_threads=1 rules=god \
+  wrappers=superhuman_learning track=superhuman_numeric_combat \
+  +br_opponents=god_target algorithm.target.character=0 \
+  +curriculum=adaptive_episode_mixture algorithm.curriculum.initial_random_probability=0.5 \
+  num_envs=4 algorithm.timesteps=262144 \
+  '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-numeric-combat-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-numeric-combat-20261001/config.yaml}' \
+  'rl.rehearsal.datasets=[logs/demonstrations/god-marisa-reimu-20261001,logs/demonstrations/god-marisa-reimu-expanded-20261001]' \
+  output=logs/training/br-reimu-numeric-rehearsal-episode-mix50-adaptive-20261001
+```
