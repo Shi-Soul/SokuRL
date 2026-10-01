@@ -80,3 +80,14 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=1 algorithm=br \
   'rl.rehearsal.datasets=[logs/demonstrations/god-marisa-reimu-20261001,logs/demonstrations/god-marisa-reimu-expanded-20261001]' \
   output=logs/training/br-reimu-numeric-rehearsal-episode-mix50-adaptive-20261001
 ```
+
+该候选已由提交 `91ca743` 在 GPU 1 启动。首轮完成 1024 步、2 个 PPO epoch，
+一次 256 帧教师复习及 14788 帧前缀重放；采样 10.97 秒、更新 7.85 秒，
+其中复习 0.71 秒。首轮时间包含初始化影响，不据此宣称整体加速。
+模型参数已改变、优化器有状态，复习数据身份与原实验一致；
+检查点及课程 sidecar 哈希相符，课程局数仍为 0、uniform=0.5。
+这确认实际更新已经发生，还没有完整对局或强度结论。
+证据 `logs/diagnostics/episode-mixture-first-update-20261001/summary.json`，
+核对 `.dev/audit-episode-mixture-launch-20261001.log`。
+机制图的源文件快照哈希、16 个课程事件、实际分支和全部战斗滚动均值也已逐项复核，
+记录在机制曲线目录的 `audit.json`。
