@@ -169,6 +169,13 @@ NLL 0.24373、总准确率 93.741%、变化帧准确率 62.019%（9805 帧）、
 日志 `.dev/audit-recurrent-separate-final-retention-20261001.log`。
 后续共享 PPO 的持续示范复习设计、预算与测试见 [PPO 复习实验](ppo-rehearsal.md)。
 
+最终完整神 AI 测评 `br-reimu-recurrent-separate-adaptive-131072-20261001` 已完成：
+233.47 秒、4 局全负，平均自身/对手 HP 下降 10000/379，双方符卡动作进入均为 0。
+相同种子、双方角色/策略种子及座位已与分离特征 BC 起点配对，模型哈希匹配，
+私有 worker `840bac8de8344887a6f50703bc695a88` 正常退出并清理。
+日志 `.dev/audit-recurrent-separate-final-evaluation-20261001.log`，结构化结果见同诊断目录下
+`full_god_evaluation.json`。与起点的对手 HP 下降 1246.25 相比，此小样本没有改善证据。
+
 ### 扩充循环模型的学习者状态采样
 
 后续数据由扩充模型 best 实际操作，原神 AI 只标注，完整灵梦神 AI 作为对手。
@@ -191,6 +198,30 @@ identity 明确标记学习者控制、教师只标注。
 stable-baselines3，循环模型再记录 sb3-contrib；不改变实际采样算法。
 已运行任务保留原 identity，另写 `behavior-runtime-audit.json` 明确注明启动后核对，
 两包均为 2.9.0，见 `.dev/audit-recurrent-collection-runtime-20261001.log`。
+
+该学习者控制采样已成功完成：32 局、116566 帧、1364.27 秒，其中训练 87263 帧、验证 29303 帧。
+结果为 31 负、1 超时，仍无完整神 AI 胜局；教师与实际控制命令不一致的帧为 58171。
+manifest SHA256 为 `69aeeb763098eca6f6cfcedb0c9bf22e522fb6d29b2b67ae03c9b891a46ddd55`。
+严格数据 loader、全部已有数据集/正式评估种子排除、模型身份及 worker 清理均核对通过。
+记录见 `logs/diagnostics/recurrent-learner-data-20261001/summary.json` 和
+`.dev/audit-recurrent-learner-data-20261001.log`。
+
+下一项离线拟合将原教师、扩充教师和本组学习者轨迹聚合，共 80 局、422387 帧，
+训练 314540 帧、验证 107847 帧。使用扩充循环 BC best 权重，重置优化器，学习率 1e-4，
+20 epoch、sequence_length=64、batch_size=256、value_coef=0；仍按完整聚合验证集 NLL 选 best。
+不使用前两组前馈学习者轨迹，单独观察新增循环学习者状态的作用。
+该拟合与上面的原数据在线复习对照分别记录；学习者回报不作为教师 critic 目标，
+共享特征的变化仍可能使价值预测漂移。
+
+```bash
+bash scripts/linux.sh tools/pretrain_demonstrations.py \
+  --config-name pretrain_recurrent_demonstrations linux.cuda_devices=1 rl.cpu_threads=1 \
+  rl.ppo.learning_rate=0.0001 pretraining.value_coef=0 \
+  pretraining.dataset=logs/demonstrations/god-marisa-reimu-20261001 \
+  'pretraining.additional_datasets=[logs/demonstrations/god-marisa-reimu-expanded-20261001,logs/demonstrations/learner-recurrent-marisa-reimu-20261001]' \
+  '++pretraining.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-expanded-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-expanded-20261001/config.yaml}' \
+  output=logs/pretraining/god-marisa-reimu-recurrent-aggregate-20261001
+```
 
 ## 最新课程及优化曲线快照
 

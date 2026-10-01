@@ -64,6 +64,7 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
 首个真实 GPU 运行（不带 `-v2`，源码 `8511fab`）在第一次复习反向传播时失败：
 `cudnn RNN backward can only be called in training mode`。CPU 单元测试没有覆盖该限制。
 原运行耗时 151.74 秒，保留失败 result、配置、源码指纹及日志，不作为完成的 PPO 对照。
+私有 worker `7d0aa118768a4736a4dfe21bc41ca2b0` 及服务退出码均为 0，前缀和游戏副本已清理。
 随后按上文方式限定短窗口走原生 LSTM，增加实际 CUDA 反向测试。
 相关 37 项检查通过（`.dev/pytest-rehearsal-cuda-20261001.log`）。
 另在 GPU 0 用真实原循环 BC、原教师数据和生产复习设置完成一次更新：
@@ -72,3 +73,13 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
 该局部检查不产生真实游戏胜率，证据见
 `logs/diagnostics/rehearsal-cuda-real-data-20261001/summary.json`。
 修复后从相同原始权重重新开始 `-v2`，不从失败运行的局部状态续接。
+
+`-v2` 已从源码 `7c79b98` 在 GPU 7 完成首轮真实游戏更新。
+1024 步采样耗时 8.795 秒，PPO 加复习更新共 3.081 秒，其中复习 0.649 秒，
+256 个监督帧、12633 帧历史恢复；两个 PPO epoch 与一次复习分别计数。
+首个 updated 检查点 SHA256 为 `e3ae2256fe9c7997efb7a70ad12f6fbcf0c27b1ec8f588e0d7faf9203594c17c`，
+课程 sidecar、复习计数/数据身份及源码指纹验证通过，actor LSTM 参数确实变化。
+与原循环 BC 在线 PPO 的网络、PPO 参数、种子、观察、环境数和课程配置一致。
+日志 `.dev/audit-recurrent-rehearsal-first-update-20261001.log`，结构化记录在
+`logs/diagnostics/recurrent-rehearsal-first-update-20261001/summary.json`。
+此时还没有完整训练局，uniform 为 0.90；这只是运行正确性的证据。
