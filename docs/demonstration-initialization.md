@@ -174,7 +174,8 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=6 rl.c
   output=logs/pretraining/god-marisa-reimu-aggregate-20261001
 ```
 
-原示范初始化的 PPO 已到 65536 步，课程内 8 局全负，完整神 AI 配对评估已另行启动。
+原示范初始化的 PPO 在 65536 步完成课程内 8 局，7 负、1 次超时，没有胜局，
+完整神 AI 配对评估另行进行。
 保守更新的稳定性仍没有转化成已验证的策略强度。
 
 该 65536 步评估 `br-reimu-bc-adaptive-65536-20261001` 已成功完成，4 局全负，
