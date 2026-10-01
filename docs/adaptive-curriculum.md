@@ -87,6 +87,9 @@ worker、私有服务 stop/wait 均退出 0，清理各用 1 次尝试。
 GPU 3、4 环境、seed=1732、固定魔理沙、随机座位、原灵梦神 AI，使用本页默认课程参数，
 7200 帧上限和原 sparse-transfer PPO（n_steps=2048、n_epochs=10），预算 1048576 步。
 运行中的结果仍待评估；后续使用完整神 AI 和公共验证种子评价保存的模型。
+首轮已完成 8192 步、10 个 PPO epoch：采样 97.96 秒、更新 5.68 秒；
+`updated_8192_steps.zip` 及课程 sidecar 的 SHA256 已核对一致。
+此时还没有完整对局，uniform 概率保持 0.90，EMA 胜率按约定留空。
 
 固定两阶段课程保留为历史证据，不再作为后续课程方案：
 `br-superhuman-noise90-to-reimu-20261001` 完成额外 65536 步（连同 warmup 总计 131072），
