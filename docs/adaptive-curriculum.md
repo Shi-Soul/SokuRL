@@ -106,6 +106,27 @@ GPU 3、4 环境、seed=1732、固定魔理沙、随机座位、原灵梦神 AI�
 16384 步、无完整对局；短局诊断快照包含 16 局，曲线中的两次增加与逐局事件逐项一致。
 PNG 已目视检查；PDF 和 JSON 使用同一源快照生成。
 
+## 固定角色的规则基准
+
+`benchmark_br.py +br_candidate=god` 在相同 BR 角色/观察/时序配置下评估原神 AI 候选，
+使用 `rule-br:god` 标记，保存规则指纹，不加载或伪造 PPO 检查点哈希。
+默认候选仍是训练模型，原模型评测命令保持有效。
+与普通固定双方选角的 benchmark 不同，此入口随候选换边移动其角色，确保测的始终是魔理沙。
+公共角色种子保持与已有 PPO 测评一致；训练课程不注入评测。
+20 项候选来源、配对评测和动作分析相关测试通过，日志
+`.dev/pytest-br-rule-reference-20261001.log`。
+
+```bash
+bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=3 rl.cpu_threads=1 \
+  training_directory=logs/training/br-superhuman-reimu-adaptive-20261001 \
+  require_complete=false +br_candidate=god \
+  'benchmark.world_seeds=[918042743,1897077702]' num_envs=1 \
+  output=logs/benchmark/god-marisa-reimu-reference-20261001
+```
+
+此基准用于判断原魔理沙神 AI 是否能提供有用示范，结果不计为 PPO 成绩；
+只有在原策略表现确有价值后，才考虑将示范用于共享 PPO 的初始权重。
+
 固定两阶段课程保留为历史证据，不再作为后续课程方案：
 `br-superhuman-noise90-to-reimu-20261001` 完成额外 65536 步（连同 warmup 总计 131072），
 训练 16 局全负。`br-noise90-to-reimu-final-20261001` 在完整灵梦神 AI、

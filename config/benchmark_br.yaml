@@ -8,6 +8,7 @@ defaults:
   - _self_
 
 training_directory: ???
+candidate: {kind: checkpoint}
 checkpoint: final.zip
 require_complete: true
 opponent_source: training
