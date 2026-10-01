@@ -114,8 +114,13 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
   output=logs/pretraining/god-marisa-reimu-recurrent-expanded-20261001
 ```
 
-扩充拟合已从源码 `1c84514` 在 GPU 1 启动，首轮完成 1017 次监督更新，
-合并验证 NLL 0.73536、动作准确率 84.024%；尚在拟合，不能使用早期指标宣称效果改善。
+扩充拟合已从源码 `1c84514` 在 GPU 1 成功完成：549.66 秒、20273 次监督更新、
+20 轮，按合并验证 NLL 选择第 18 轮 best。
+NLL 0.24373、总准确率 93.741%、变化帧准确率 62.019%（9805 帧）、价值 MSE 0.39906。
+旧模型与扩充模型的初始 38 个策略张量逐项一致，RL 配置和随机种子也相同，
+核对记录 `.dev/audit-expanded-recurrent-initialization-20261001.log`。
+新验证总体包含原验证之外的整局，不能直接把新旧总分差异全部当成模型效果。
+完整神 AI 对照在 `logs/benchmark/br-reimu-recurrent-expanded-zero-shot-20261001`。
 
 ## 最新课程及优化曲线快照
 
