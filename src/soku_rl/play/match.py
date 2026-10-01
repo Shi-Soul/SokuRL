@@ -26,6 +26,12 @@ class MatchState:
 
 
 @dataclass(frozen=True)
+class MatchFrame:
+    match: MatchState
+    observations: tuple
+
+
+@dataclass(frozen=True)
 class MatchEvent:
     kind: str
     match: int

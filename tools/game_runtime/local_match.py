@@ -1,6 +1,5 @@
 """Own one paused local match, with complete observations and selected-seat control."""
 from contextlib import ExitStack
-from dataclasses import dataclass
 import struct
 
 from bridge_shared import BridgeClient, wait_for_steps
@@ -8,15 +7,9 @@ from game_runtime.frames import wait_for_frame_zero
 from game_runtime.observation import ObservationReader
 from game_runtime.privileged import ProcessMemory
 from soku_rl.env.observation.memory_schema import FIGHTER_FIELDS
-from soku_rl.play.match import MatchState
+from soku_rl.play.match import MatchFrame, MatchState
 from soku_rl.replay.recording import OriginalReplayReader
 import sokurl
-
-
-@dataclass(frozen=True)
-class LocalFrame:
-    match: MatchState
-    observations: tuple
 
 
 class LocalMatch:
@@ -67,7 +60,7 @@ class LocalMatch:
             raise RuntimeError("game advanced while reading local match scores")
         match = MatchState(raw.segmentId + 1, raw.roundId, state.frame, scores,
                            (raw.p1.hp, raw.p2.hp), "battle")
-        return LocalFrame(match, state.observations)
+        return MatchFrame(match, state.observations)
 
     def step(self, inputs):
         if self.process.poll() is not None:

@@ -1,0 +1,19 @@
+defaults:
+  - train
+  - override rules: god
+  - override track: superhuman
+  - _self_
+
+device: cpu
+players:
+  player_0:
+    name: god
+    policy: {kind: rule, name: god}
+  player_1: human
+session:
+  matches: 1
+  timeout: 3600.0
+runtime:
+  mute_audio: false
+  command: [.venv/Scripts/python.exe, -u, tools/local_worker.py]
+output: logs/play/local-${now:%Y%m%d-%H%M%S}

@@ -22,6 +22,8 @@ class RecordedEpisode:
         if match_index != 0 or len(replay.matches) != 1:
             raise ValueError("an environment episode must contain exactly one replay match")
         metadata = json.loads(source.with_suffix(".json").read_text(encoding="utf-8"))
+        if "scope" in metadata and metadata["scope"] != "episode":
+            raise ValueError("a full match is not one environment episode; use input_stream conversion")
         if metadata["sha256"] != hashlib.sha256(replay.encode()).hexdigest():
             raise ValueError("episode metadata does not match the replay bytes")
         if type(metadata["seed"]) is not int or metadata["seed"] != replay.matches[0].seed:
