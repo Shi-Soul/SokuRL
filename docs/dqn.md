@@ -90,3 +90,19 @@ RTX 3080 Ti，Torch 2.9.1+cu128 和 Wine 工作进程依赖可用。第一轮 DQ
 262144 转移、seed 1732；stdout 为 `logs/train-dqn-five-step-20261001.txt`。
 两组独立工作进程将采样和更新交错，继续观察吞吐与资源占用。此时五步组仍在
 初始化，不能写成已通过真实更新，更不能从前述执行证据推断胜率。
+
+训练诊断现已支持 DQN：`tools/analyze_training.py --config-name analyze_dqn`。
+原脚本按 PPO 的 epochs 换算 CSV 更新步数，会错误解释 DQN；现在直接把 CSV
+中的梯度更新计数对应到 `timing.json` 的实际已更新步数，也支持 PPO 的同一计数。
+顺序快照若有更新的 CSV 行暂时找不到对应时序，保留原始行并列入
+`unaligned_train_counters`，不猜测横轴。DQN 显示 epsilon、Huber loss、TD 误差
+和平均 Q 值；吞吐使用每批 `train_freq * num_envs` 转移，而不是 PPO rollout
+大小。2 项测试覆盖两种学习器的计数对齐及快照边界。
+
+首份已检查图为 `logs/diagnostics/dqn-curves-20261001-b/`，含 PNG/PDF、原始
+配置/CSV/JSON 快照及 SHA256。缺少标量时仍保留正确的运行图例，各面板共用环境
+步数横轴。`-a` 是尚缺图例的初稿。SB3 DQN 每完成 4 局才输出标量 CSV，因此
+早期图的优化/探索指标可能尚无记录，不能当作零损失或零探索率。后续实机进展
+观测为基线 28416 转移、3040 次更新，已完成 2 局全负；五步组 15616 转移、
+1440 次更新，尚无完整局。两组有更新的采样周期各约 66 转移/秒，含本次各自
+经历的重置；机器并发条件不同，不能据此将吞吐差异归因于 n-step 参数。
