@@ -1,6 +1,7 @@
 #include "FrameState.hpp"
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
+#include <Character.hpp>
 #include <SokuAddresses.hpp>
 #include <Weather.hpp>
 #include <algorithm>
