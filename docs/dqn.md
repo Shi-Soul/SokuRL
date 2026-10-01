@@ -150,7 +150,7 @@ DLL、资源、观测/动作/对手/种子/依赖身份。恢复段包含日志�
 
 | 候选 | 65536 步 validation 胜/负/超时 | 平均收益 | 最终 validation |
 | --- | --- | ---: | --- |
-| 三步恢复基线 | 0 / 64 / 0 | -1.000000 | 运行中 |
+| 三步恢复基线 | 0 / 64 / 0 | -1.000000 | 0 胜、64 负、0 超时；收益 -1 |
 | 五步 | 0 / 64 / 0 | -1.000000 | 0 胜、64 负、0 超时；收益 -1 |
 | 更多回放 | 0 / 49 / 15 | -0.765625 | 运行中 |
 
@@ -163,8 +163,11 @@ DLL、资源、观测/动作/对手/种子/依赖身份。恢复段包含日志�
 五步最终评估成功，耗时约 2131.9 秒，双座位各 32 负；同样通过全部计划、回放
 种子/帧数/动作范围、模型哈希与私有进程清理审计，见
 `logs/diagnostics/dqn-five-step-final-validation-audit-20261001/result.json`。
-该配置未显示出战胜规则灵梦的能力。其余两组最终 validation、模型选型与独立
-test 仍未完成。
+基线最终评估同样成功，双座位各 32 负，耗时约 1977.1 秒；完整计划、模型哈希、
+64 份回放及私有进程清理检查通过，审计为
+`logs/diagnostics/dqn-baseline-final-validation-audit-20261001/result.json`。
+这两个配置均未显示出战胜规则灵梦的能力。更多回放组最终 validation、模型
+选型与独立 test 仍未完成。
 
 最终评估输出依次为 `logs/benchmark/br-dqn-baseline-final-validation-20261001/`、
 `logs/benchmark/br-dqn-five-step-final-validation-direct-20261001/` 和
