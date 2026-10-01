@@ -52,6 +52,12 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 完整对局评估 `logs/benchmark/br-reimu-recurrent-zero-shot-20261001` 已成功完成，耗时 185.86 秒。
 两座位各 2 局，全部失败；平均自身/对手 HP 下降 10000/1403.25，双方符卡动作进入均为 0。
 动作变化帧拟合提高还没有转化为完整神 AI 胜局。
+与前馈 BC 的世界/策略种子、角色和座位配对核对通过；私有 worker 正常退出并清理。
+记录在 `.dev/audit-recurrent-zero-shot-20261001.log`。
+逻辑输入统计 `logs/diagnostics/recurrent-clone-actions-20261001` 显示：
+循环模型平均相同命令连续 7.14 帧、重复率 86.03%，前馈为 8.84 帧、88.72%；
+循环模型 A/B/C 按下比例为 2.23%/1.56%/0.75%，前馈为 1.00%/1.17%/0.34%。
+这些是提交的按键，不能解释为实际攻击命中或符卡成功施放。
 
 另外使用最佳模型核对四局验证数据各前 128 帧，共 512 帧的批量与逐帧 GPU 推断。
 默认 cuDNN TF32 下，初次严格容差检查失败；进一步只改变该精度开关进行诊断：
@@ -77,3 +83,9 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
   '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-20261001/config.yaml}' \
   output=logs/training/br-superhuman-reimu-recurrent-bc-adaptive-20261001
 ```
+
+该在线实验已从源码 `1dcc9ba` 在 GPU 7 启动，并完成首批真实更新。
+首轮 1024 步采样 9.87 秒、更新 2.56 秒；KL 提前停止生效，计数为 2 个 PPO epoch。
+首个 updated 检查点相对 BC best 有 38 个参数张量改变，包含 LSTM actor，
+课程 sidecar 的模型 SHA256 验证通过，记录在 `.dev/audit-recurrent-first-update-20261001.log`。
+此时无完整对局，课程为初始 0.90 uniform，不能报告虚构的训练胜率；长训练仍在继续。
