@@ -81,7 +81,9 @@ def load_demonstrations(source, interface):
             if (not isinstance(observation, PackedObservation) or observation.shape != interface.observation_space.shape
                     or observation.dtype != interface.observation_space.dtype.str):
                 raise ValueError("invalid packed demonstration observation")
-        samples[row["split"]].extend(zip(data["observations"], data["actions"], data["returns"], strict=True))
+        # -1 marks the first frame: never count a transition across episode boundaries.
+        changes = np.concatenate(([-1], np.not_equal(data["actions"][1:], data["actions"][:-1]).astype(int)))
+        samples[row["split"]].extend(zip(data["observations"], data["actions"], data["returns"], changes, strict=True))
         seats[row["split"]].add(row["learner_seat"])
     if any(value != {0, 1} for value in seats.values()):
         raise ValueError("both demonstration splits must cover both learner seats")
@@ -93,17 +95,27 @@ def load_demonstrations(source, interface):
 def score_samples(model, samples, batch_size):
     model.policy.set_training_mode(False)
     totals = dict(nll=0., accuracy=0., value_mse=0., entropy=0.)
+    changed_count, changed_correct, changed_nll = 0, 0., 0.
     with torch.no_grad():
         for first in range(0, len(samples), batch_size):
             batch = samples[first:first + batch_size]
             observations, actions, returns = sample_tensors(model, batch)
             distribution = model.policy.get_distribution(observations)
             values = model.policy.predict_values(observations).flatten()
-            totals["nll"] += float(-distribution.log_prob(actions).sum())
-            totals["accuracy"] += float((distribution.mode() == actions).sum())
+            nll = -distribution.log_prob(actions)
+            correct = distribution.mode() == actions
+            totals["nll"] += float(nll.sum())
+            totals["accuracy"] += float(correct.sum())
             totals["value_mse"] += float(((values - returns) ** 2).sum())
             totals["entropy"] += float(distribution.entropy().sum())
+            changed = torch.as_tensor([row[3] == 1 for row in batch], device=model.device)
+            changed_count += int(changed.sum())
+            changed_correct += float(correct[changed].sum())
+            changed_nll += float(nll[changed].sum())
     result = {key: value / len(samples) for key, value in totals.items()}
+    result["changed_samples"] = changed_count
+    if changed_count:
+        result.update(changed_accuracy=changed_correct / changed_count, changed_nll=changed_nll / changed_count)
     if not all(math.isfinite(value) for value in result.values()):
         raise RuntimeError("non-finite behavior-cloning validation metrics")
     return result
@@ -134,6 +146,12 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         "train_majority_fraction": float(label_counts["train"][majority] / len(samples["train"])),
         "validation_accuracy": float(label_counts["validation"][majority] / len(samples["validation"])),
         "label_counts": {split: counts.tolist() for split, counts in label_counts.items()}}
+    repeat_baselines = {}
+    for split, rows in samples.items():
+        transitions = sum(row[3] >= 0 for row in rows)
+        repeat_baselines[split] = {"transitions": int(transitions)}
+        if transitions:
+            repeat_baselines[split]["accuracy"] = float(sum(row[3] == 0 for row in rows) / transitions)
     validation = score_samples(model, samples["validation"], config["batch_size"])
     history = [{"epoch": 0, "validation": validation}]
     best, best_epoch = validation["nll"], 0
@@ -176,4 +194,5 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         "ppo_steps": model.num_timesteps, "supervised_updates": updates, "best_epoch": best_epoch,
         "initial_policy_hash": initial, "final_policy_hash": final,
         "constant_action_baseline": baseline,
+        "copy_previous_action_baseline": repeat_baselines,
         "train_frames": len(samples["train"]), "validation_frames": len(samples["validation"]), "history": history}

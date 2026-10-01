@@ -6,7 +6,7 @@ from omegaconf import OmegaConf
 import pytest
 import torch
 
-from soku_rl.rl.behavior_cloning import ObservationContractEnv, fit_demonstrations, load_demonstrations
+from soku_rl.rl.behavior_cloning import ObservationContractEnv, fit_demonstrations, load_demonstrations, score_samples
 from soku_rl.rl.demonstrations import collect_demonstrations, demonstration_plan
 from soku_rl.rl.ppo import create_ppo, parameter_hash
 from test_demonstrations import ConstantPolicy, population
@@ -47,7 +47,7 @@ def test_fit_uses_shared_ppo_and_weights_reload_with_fresh_optimizer(dataset):
     assert {key: len(rows) for key, rows in samples.items()} == {"train": 6, "validation": 6}
     assert manifest["successful_env_steps"] == 12
     assert digest == hashlib.sha256((directory / "episodes/manifest.json").read_bytes()).hexdigest()
-    validation_before = [(row[0].unpack().copy(), row[1], row[2]) for row in samples["validation"]]
+    validation_before = [(row[0].unpack().copy(), *row[1:]) for row in samples["validation"]]
     output = directory / "fit"
     output.mkdir()
     result = fit_demonstrations(interface, config, samples,
@@ -64,6 +64,30 @@ def test_fit_uses_shared_ppo_and_weights_reload_with_fresh_optimizer(dataset):
     assert parameter_hash(model.policy) == result["final_policy_hash"]
     assert not model.policy.optimizer.state
     assert model.num_timesteps == source["source_steps"] == 0
+
+
+def test_change_accuracy_exposes_a_policy_that_only_copies_previous_commands(dataset):
+    directory, interface, config = dataset
+    manifest = json.loads((directory / "episodes/manifest.json").read_text())
+    for row in manifest["episodes"]:
+        path = directory / "episodes" / row["path"]
+        data = torch.load(path, weights_only=False)
+        data["actions"][:] = [3, 3, 8]
+        torch.save(data, path)
+        row["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    rewrite_manifest(directory, manifest)
+    samples, _, _, _ = load_demonstrations(directory, interface)
+    assert [int(row[3]) for row in samples["validation"]] == [-1, 0, 1, -1, 0, 1]
+    model, _ = create_ppo(ObservationContractEnv(interface), interface, config, {"kind": "fresh"}, "cpu", 7)
+    with torch.no_grad():
+        model.policy.action_net.weight.zero_()
+        model.policy.action_net.bias.zero_()
+        model.policy.action_net.bias[3] = 10.
+    scored = score_samples(model, samples["validation"], 4)
+    assert scored["accuracy"] == pytest.approx(2 / 3)
+    assert scored["changed_samples"] == 2
+    assert scored["changed_accuracy"] == 0.
+    assert scored["changed_nll"] > scored["nll"]
 
 
 @pytest.mark.parametrize("damage", ["partial", "hash", "return", "reserved", "split", "accounting"])
