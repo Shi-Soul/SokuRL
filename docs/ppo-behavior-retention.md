@@ -248,6 +248,16 @@ best SHA256 为 `756eb8dcdbc44a47218f835ba89a3ede886f9317e759820a983a3ee9f013cee
 输出 `logs/diagnostics/recurrent-aggregate-by-dataset-and-seat-20261001` 保留逐座位结果及身份，
 核对日志 `.dev/audit-recurrent-aggregate-by-dataset-and-seat-20261001.log`。
 
+聚合循环模型的完整神 AI 配对测评现已完成：240.14 秒，4 局全负，
+平均自身/对手 HP 下降 10107.25/1270.75，双方符卡动作进入均为 0。
+HP 下降是逐帧累计量，可能超过初始 HP，不等同净 HP 差或归因后的攻击伤害。
+相同种子、角色和座位与扩充 BC 配对，检查点哈希一致，私有 worker
+`2a30bd6c5dce44ce8a177f8284b43a7e` 正常退出并清理。
+结果保存在对应诊断目录 `full_god_evaluation.json`，核对日志
+`.dev/audit-recurrent-aggregate-zero-shot-20261001.log`。
+学习者状态拟合提升尚未转化为实战胜局；下一项输入表示对照见
+[数值与战斗特征组合](numeric-combat-features.md)。
+
 ## 最新课程及优化曲线快照
 
 `logs/diagnostics/br-retention-curves-20261001-v2` 保存带源文件 SHA256 的三个运行快照，
