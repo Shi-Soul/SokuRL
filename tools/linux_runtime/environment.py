@@ -11,9 +11,9 @@ from omegaconf import OmegaConf
 REPO = Path(__file__).resolve().parents[2]
 
 
-def settings():
+def settings(overrides):
     with initialize_config_dir(version_base="1.3", config_dir=str(REPO / "config")):
-        config = compose(config_name="linux")
+        config = compose(config_name="linux", overrides=overrides)
     return OmegaConf.to_container(config.linux, resolve=True, throw_on_missing=True)
 
 

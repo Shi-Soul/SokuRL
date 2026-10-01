@@ -33,6 +33,10 @@ bash scripts/linux.sh tools/linux.py operation=check
 检查会确认 CUDA 与 Wine Python 的依赖。GPU 选择来自 `linux.cuda_devices`；训练配置中的 `cuda:0`
 指可见设备列表中的第一张卡。CUDA 不可用时立即失败，不改成 CPU 训练。
 
+单次命令可追加 `linux.cuda_devices=1`，由启动器按 Hydra 机器配置解析并消费，
+不修改共享的本机配置或其他运行进程。先检查目标卡资源；BR 测评的 `result.json`
+记录实际 `CUDA_VISIBLE_DEVICES`、逻辑设备和 GPU 名称。
+
 ## 构建、测试与部署
 
 ```bash

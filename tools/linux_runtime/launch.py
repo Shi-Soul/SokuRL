@@ -10,9 +10,15 @@ from linux_runtime.environment import REPO, native_environment, restrict_writes,
 def main():
     if len(sys.argv) < 3 or sys.argv[1] not in {"native", "wine", "worker"}:
         raise ValueError("use scripts/linux.sh or scripts/wine-python.sh with Python arguments")
-    config = settings()
+    # Consume only the machine GPU override; remaining Hydra arguments belong
+    # to the selected entry point. Keep sys.argv intact across sudo re-exec.
+    overrides = [arg for arg in sys.argv[3:] if arg.startswith("linux.cuda_devices=")]
+    if len(overrides) > 1:
+        raise ValueError("specify linux.cuda_devices only once")
+    config = settings(overrides)
     use_workspace_user(config)
-    mode, arguments = sys.argv[1], sys.argv[2:]
+    mode = sys.argv[1]
+    arguments = [arg for arg in sys.argv[2:] if not arg.startswith("linux.cuda_devices=")]
     if mode == "worker":
         from linux_runtime.worker_session import run_worker
         os.chdir(REPO)

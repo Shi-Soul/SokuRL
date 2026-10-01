@@ -2,6 +2,7 @@
 from contextlib import closing
 import hashlib
 import json
+import os
 from pathlib import Path
 import time
 
@@ -61,7 +62,9 @@ def main(cfg):
         checkpoint_sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
         training_config_sha256=hashlib.sha256(training_path.read_bytes()).hexdigest())
     (output / "config.yaml").write_text(OmegaConf.to_yaml(OmegaConf.create(config)), encoding="utf-8")
-    report = {"success": False, "phase": "loading_policies"}
+    report = {"success": False, "phase": "loading_policies",
+        "device": str(device), "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
+        "device_name": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu"}
     started = time.perf_counter()
     try:
         policy = load_policy(candidate, {"kind": kind, "path": str(model_path),
