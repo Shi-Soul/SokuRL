@@ -1,0 +1,17 @@
+defaults:
+  - train
+  - _self_
+
+launch:
+  command: ???
+  timeout: 30.0
+  pid: null
+  headless: false
+  unlimited: false
+  path: ???
+  frame: null
+  name: ???
+
+hydra:
+  run:
+    dir: logs/hydra/game-control-${now:%Y%m%d-%H%M%S}

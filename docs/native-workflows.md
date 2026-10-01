@@ -5,21 +5,21 @@
 ## 启动模式
 
 ```powershell
-.\.venv\Scripts\python.exe tools\sokurl.py practice
-.\.venv\Scripts\python.exe tools\sokurl.py vs
-.\.venv\Scripts\python.exe tools\sokurl.py vs --headless
-.\.venv\Scripts\python.exe tools\sokurl.py vs --headless --unlimited
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=practice
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=vs
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=vs launch.headless=true
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=vs launch.headless=true launch.unlimited=true
 ```
 
-`--headless` 跳过已定位的战斗渲染，仍创建窗口并初始化图形、音频与资源。`--unlimited` 取消本地 VS 战斗的计时等待，要求同时使用 `--headless`。二者不改变游戏模拟帧的定义。
+`launch.headless=true` 跳过已定位的战斗渲染，仍创建窗口并初始化图形、音频与资源。`launch.unlimited=true` 取消本地 VS 战斗的计时等待，要求同时使用 `launch.headless=true`。二者不改变游戏模拟帧的定义。
 
-VS 启动经标题、加载和战斗场景的正常生命周期。练习模式由 SkipIntro 配置选择。回放命令交给 ReplayDnD；所需 SkipIntro 补丁必须已安装。
+此诊断入口使用 `config/game_control.yaml`，游戏目录取自共享的 `runtime.game_directory`。必须显式指定 `launch.command`；关闭进程还必须指定 `launch.pid`。VS 诊断命令沿用 SkipIntro 中的角色和卡组选择；训练与本地策略对战通过 `episode.match` 指定双方设置。VS 启动经标题、加载和战斗场景的正常生命周期。练习模式由 SkipIntro 配置选择。回放命令交给 ReplayDnD；所需 SkipIntro 补丁必须已安装。
 
 ## 帧控制与重置
 
 `BridgeClient.step_with_inputs(p1, p2)` 同时设置双方逻辑按键并推进一个模拟帧。调用方须核对确认序号、结果码、目标帧号和暂停状态，不能只看到确认就认为动作完成。
 
-`send_action()` 只控制 1P，适合连续运行。ABI 9 的 `step_controlled({seat: keys})` 只接管给定座位并推进一帧，另一侧保留原游戏输入；座位为 0 或 1。传入两个座位时与联合步进使用同一条命令处理路径。完整实时人机入口仍待接通和验证。
+`send_action()` 只控制 1P，适合连续运行。ABI 9 的 `step_controlled({seat: keys})` 只接管给定座位并推进一帧，另一侧保留原游戏输入；座位为 0 或 1。传入两个座位时与联合步进使用同一条命令处理路径。完整实时人机入口见[本地对战](local-match.md)；真实游戏验证尚未完成。
 
 三种操作须分清：
 
@@ -52,7 +52,7 @@ VS 检查要求双方控制、攻击、对象生成及伤害实际发生。加�
 ## 回放与策略视频
 
 ```powershell
-.\.venv\Scripts\python.exe tools\sokurl.py replay C:\path\to\match.rep
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=replay launch.path=C:/path/to/match.rep
 ```
 
 原生 `.rep` 文件与学习策略评测保存的动作序列是不同格式。`tools/render_replay.py` 用后者及保存的配置重新运行真实游戏，再输出视频；命令及证据见[学习包装层](learning-wrappers.md)和[验收记录](env-validation.md)。

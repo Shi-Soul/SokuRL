@@ -103,10 +103,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_sokumods.ps1 
 ## 启动和验收
 
 ```powershell
-.\.venv\Scripts\python.exe tools\sokurl.py practice
-.\.venv\Scripts\python.exe tools\sokurl.py list
-.\.venv\Scripts\python.exe tools\sokurl.py status --pid <本次启动的进程编号>
-.\.venv\Scripts\python.exe tools\sokurl.py shutdown --pid <本次启动的进程编号>
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=practice
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=list
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=status launch.pid=<本次启动的进程编号>
+.\.venv\Scripts\python.exe tools\sokurl.py launch.command=shutdown launch.pid=<本次启动的进程编号>
 ```
 
 人类操作检查需确认真实画面、移动、跳跃和攻击。自动对战、加速一致性、回放及重置的完整命令见[原生运行流程](native-workflows.md)。训练工作进程命令与 Hydra 配置见[双人环境接口](multi-agent-env.md)和[算法说明](algorithms.md)。

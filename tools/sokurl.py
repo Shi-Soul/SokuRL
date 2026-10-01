@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import configparser
 import ctypes
 import hashlib
@@ -8,7 +7,6 @@ import json
 import os
 import struct
 import subprocess
-import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -598,93 +596,6 @@ def shutdown(timeout: float, pid: int | None) -> int:
     return 0
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Thin SokuRL game launcher")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    practice_parser = subparsers.add_parser("practice", help="launch the SkipIntro Practice preset")
-    practice_parser.add_argument("--timeout", type=float, default=30.0)
-    practice_parser.add_argument("--pid", type=int)
-    vs_parser = subparsers.add_parser("vs", help="launch local VS Player through Title")
-    vs_parser.add_argument("--timeout", type=float, default=30.0)
-    vs_parser.add_argument("--headless", action="store_true", help="skip complex battle rendering")
-    vs_parser.add_argument(
-        "--unlimited", action="store_true", help="remove VS battle wall-clock pacing"
-    )
-    replay_parser = subparsers.add_parser("replay", help="launch a replay through ReplayDnD")
-    replay_parser.add_argument("path", type=Path)
-    replay_parser.add_argument("--frame", type=int)
-    replay_parser.add_argument("--timeout", type=float, default=35.0)
-    anchor_parser = subparsers.add_parser("anchor", help="save or load a ScenarioRunner anchor")
-    anchor_commands = anchor_parser.add_subparsers(dest="anchor_command", required=True)
-    anchor_save = anchor_commands.add_parser("save")
-    anchor_save.add_argument("name")
-    anchor_save.add_argument("--pid", type=int, required=True)
-    anchor_load = anchor_commands.add_parser("load")
-    anchor_load.add_argument("name")
-    anchor_load.add_argument("--pid", type=int)
-    script_parser = subparsers.add_parser("script", help="run a ScenarioRunner opponent script")
-    script_commands = script_parser.add_subparsers(dest="script_command", required=True)
-    script_run = script_commands.add_parser("run")
-    script_run.add_argument("path", type=Path)
-    script_run.add_argument("--pid", type=int, required=True)
-    subparsers.add_parser("list", help="list all th123 instances")
-    status_parser = subparsers.add_parser("status", help="show process and Practice status")
-    status_parser.add_argument("--pid", type=int)
-    shutdown_parser = subparsers.add_parser("shutdown", help="close th123")
-    shutdown_parser.add_argument("--timeout", type=float, default=5.0)
-    shutdown_parser.add_argument("--pid", type=int)
-    return parser
-
-
-def main() -> int:
-    args = build_parser().parse_args()
-    try:
-        if args.command == "practice":
-            return practice(args.timeout, args.pid)
-        if args.command == "vs":
-            return versus(args.timeout, args.headless, args.unlimited)
-        if args.command == "replay":
-            return replay(args.path, args.frame, args.timeout)
-        if args.command == "anchor":
-            from scenario_runner import anchor_path, load_anchor, save_anchor
-            if args.anchor_command == "save":
-                document = save_anchor(args.name, args.pid)
-                print(json.dumps({
-                    "anchor": args.name,
-                    "path": str(anchor_path(args.name)),
-                    "target_frame": document["target_frame"],
-                    "target_hash": document["target_hash"],
-                }, indent=2))
-                return 0
-            if args.pid is not None:
-                shutdown(5.0, args.pid)
-            instance = load_anchor(args.name)
-            snapshot = instance.client.snapshot()
-            pid = instance.pid
-            instance.client.close()
-            print(json.dumps({
-                "anchor": args.name,
-                "pid": pid,
-                "frame": snapshot.game_frame,
-                "hash": f"{snapshot.latest.stateHash:016X}",
-                "state": snapshot.run_state_name,
-            }, indent=2))
-            print("ANCHOR_READY")
-            return 0
-        if args.command == "script":
-            from scenario_runner import parse_script, run_script
-            result = run_script(parse_script(args.path), args.pid)
-            print(json.dumps(result, indent=2))
-            return 0
-        if args.command == "list":
-            return list_instances()
-        if args.command == "status":
-            return status(args.pid)
-        return shutdown(args.timeout, args.pid)
-    except (BridgeUnavailable, RuntimeError, ValueError, OSError, psutil.Error) as error:
-        print(f"ERROR: {error}", file=sys.stderr)
-        return 1
-
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from game_runtime.commands import main
+    main()
