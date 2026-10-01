@@ -11,6 +11,7 @@
 | 前馈 BC + PPO 262144 步 | 0.53745 | 86.892% | 37.790% | 0.66192 | 0.11731 |
 | 循环 BC best | 0.35580 | 91.847% | 46.581% | 0.38287 | 0.12841 |
 | 循环 BC + PPO 65536 步 | 1.53217 | 57.538% | 37.957% | 1.19795 | 0.11694 |
+| 循环 BC + PPO 131072 步 | 2.19479 | 46.882% | 28.914% | 1.24748 | 0.13241 |
 
 变化帧分母固定为 3583。两类 PPO 的动作分布均偏离原教师标签，循环模型更明显；
 但表格本身不能判定是策略损失、价值损失、熵正则或状态分布变化中的哪一项造成，
@@ -18,6 +19,20 @@
 GPU 6 的只读核对日志为 `.dev/audit-cloning-retention-20261001.log`，
 结构化指标、模型和数据 manifest SHA256 为
 `logs/diagnostics/cloning-retention-20261001/summary.json`。
+
+原循环 PPO 已完成 131072 步，耗时 1897.79 秒。课程训练共 20 局，
+2 胜、10 负、8 超时；平均自身/对手 HP 下降为 9601.45/6827.45，
+自身/对手符卡动作进入平均为 0.40/0.25 次每局。
+第 20 局 EMA 严格胜率为 0.09312，下一局 uniform 比例由 0.90 调至 0.95。
+最终教师验证保留分数继续下降；模型与课程 sidecar SHA256 匹配，
+记录在 `.dev/audit-recurrent-final-retention-20261001.log` 和
+`logs/diagnostics/recurrent-final-retention-20261001/summary.json`。
+训练私有 worker `309c305ca913427198d9f820b41fcd6a` 与服务均正常退出，前缀/游戏副本清理成功。
+最终完整神 AI 测评单独保存在 `logs/benchmark/br-reimu-recurrent-adaptive-131072-20261001`。
+该评估已成功完成，187.31 秒、4 局全负，平均对手 HP 下降 310.25，自身 10000，
+双方符卡动作进入均为 0；种子/角色/座位配对、模型哈希与私有服务清理均核对通过。
+记录为 `.dev/audit-recurrent-final-evaluation-20261001.log`。
+不再延长这一共享特征循环 PPO 配置，保留终点及中点作为对照。
 
 ## 分离 actor / critic 特征的对照
 
@@ -47,3 +62,21 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 同时检查存档、通用策略加载、仅权重初始化，以及两种结构从序列 BC 进入实际短 PPO 更新。
 这些单元测试不替代真实游戏强度验证。
 相关测试共 19 项通过，日志 `.dev/pytest-recurrent-separate-features-20261001-v2.log`。
+
+分离特征的拟合从源码 `880de9f` 成功完成，245.30 秒、6734 次监督更新，
+与原循环 BC 使用相同训练/验证帧及分块顺序。按 NLL 选择第 20 轮 best：
+NLL 0.34007、总准确率 92.049%、变化帧准确率 50.461%、价值 MSE 0.07127。
+此处没有新增在线 PPO 步数，完整神 AI 对照在
+`logs/benchmark/br-reimu-recurrent-separate-zero-shot-20261001`；离线改善不代表已经获胜。
+
+后续在线对照使用该 best 初始化独立特征架构，优化器、步数和课程从零开始，预算仍为 131072 步：
+
+```bash
+bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
+  rl=recurrent_separate_transfer rl.cpu_threads=1 rules=god \
+  wrappers=superhuman_learning track=superhuman_combat \
+  +br_opponents=god_target algorithm.target.character=0 +curriculum=adaptive_noise \
+  num_envs=4 algorithm.timesteps=131072 \
+  '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-separate-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-separate-20261001/config.yaml}' \
+  output=logs/training/br-superhuman-reimu-recurrent-separate-adaptive-20261001
+```
