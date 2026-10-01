@@ -1,0 +1,30 @@
+defaults:
+  - _self_
+  - optional local: linux
+
+operation: check
+linux:
+  root: ???
+  state: ${linux.root}/.dev
+  uid: ???
+  wine: ???
+  windows_python: ???
+  windows_packages: ???
+  prefix: ${linux.state}/prefix
+  toolchain: ${linux.state}/toolchain
+  game: ${linux.state}/game
+  game_source: ???
+  prefix_source: ???
+  display: "127.0.0.1:101"
+  display_number: 101
+  xauthority: ${linux.state}/display/auth
+  pulse_socket: ${linux.state}/audio/native
+  xvfb: ???
+  pulseaudio: /usr/bin/pulseaudio
+  cuda_devices: ???
+
+hydra:
+  run:
+    dir: ${linux.state}/logs/setup-${now:%Y%m%d-%H%M%S}
+  job:
+    chdir: false
