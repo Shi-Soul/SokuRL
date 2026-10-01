@@ -1,6 +1,12 @@
 """Load every policy type through the same observation and action contract."""
 def load_policy(name, spec, interface, device):
     kind = spec["kind"]
+    if kind == "action_noise":
+        from soku_rl.policy.action_noise import ActionNoisePolicy
+        if set(spec) != {"kind", "policy", "random_probability"}:
+            raise ValueError("action_noise requires policy and random_probability")
+        return ActionNoisePolicy(name, load_policy(name, spec["policy"], interface, device),
+            int(interface.action_space.n), spec["random_probability"])
     if kind == "rule":
         from soku_rl.policy.rules.observed_rules import RulePolicy, LearningRulePolicy
         from soku_rl.policy.rules.strategies import rule_implementation

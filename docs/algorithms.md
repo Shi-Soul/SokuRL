@@ -416,3 +416,31 @@ rollout 跨过边界，文件名仍写实际已更新步数，不伪造精确边
 的 step 从 5120 增至 5440；与源 `final.zip` 逐项读取核对，记录和两个检查点
 SHA256 见 `logs/diagnostics/br-combat-continuation-20261001/result.json`。
 此检查确认优化器计数接续，不表示游戏现场或随机数流逐位恢复，也不证明强度。
+
+课程候选 `+br_opponents=god_noisy_target` 使用显式的 `kind: action_noise`
+策略包装器。每个决策以 `algorithm.target.random_probability` 的概率将原策略
+输出替换为完整动作空间上的均匀抽样；默认 0.9。原控制器每帧仍读取当前观测、
+推进计时和记忆，替换发生在输出端。每局使用独立的替换门控和动作随机流，
+原控制器保持原种子。概率为 0 时输出与原策略逐帧相同，概率为 1 时输出均匀
+随机；后者仍执行原控制器，不是省略控制器计算的优化。
+包装后的指纹包含原策略身份、概率、动作数量与包装器版本。God 脚本与角色的
+一致性校验穿过包装器执行。学习者的动作、奖励、输入和逐帧控制合同不变，
+同一策略加载器也供其他 MARL 使用。33 项相关测试通过，日志在
+`.dev/pytest-action-noise-20261001.log`；尚未证明此课程提高实战强度。
+
+预先固定首个实验为神灵梦随机替换概率 0.9、65536 步，使用
+`rl=ppo_sparse_transfer track=superhuman_combat`、seed 1732、随机座位、
+4 环境、1 CPU 线程。随后在完整神灵梦上做零样本双座位评测，再视实测结果
+决定是否转入更低噪声或直接训练完整神 AI。替换概率与难度未必单调对应，
+噪声目标上的胜率不能作为战胜原神 AI 的证据。评测完整神 AI 时必须指定
+`opponent_source=config +br_opponents=god_target`，避免默认沿用训练噪声目标。
+课程预训练步数计入全部预算；已有无噪声长期续训保留为对照。
+
+```bash
+bash scripts/linux.sh tools/train.py linux.cuda_devices=3 algorithm=br \
+  rl=ppo_sparse_transfer rl.cpu_threads=1 rules=god \
+  wrappers=superhuman_learning track=superhuman_combat \
+  +br_opponents=god_noisy_target algorithm.target.random_probability=0.9 \
+  num_envs=4 algorithm.timesteps=65536 \
+  output=logs/training/br-superhuman-reimu-noise90-warmup-20261001
+```
