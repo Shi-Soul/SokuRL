@@ -118,3 +118,10 @@ RTX 3080 Ti，Torch 2.9.1+cu128 和 Wine 工作进程依赖可用。第一轮 DQ
 预算仍为 262144 转移。这会增加优化成本，是否提高样本效率由相同 validation
 对局判断，不能把更多更新本身当作改善。第三组选择已检查有约 6 GiB 可用显存的
 GPU 5，继续保留其他任务进程；运行入口显式 `linux.cuda_devices=5`。
+
+第三组已启动于 `logs/training/br-dqn-reimu-more-replay-20261001`，stdout 为
+`logs/train-dqn-more-replay-20261001.txt`，启动前再次检查 GPU 5 可用显存不少于
+5500 MiB；8 环境、2 CPU 线程，source commit `97e9240`。截至本条记录只确认
+训练进程存活及配置落盘，首个真实更新仍待核对。三组最终样本预算保持一致；
+第三组所在物理 GPU 和并发条件不同，墙钟差异不能全部归因于回放更新次数。
+`config/analyze_dqn.yaml` 已包含三组路径，等待第三组产生时序日志后再运行。
