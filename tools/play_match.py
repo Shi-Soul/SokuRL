@@ -21,15 +21,23 @@ def main(cfg):
         raise ValueError("players must specify player_0 and player_1")
     episode = EpisodeConfig.from_dict(config["episode"])
     interface = LearningInterface(episode, LearningConfig(**config["wrappers"]))
-    policies = {seat: load_play_policy(candidate, interface, config["rules"], config["device"], seat)
-                for seat, candidate in enumerate(config["players"][f"player_{i}"] for i in (0, 1))
-                if candidate != "human"}
+    policies = {}
+    for seat in (0, 1):
+        candidate = config["players"][f"player_{seat}"]
+        if candidate == "human":
+            continue
+        if not isinstance(candidate, dict):
+            raise ValueError("each player must be human or a named policy configuration")
+        policies[seat] = load_play_policy(candidate, interface, config["rules"], config["device"], seat)
     if not policies:
         raise ValueError("at least one player must be a policy")
     directory = Path(config["output"]).resolve()
     directory.mkdir(parents=True, exist_ok=False)
     (directory / "config.yaml").write_text(OmegaConf.to_yaml(cfg, resolve=True), encoding="utf-8")
     report = {"success": False, "policies": {seat: policy.fingerprint for seat, policy in policies.items()}}
+    labels = [f"{seat + 1}P：策略 {policies[seat].name}" if seat in policies else f"{seat + 1}P：玩家"
+              for seat in (0, 1)]
+    print("；".join(labels) + "。", flush=True)
     try:
         with closing(WorkerBackend(log_path=directory / "worker.log", **config["runtime"])) as connection:
             if connection.identity["kind"] != "local_match":
@@ -40,6 +48,11 @@ def main(cfg):
                     events.write(json.dumps(value) + "\n")
                     if value["kind"] == "frame" and value["events"]:
                         events.flush()
+                        for event in value["events"]:
+                            if event["kind"] == "round_started":
+                                print(f"第 {event['round'] + 1} 局开始，比分 {event['scores'][0]}:{event['scores'][1]}。", flush=True)
+                            elif event["kind"] == "match_finished":
+                                print(f"本场结束，比分 {event['scores'][0]}:{event['scores'][1]}。", flush=True)
                 report["result"] = run_session(connection, policies, interface, config["seed"],
                     config["session"]["matches"], config["session"]["timeout"], record)
             report["success"] = report["result"]["termination"] == "matches_completed"

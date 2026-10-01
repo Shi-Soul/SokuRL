@@ -65,3 +65,8 @@ def test_local_play_composes_the_shared_superhuman_configuration():
     assert config.episode.decision_frames == 1 and config.episode.latency_frames == 0
     assert config.rules.roster == ["god"]
     assert config.players.player_1 == "human"
+    with initialize_config_dir(version_base="1.3", config_dir=str(root / "config")):
+        swapped = compose(config_name="local_match", overrides=["players.player_0=human",
+            "players.player_1={name:god,policy:{kind:rule,name:god}}"])
+    assert swapped.players.player_0 == "human"
+    assert swapped.players.player_1.policy.name == "god"
