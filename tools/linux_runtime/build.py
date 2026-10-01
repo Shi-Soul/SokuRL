@@ -100,10 +100,11 @@ def deploy(config):
         try:
             arguments = " ".join(process.info["cmdline"] or [])
             executable = process.info["exe"] or ""
-            if "th123.exe" in arguments.lower() + executable.lower() and (
-                    str(game) in arguments + executable or windows(game) in arguments):
-                raise RuntimeError(f"game directory is in use by PID {process.pid}")
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            if "th123.exe" in (arguments + executable).lower():
+                normalized = (arguments + executable).replace("\\", "/").lower()
+                if str(game).lower() in normalized or process.cwd() == str(game):
+                    raise RuntimeError(f"game directory is in use by PID {process.pid}")
+        except psutil.NoSuchProcess:
             continue
     report = json.loads((REPO / "build/linux/artifacts.json").read_text(encoding="utf-8"))
     for name, target in MODULES.items():

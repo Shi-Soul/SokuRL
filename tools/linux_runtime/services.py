@@ -1,6 +1,7 @@
 """Start only workspace-owned virtual display and audio services."""
 import json
 import os
+import pwd
 from pathlib import Path
 import secrets
 import socket
@@ -37,6 +38,10 @@ def start(config):
     if not cookie.exists():
         cookie.write_bytes(secrets.token_bytes(256))
         cookie.chmod(0o600)
+    account = pwd.getpwuid(config["uid"])
+    for path in (auth, cookie, pulse.parent, state / "audio"):
+        if path.stat().st_uid != account.pw_uid:
+            path.chown(account.pw_uid, account.pw_gid)
     env.update(PULSE_CONFIG_PATH=str(cookie.parent), PULSE_STATE_PATH=str(state / "audio/state"),
         PULSE_RUNTIME_PATH=str(pulse.parent))
     commands = {
@@ -56,7 +61,7 @@ def start(config):
             uid = 0 if name == "display" else config["uid"]
             with (state / f"{name}.log").open("wb") as output:
                 process = subprocess.Popen(command, env=child_env, cwd=state, stdin=subprocess.DEVNULL,
-                    stdout=output, stderr=subprocess.STDOUT, user=uid, group=uid, extra_groups=(),
+                    stdout=output, stderr=subprocess.STDOUT, user=uid, group=0 if uid == 0 else account.pw_gid, extra_groups=(),
                     start_new_session=True, preexec_fn=lambda: restrict_writes(root))
             processes.append(process)
             records[name] = {"pid": process.pid, "command": command}

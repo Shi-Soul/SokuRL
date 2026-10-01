@@ -30,3 +30,8 @@ gcc -shared -fPIC -O2 -Wall -Wextra XkbDirectory.c -ldl -o XkbDirectory.so
 Xvfb 的授权文件、帧缓冲、缓存、日志和临时目录也须放在获准目录中。
 使用带授权的 TCP 连接，关闭 Unix 监听和锁文件，避免生成系统临时目录文件。
 当前 Xvfb 要求以 root 身份使用 `-nolock`；测试游戏仍以非特权用户运行。
+
+`MappingMemory.c` 将 Wine 10.0 创建后立即删除的 `tmpmap-*` 文件改为匿名内存文件，
+避免在系统盘存放这些短期映射。它不将任务文件写入 `/dev/shm`。
+项目的 [Linux 开发入口](../../docs/linux-development.md) 会统一编译这三个库，配置缓存与运行路径，
+并限制运行进程的文件写入范围；不要继续使用未纳入版本管理的旧启动脚本。

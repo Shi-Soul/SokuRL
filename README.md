@@ -15,6 +15,7 @@ SokuRL 用原版《东方非想天则》1.10a 引擎运行双人对战，通过 
 | 拟人观测过滤及其误差 | [可见性与控制规范](docs/human-aligned-env.md) |
 | 90 动作、派生特征、按键历史和奖励塑形 | [学习包装层](docs/learning-wrappers.md) |
 | 安装、构建、部署和启动 | [安装指南](docs/installation.md) |
+| 不依赖 Windows 机器的 Linux 开发、训练与测评 | [Linux 开发流程](docs/linux-development.md) · [Agent 工作说明](AGENTS.md) |
 | 原生控制、回放、场景重建和验证命令 | [原生运行流程](docs/native-workflows.md) |
 | 双方 AI 或单窗口人机对战 | [本地逐帧对战](docs/local-match.md)，真实游戏验收待完成 |
 | 保存官方回放及转换环境轨迹 | [回放与轨迹](docs/replays.md) |
