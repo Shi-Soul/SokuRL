@@ -9,7 +9,7 @@
 #include "NetworkState.hpp"
 #include "NetworkInput.hpp"
 #include "NetworkSelection.hpp"
-#include "ProfileDeck.hpp"
+#include "LocalStart.hpp"
 #include "HeldInput.hpp"
 
 #include <BattleManager.hpp>
@@ -18,7 +18,6 @@
 #include <Hash.hpp>
 #include <InputManager.hpp>
 #include <PracticeSettings.hpp>
-#include <Profile.hpp>
 #include <Scenes.hpp>
 #include <SokuAddresses.hpp>
 #include <Tamper.hpp>
@@ -35,6 +34,7 @@
 namespace
 {
 using SokuRLBridge::stateHash;
+using SokuRLBridge::environmentValue;
 using SokuRLBridge::captureState;
 using SokuRLBridge::load32;
 using SokuRLBridge::store32;
@@ -49,18 +49,12 @@ using BattleRenderMethod = int (SokuLib::Battle::*)();
 using BattleManagerProcessMethod = int (SokuLib::BattleManager::*)();
 using SelectProcessMethod = int (SokuLib::Select::*)();
 using TitleProcessMethod = int (SokuLib::Title::*)();
-using ProfileInitializeMethod = void (__thiscall *)(SokuLib::Profile *, char);
 
 constexpr DWORD KEYMAP_SET_INPUTS_HOOK = 0x0040A45D;
 constexpr DWORD INPUT_CLUSTER_UPDATE_HOOK = 0x0043E55F;
 constexpr DWORD P1_KEYMAP_MANAGER_PTR = 0x008989A0;
 constexpr DWORD P2_KEYMAP_MANAGER_PTR = 0x0089918C;
-constexpr DWORD P1_INPUT_MANAGER_PTR = 0x00898680;
-constexpr DWORD P2_INPUT_MANAGER_PTR = 0x00898684;
-constexpr DWORD P1_INPUT_DEVICE = 0x00898678;
-constexpr DWORD INPUT_MANAGER_CLUSTER_DEVICE = 0x0089A2BC;
 constexpr DWORD FALLBACK_KEY_MANAGER = 0x008986A8;
-constexpr DWORD PROFILE_INITIALIZE = 0x00434BF0;
 constexpr std::uint32_t LOCAL_BATTLE_SCENE = 5;
 
 HANDLE g_fileMapping = nullptr;
@@ -99,17 +93,7 @@ bool g_vsBootstrapComplete = false;
 bool g_episodeResetRequested = false;
 bool g_headlessRender = false;
 bool g_unlimitedPacing = false;
-bool g_vsPauseAtStart = false;
-bool g_vsSeedRequested = false;
-std::uint32_t g_vsSeed = 0;
-std::uint32_t g_vsP1Character = 1;
-std::uint32_t g_vsP2Character = 0;
-std::uint32_t g_vsP1Palette = 0;
-std::uint32_t g_vsP2Palette = 0;
-std::uint32_t g_vsP1Deck = 0;
-std::uint32_t g_vsP2Deck = 0;
-std::uint32_t g_vsStage = 0;
-std::uint32_t g_vsMusic = 0;
+SokuRLBridge::LocalStart g_localStart;
 
 struct CheckpointIdentity {
     std::uint32_t leftCharacter;
@@ -187,51 +171,6 @@ void acknowledge(std::uint32_t sequence)
     store32(&g_control->ackSeq, sequence);
 }
 
-std::uint32_t environmentValue(const wchar_t *name, std::uint32_t fallback)
-{
-    wchar_t value[16]{};
-    const auto length = GetEnvironmentVariableW(name, value, _countof(value));
-    if (!length || length >= _countof(value))
-        return fallback;
-    wchar_t *end = nullptr;
-    const auto parsed = wcstoul(value, &end, 10);
-    return end && *end == L'\0' ? static_cast<std::uint32_t>(parsed) : fallback;
-}
-
-bool configureVsPlayer(SokuLib::PlayerInfo &info, bool right, std::uint32_t character,
-    std::uint32_t palette, std::uint32_t deck)
-{
-    auto &profile = right ? SokuLib::profile2 : SokuLib::profile1;
-    auto &source = SokuRLBridge::profileDeck(profile, character, deck);
-    if (source.size != 20)
-        return false;
-    const auto initializeProfile = reinterpret_cast<ProfileInitializeMethod>(PROFILE_INITIALIZE);
-    info.character = static_cast<SokuLib::Character>(character);
-    info.isRight = right;
-    info.palette = static_cast<unsigned char>(palette);
-    info.deck = static_cast<unsigned char>(deck);
-    info.effectiveDeck.clear();
-
-    if (right) {
-        *reinterpret_cast<SokuLib::KeyManager **>(P2_INPUT_MANAGER_PTR) =
-            reinterpret_cast<SokuLib::KeyManager *>(FALLBACK_KEY_MANAGER);
-        initializeProfile(&SokuLib::profile2, -1);
-        info.keyManager = reinterpret_cast<SokuLib::KeyManager **>(P2_KEYMAP_MANAGER_PTR);
-        for (int i = 0; i < source.size; ++i)
-            info.effectiveDeck.push_back(source[i]);
-        return true;
-    }
-
-    *reinterpret_cast<signed char *>(P1_INPUT_DEVICE) = -1;
-    *reinterpret_cast<SokuLib::KeyManager **>(P1_INPUT_MANAGER_PTR) =
-        reinterpret_cast<SokuLib::KeyManager *>(FALLBACK_KEY_MANAGER);
-    initializeProfile(&SokuLib::profile1, -1);
-    info.keyManager = reinterpret_cast<SokuLib::KeyManager **>(P1_KEYMAP_MANAGER_PTR);
-    for (int i = 0; i < source.size; ++i)
-        info.effectiveDeck.push_back(source[i]);
-    return true;
-}
-
 CheckpointIdentity readIdentity()
 {
     CheckpointIdentity identity{};
@@ -288,8 +227,8 @@ void consumeCommand(bool gameplay)
         publishResult(SokuRLBridge::ResultCode::NotInGameplay);
     } else if (type == SokuRLBridge::CommandType::ResetEpisode &&
         g_vsBootstrapArmed && isLocalVersusGameplay() && argument < 0xFFFFFFFFULL) {
-        g_vsSeed = static_cast<std::uint32_t>(argument);
-        g_vsSeedRequested = true;
+        g_localStart.seed = static_cast<std::uint32_t>(argument);
+        g_localStart.seedRequested = true;
         g_episodeResetRequested = true;
         g_paused = true;
         g_stepsRemaining = 0;
@@ -616,25 +555,15 @@ int __fastcall titleOnProcess(SokuLib::Title *title)
     if (!g_vsBootstrapArmed || g_vsBootstrapComplete)
         return result;
 
-    *reinterpret_cast<signed char *>(INPUT_MANAGER_CLUSTER_DEVICE) = -1;
-    SokuLib::setBattleMode(SokuLib::BATTLE_MODE_VSPLAYER,
-        SokuLib::BATTLE_SUBMODE_PLAYING2);
-    if (!configureVsPlayer(SokuLib::leftPlayerInfo, false, g_vsP1Character,
-            g_vsP1Palette, g_vsP1Deck) ||
-        !configureVsPlayer(SokuLib::rightPlayerInfo, true, g_vsP2Character,
-            g_vsP2Palette, g_vsP2Deck)) {
+    if (!SokuRLBridge::configureLocalStart(g_localStart)) {
         publishResult(SokuRLBridge::ResultCode::TargetUnavailable);
         g_vsBootstrapArmed = false;
         return SokuLib::SCENE_TITLE;
     }
-    SokuLib::gameParams.stageId = static_cast<unsigned char>(g_vsStage);
-    SokuLib::gameParams.musicId = static_cast<unsigned char>(g_vsMusic);
-    if (g_vsSeedRequested)
-        SokuLib::gameParams.randomSeed = g_vsSeed;
-    if (g_vsPauseAtStart) {
+    if (g_localStart.pauseAtStart) {
         g_checkpointArmed = true;
-        g_checkpointSeedRequested = g_vsSeedRequested;
-        g_requestedCheckpointSeed = g_vsSeed;
+        g_checkpointSeedRequested = g_localStart.seedRequested;
+        g_requestedCheckpointSeed = g_localStart.seed;
         g_paused = true;
     }
     g_vsBootstrapComplete = true;
@@ -819,18 +748,7 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE, HMODULE)
         return false;
     }
     if (g_vsBootstrapArmed) {
-        g_vsP1Character = environmentValue(L"SOKURL_VS_P1_CHARACTER", 1);
-        g_vsP2Character = environmentValue(L"SOKURL_VS_P2_CHARACTER", 0);
-        g_vsP1Palette = environmentValue(L"SOKURL_VS_P1_PALETTE", 0);
-        g_vsP2Palette = environmentValue(L"SOKURL_VS_P2_PALETTE", 0);
-        g_vsP1Deck = environmentValue(L"SOKURL_VS_P1_DECK", 0);
-        g_vsP2Deck = environmentValue(L"SOKURL_VS_P2_DECK", 0);
-        g_vsStage = environmentValue(L"SOKURL_VS_STAGE", 0);
-        g_vsMusic = environmentValue(L"SOKURL_VS_MUSIC", 0);
-        g_vsPauseAtStart = environmentValue(L"SOKURL_VS_PAUSE_AT_START", 0) == 1;
-        const auto seed = environmentValue(L"SOKURL_VS_SEED", 0xFFFFFFFFU);
-        g_vsSeedRequested = seed != 0xFFFFFFFFU;
-        g_vsSeed = seed;
+        g_localStart = SokuRLBridge::readLocalStart();
     }
     const auto *commandLine = GetCommandLineW();
     if (commandLine && wcsstr(commandLine, L".rep")) {
