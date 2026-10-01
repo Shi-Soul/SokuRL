@@ -1,5 +1,6 @@
 """Train an approximate best response to an explicit frozen strategy mixture."""
 from dataclasses import dataclass
+import json
 import numpy as np
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
 from stable_baselines3.common.logger import configure
@@ -55,8 +56,26 @@ def train_response(env, config, opponents, probabilities, device, seed, director
         if learner_kind(config) == "dqn":
             callbacks = callbacks[:1]
         callbacks = CallbackList(callbacks)
-        model.learn(total_timesteps=config["timesteps"], callback=callbacks,
-                    reset_num_timesteps=False)
+        try:
+            model.learn(total_timesteps=config["timesteps"], callback=callbacks,
+                        reset_num_timesteps=False)
+        except BaseException as error:
+            # Game/process failures must not discard all learning since the last
+            # periodic checkpoint. Keep the original failure and a recovery pair.
+            recovery = {"error": repr(error), "steps": model.num_timesteps,
+                        "updates": model._n_updates, "saved": False}
+            try:
+                path = directory / "interrupted.zip"
+                save_checkpoint(model, path)
+                recovery.update(saved=True, checkpoint=str(path))
+            except Exception as save_error:
+                recovery["save_error"] = repr(save_error)
+                error.add_note(f"recovery checkpoint failed: {save_error!r}")
+            try:
+                (directory / "interrupted.json").write_text(json.dumps(recovery, indent=2), encoding="utf-8")
+            except OSError as write_error:
+                error.add_note(f"recovery record failed: {write_error!r}")
+            raise
         final = parameter_hash(model.policy)
         if initial == final:
             raise RuntimeError("BR completed without a policy update")

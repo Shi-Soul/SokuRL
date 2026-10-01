@@ -147,7 +147,7 @@ def main(cfg):
          ("train/entropy_loss", "Policy entropy (nats)")),
         (("train/loss", "Huber loss") if dqn else ("train/approx_kl", "Approximate KL per update")),
         (("train/td_error", "Mean absolute TD error") if dqn else ("train/clip_fraction", "PPO clipped fraction")),
-        (("train/q_mean", "Mean sampled Q value (symlog)") if dqn else
+        (("train/q_mean", "Mean sampled Q value") if dqn else
          ("train/explained_variance", "Value explained variance (symlog)")),
         ("rollout_seconds", "Sampling seconds per rollout"),
         ("update_seconds", "Optimization seconds per rollout"),
@@ -186,17 +186,19 @@ def main(cfg):
         axes[0, 2].text(.02, .88, "Dotted line: uniform over 576 actions", transform=axes[0, 2].transAxes, fontsize=8)
     else:
         axes[0, 2].set_ylim(0, 1)
-    axes[1, 2].set_yscale("symlog", linthresh=1)
+    if not dqn:
+        axes[1, 2].set_yscale("symlog", linthresh=1)
     # Do not magnify floating-point noise around an all-loss return of -1.
     axes[0, 0].set_ylim(min(return_limits) - .05, max(return_limits) + .05)
     for axis in (axes[0, 1], axes[0, 2], axes[1, 0], axes[1, 1], *axes[2]):
         axis.set_ylim(bottom=0)
     figure.suptitle("Superhuman BR snapshots — one seed per run\n"
                      "Step counter includes checkpoint continuation; weight-only pretraining is excluded", fontsize=14)
-    for axis in axes.flat:
-        if axis.get_legend_handles_labels()[0]:
-            axis.legend(fontsize=9)
-            break
+    # A newly started run may have timing but no episode/optimizer CSV yet.
+    # Select the panel covering most runs so every visible color is identified.
+    legend_axis = max(axes.flat, key=lambda axis: len(axis.get_legend_handles_labels()[1]))
+    if legend_axis.get_legend_handles_labels()[0]:
+        legend_axis.legend(fontsize=9, title="Runs")
     maximum_steps = max(summary["sampled_steps"] for summary in summaries.values())
     for axis in axes.flat:
         axis.set_xlim(0, max(maximum_steps / 1000, .001))

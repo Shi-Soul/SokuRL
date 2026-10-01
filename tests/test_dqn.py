@@ -295,3 +295,38 @@ def test_dqn_learns_terminal_rewards_instead_of_only_changing_weights():
         np.testing.assert_allclose(values, [-1., 1., -1.], atol=.12)
     finally:
         env.close()
+
+
+def test_br_runtime_failure_preserves_recoverable_dqn_without_claiming_success(tmp_path, monkeypatch):
+    from soku_rl.marl.br import train_br
+    torch.set_num_threads(1)
+    env=fixture_env()
+    config=dqn_config() | {"name":"br", "player":0, "matchups":{"mode":"fixed"},
+        "timesteps":16, "checkpoint_every":8, "initial_policy":{"kind":"fresh"},
+        "opponents":[{"name":"random", "probability":1., "policy":{"kind":"uniform"}}]}
+    first, second=tmp_path/'first', tmp_path/'second'
+    first.mkdir(); second.mkdir()
+    original=DoubleDQN.learn
+
+    def interrupted(model, total_timesteps, *args, **kwargs):
+        original(model, 8, *args, **kwargs)
+        raise RuntimeError("injected game restart failure")
+
+    monkeypatch.setattr(DoubleDQN, 'learn', interrupted)
+    try:
+        with pytest.raises(RuntimeError, match="injected game restart failure"):
+            train_br(env, config, 'cpu', 3, first)
+        recovery=json.loads((first/'interrupted.json').read_text())
+        assert recovery['saved'] is True and recovery['steps']==8 and recovery['updates']==2
+        assert not (first/'final.zip').exists()
+        source=contract(first, env, config)
+        monkeypatch.setattr(DoubleDQN, 'learn', original)
+        config['initial_policy']={'kind':'checkpoint','path':recovery['checkpoint'],'training_config':source}
+        config['timesteps']=8
+        resumed=train_br(env, config, 'cpu', 4, second)
+        assert resumed['start_steps']==8 and resumed['steps']==16
+        model=DoubleDQN.load(second/'final.zip',device='cpu')
+        model.load_replay_buffer(second/'final.replay.pkl')
+        assert model._n_updates==4 and model.replay_buffer.size()*model.n_envs==16
+    finally:
+        env.close()
