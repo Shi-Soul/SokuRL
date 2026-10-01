@@ -1,4 +1,4 @@
-"""Run a rule or learned policy on consecutive frames of one game round."""
+"""Run a rule or learned policy on consecutive frames with private memory."""
 from dataclasses import replace
 
 from soku_rl.env.encoding import AGENTS
@@ -8,7 +8,7 @@ from soku_rl.env.wrappers.learning import LearningEpisode
 
 
 class LivePolicy:
-    """Keep policy memory, observation history and own commands local to one round.
+    """Keep policy memory, observation history and own commands in one instance.
 
     The caller supplies observations for the configured track and submits returned
     commands through the local input transport. Command history records issued
