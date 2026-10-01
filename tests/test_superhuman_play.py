@@ -14,7 +14,7 @@ from soku_rl.play.live_policy import LivePolicy
 from soku_rl.play.match import MatchFrame, MatchState
 from soku_rl.play.match_policies import MatchPolicies
 from soku_rl.play.realtime_session import RealtimePolicy
-from soku_rl.env.encoding import decode_action
+from soku_rl.env.encoding import AGENTS, decode_action
 from soku_rl.policy.god.package import ScriptPackage
 from soku_rl.policy.god.runtime import GodPolicy
 from soku_rl.policy.rules.observed_rules import LearningRulePolicy
@@ -36,7 +36,7 @@ def test_original_strategy_matches_offline_with_absolute_live_frame_numbers(seat
     live = LivePolicy(policy, interface, seat)
     for origin, seed in ((1500, 37), (9000, 52)):
         actor = policy.spawn(seed)
-        history, features = ObservationHistory(episode), LearningEpisode(interface)
+        history, features = ObservationHistory(episode, AGENTS), LearningEpisode(interface)
         for frame in range(12):
             first = observation(1)
             first.world.update(frame=frame, battle_time=500 + frame)

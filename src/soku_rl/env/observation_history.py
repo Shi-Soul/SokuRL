@@ -9,9 +9,12 @@ from soku_rl.env.encoding import AGENTS
 
 
 class ObservationHistory:
-    def __init__(self, config):
+    def __init__(self, config, agents):
+        if not agents or len(set(agents)) != len(agents) or any(agent not in AGENTS for agent in agents):
+            raise ValueError("history requires distinct supported agent names")
         self.config = config
-        self.history = [deque(maxlen=config.history_frames) for _ in AGENTS]
+        self.indices = {agent: AGENTS.index(agent) for agent in agents}
+        self.history = {agent: deque(maxlen=config.history_frames) for agent in agents}
         self.frame = -1
 
     def _encode(self, frame, observations):
@@ -20,11 +23,12 @@ class ObservationHistory:
         for observation in observations:
             if isinstance(observation, (RGBFrame, StateObservation)) and observation.frame != frame:
                 raise RuntimeError("image and simulation frame do not match")
-        return tuple(self.config.encode(observation) for observation in observations)
+        return {agent: self.config.encode(observations[index]) for agent, index in self.indices.items()}
 
     def reset(self, frame, observations):
         encoded = self._encode(frame, observations)
-        for history, value in zip(self.history, encoded, strict=True):
+        for agent, history in self.history.items():
+            value = encoded[agent]
             history.clear()
             history.extend(value.copy() for _ in range(self.config.history_frames))
         self.frame = frame
@@ -33,26 +37,27 @@ class ObservationHistory:
         if self.frame < 0 or frame != self.frame + 1:
             raise RuntimeError("observation history requires consecutive frames after reset")
         encoded = self._encode(frame, observations)
-        for history, value in zip(self.history, encoded, strict=True):
-            history.append(value)
+        for agent, history in self.history.items():
+            history.append(encoded[agent])
         self.frame = frame
 
     def clear(self):
-        for history in self.history:
+        for history in self.history.values():
             history.clear()
         self.frame = -1
 
     def observations(self):
         if self.frame < 0:
             raise RuntimeError("reset observation history before reading it")
-        result = {agent: np.concatenate(self.history[index]) for index, agent in enumerate(AGENTS)}
+        result = {agent: np.concatenate(history) for agent, history in self.history.items()}
         if self.config.observation_mode == "image":
-            for index, agent in enumerate(AGENTS):
+            for agent, index in self.indices.items():
                 role = np.full((1, 240, 320), index * 255, dtype=np.uint8)
                 result[agent] = np.concatenate((result[agent], role))
         return result
 
     def image(self, seat):
-        if self.frame < 0 or self.config.observation_mode != "image" or type(seat) is not int or seat not in (0, 1):
+        if (self.frame < 0 or self.config.observation_mode != "image" or type(seat) is not int
+                or seat not in (0, 1) or AGENTS[seat] not in self.history):
             raise ValueError("image requires a reset image history and a valid seat")
-        return self.history[seat][-1].transpose(1, 2, 0).copy()
+        return self.history[AGENTS[seat]][-1].transpose(1, 2, 0).copy()

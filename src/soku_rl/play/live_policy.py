@@ -24,7 +24,7 @@ class LivePolicy:
             raise ValueError("live policy requires public or complete privileged observations")
         self.policy, self.interface = policy, interface
         self.agent = AGENTS[seat]
-        self.history = ObservationHistory(interface.episode)
+        self.history = ObservationHistory(interface.episode, (self.agent,))
         self.features = LearningEpisode(interface)
         self.active = False
 

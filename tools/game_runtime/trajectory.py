@@ -39,7 +39,7 @@ def replay_frames(replay, match_index, config, launch_timeout, scratch_directory
         resources.callback(reader.close)
         memory = ProcessMemory(instance.pid)
         resources.callback(memory.close)
-        history = ObservationHistory(config)
+        history = ObservationHistory(config, AGENTS)
         raw = instance.state
         while True:
             state = reader.read(raw, instance.client)

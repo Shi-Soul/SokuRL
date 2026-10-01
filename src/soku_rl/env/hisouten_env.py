@@ -80,7 +80,7 @@ class Episode:
     """Own episode counters and observation history, never a policy."""
     def __init__(self, config):
         self.config = config
-        self.observation_history = ObservationHistory(config)
+        self.observation_history = ObservationHistory(config, AGENTS)
         self.ready = False
         self.ended = True
         self.frame = 0
