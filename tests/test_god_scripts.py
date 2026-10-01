@@ -102,6 +102,30 @@ def test_play_reuses_the_loaded_package_without_sharing_actor_memory(monkeypatch
 
 
 @pytest.mark.skipif(not NAMES, reason="external original community package is not installed")
+def test_compiled_scripts_keep_policy_portable_and_do_not_execute_before_observation(monkeypatch):
+    import pickle
+    from lupa.lua51 import LuaSyntaxError
+    from soku_rl.policy.god import runtime
+    package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
+    episode = EpisodeConfig(7200, 1, 1, 0, "privileged_state", VISIBILITY, LEGACY_MATCH)
+    policy = pickle.loads(pickle.dumps(GodPolicy("god", package, "00_reimu_main.ai", episode)))
+
+    def compile_during_play(*args):
+        raise AssertionError("script compilation ran after policy loading")
+
+    monkeypatch.setattr(runtime, "compiled_source", compile_during_play)
+    actor = policy.spawn(37)
+    assert actor.lua.globals()[b"main"] is None
+    actor.act(encode_privileged(observation(0)))
+    assert actor.lua.globals()[b"main"] is not None
+    assert policy.program(b"function_command.txt").startswith(b"\x1bLua")
+    # This asset is a table body, not a standalone Lua program. It must fail
+    # explicitly if a script tries to execute it, rather than act as empty code.
+    with pytest.raises(LuaSyntaxError):
+        policy.program(b"char_data.lua")
+
+
+@pytest.mark.skipif(not NAMES, reason="external original community package is not installed")
 def test_repaired_distance_tables_match_the_standard_script_conditions():
     from lupa.lua51 import LuaRuntime
     package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")

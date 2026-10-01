@@ -54,13 +54,16 @@ class ScriptPackage:
                 digest.update(name.encode("utf-8") + b"\0" + definition)
         self.fingerprint = digest.hexdigest()
 
-    def source(self, name):
+    def resolve_name(self, name):
         if isinstance(name, str):
             name = name.encode("utf-8")
         name = name.replace(b"\\", b"/")
         if name not in self.aliases:
             raise FileNotFoundError(f"script is absent from the source package: {name!r}")
-        relative = self.aliases[name]
+        return name
+
+    def source(self, name):
+        relative = self.aliases[self.resolve_name(name)]
         if relative in self.repairs:
             return self.repairs[relative] + self.files[relative]
         return self.files[relative]

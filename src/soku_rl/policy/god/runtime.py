@@ -1,7 +1,8 @@
 """Resume unchanged Lua strategies at each original _yield frame boundary."""
 import hashlib
+from functools import lru_cache
 
-from lupa.lua51 import LuaRuntime
+from lupa.lua51 import LuaRuntime, LuaSyntaxError
 
 from soku_rl.env.encoding import encode_action
 from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
@@ -52,17 +53,41 @@ end
 """
 
 
+@lru_cache(maxsize=512)
+def compiled_source(source, name):
+    """Cache immutable bytecode; never share a Lua state between actors."""
+    compiler = LuaRuntime(encoding=None)
+    try:
+        return compiler.eval(b"string.dump")(compiler.compile(source, name=name))
+    except LuaSyntaxError as error:
+        # The original package also contains data and documentation. An invalid
+        # chunk is an error only when selected or required as executable code.
+        return str(error)
+
+
 class GodPolicy(RulePolicy):
     def __init__(self, name, package, script, episode):
         if episode.observation_mode != "privileged_state" or (episode.decision_frames, episode.latency_frames) != (1, 0):
             raise ValueError("original community scripts require complete state and frame-by-frame control")
         self.name, self.package, self.script, self.episode = name, package, script, episode
+        self.programs = {alias: compiled_source(package.source(alias), b"@original/"+alias)
+                         for alias in package.aliases}
+        self.api_program = compiled_source(package.api, b"@original/api.ai")
+        self.scheduler_program = compiled_source(SCHEDULER, b"@sokurl/scheduler")
+        if isinstance(self.api_program, str) or isinstance(self.scheduler_program, str):
+            raise LuaSyntaxError("invalid original API or frame scheduler")
         if script != "character":
-            package.source(script)
+            self.program(script)
         self.fingerprint = hashlib.sha256((package.fingerprint + script).encode()).hexdigest()
 
     def spawn(self, seed):
         return GodActor(self, seed)
+
+    def program(self, name):
+        code = self.programs[self.package.resolve_name(name)]
+        if isinstance(code, str):
+            raise LuaSyntaxError(code)
+        return code
 
     def spawn_play(self, seed):
         # The original host reloads on battle scene entry, not on each knockout.
@@ -79,8 +104,8 @@ class GodActor:
         self.lua.globals()[b"_script_error"] = self.failures.append
         self.lua.globals()[b"print"] = self.record_message
         self.lua.globals()[b"require"] = self.require
-        self.lua.execute(policy.package.api, name=b"@original/api.ai")
-        self.lua.execute(SCHEDULER, name=b"@sokurl/scheduler")
+        self.lua.execute(policy.api_program)
+        self.lua.execute(policy.scheduler_program)
         self.started = False
         self.last_frame = -1
 
@@ -89,7 +114,7 @@ class GodActor:
             self.logs.append(tuple(parts))
 
     def require(self, name):
-        self.lua.execute(self.policy.package.source(name), name=b"@original/" + name)
+        self.lua.execute(self.policy.program(name))
 
     def act(self, observation):
         expected = PRIVILEGED_FEATURES * self.policy.episode.history_frames
