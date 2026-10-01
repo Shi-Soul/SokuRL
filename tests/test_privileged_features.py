@@ -10,10 +10,11 @@ from soku_rl.env.observation.memory_schema import (
     FIGHTER_NAMES, FIGHTER_WIDTH, MAX_OBJECTS, OBJECT_WIDTH, PLAYER_WIDTH,
     PRIVILEGED_FEATURES, WORLD_NAMES)
 from soku_rl.rl.features import PrivilegedFeatures, NumericPrivilegedFeatures
+from soku_rl.rl.combat_features import CombatPrivilegedFeatures, FIGHTER_SCALES
 from soku_rl.env.observation.privileged import encode_values
 
 
-@pytest.mark.parametrize("encoder_type", [PrivilegedFeatures, NumericPrivilegedFeatures])
+@pytest.mark.parametrize("encoder_type", [PrivilegedFeatures, NumericPrivilegedFeatures, CombatPrivilegedFeatures])
 def test_every_object_position_affects_features_and_padding_is_ignored(encoder_type):
     torch.set_num_threads(1)
     torch.manual_seed(17)
@@ -48,3 +49,38 @@ def test_numeric_features_keep_lossless_parts_and_scale_small_signed_values():
     np.testing.assert_allclose(features[0, parts.shape[-1]:].numpy(),
                                np.sign(raw) * np.log1p(np.abs(raw)) / 16., rtol=1e-6)
     assert features[0, parts.shape[-1] + 2] > 1000 * parts[0, 5]
+
+
+def test_combat_context_scales_health_and_facing_relative_geometry():
+    space = spaces.Box(-np.inf, np.inf, (PRIVILEGED_FEATURES,), np.float32)
+    encoder = CombatPrivilegedFeatures(space, 1, 4, 16, 8)
+    observations = np.zeros((2, PRIVILEGED_FEATURES), np.float32)
+    # Mirrored positions and facing should preserve the learner-relative distance.
+    for batch, facing in enumerate((1, -1)):
+        for seat in (0, 1):
+            fields = {"hp": (8000., 5000.)[seat], "rei": (5000., 2500.)[seat],
+                      "x": (300., 620.)[seat] if facing == 1 else (980., 660.)[seat],
+                      "y": (0., 128.)[seat], "dir": facing if seat == 0 else -facing,
+                      "xspeed": facing * (0., 2.)[seat], "yspeed": (0., -2.)[seat]}
+            for name, value in fields.items():
+                index = (len(WORLD_NAMES) + seat * PLAYER_WIDTH + FIGHTER_NAMES.index(name)) * 2
+                observations[batch, index:index + 2] = encode_values(np.array([value]))[0]
+    tensor = torch.from_numpy(observations)
+    context = encoder.frame_context(tensor)
+    expected = torch.tensor([.25, .1, .1, -.1, .3, .5]).expand(2, -1)
+    torch.testing.assert_close(context[:, -6:], expected)
+    assert context.shape == (2, len(FIGHTER_SCALES) * 2 + 6)
+    torch.testing.assert_close(context[:, 0], torch.full((2,), .8))
+    assert encoder(tensor).shape == (2, 8)
+
+
+def test_combat_context_supports_history_and_checkpoint_roundtrip(tmp_path):
+    space = spaces.Box(-np.inf, np.inf, (2 * PRIVILEGED_FEATURES + 8,), np.float32)
+    encoder = CombatPrivilegedFeatures(space, 2, 4, 16, 8)
+    values = torch.zeros(1, space.shape[0])
+    assert encoder(values).shape == (1, 8)
+    path = tmp_path / "encoder.pt"
+    torch.save(encoder.state_dict(), path)
+    reloaded = CombatPrivilegedFeatures(space, 2, 4, 16, 8)
+    reloaded.load_state_dict(torch.load(path, weights_only=True))
+    torch.testing.assert_close(encoder(values), reloaded(values), rtol=0, atol=0)

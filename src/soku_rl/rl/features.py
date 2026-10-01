@@ -10,6 +10,7 @@ from soku_rl.env.observation.memory_schema import (
 
 class PrivilegedFeatures(BaseFeaturesExtractor):
     numeric_width = 2
+    context_width = 0
 
     def __init__(self, observation_space, history_frames, object_features, player_features, features_dim):
         if min(history_frames, object_features, player_features, features_dim) < 1:
@@ -23,12 +24,16 @@ class PrivilegedFeatures(BaseFeaturesExtractor):
         self.object_encoder = nn.Sequential(nn.Linear(OBJECT_WIDTH * self.numeric_width, object_features), nn.Tanh())
         self.player_encoder = nn.Sequential(
             nn.Linear(FIGHTER_WIDTH * self.numeric_width + MAX_OBJECTS * object_features, player_features), nn.Tanh())
-        width = history_frames * (len(WORLD_NAMES) * self.numeric_width + player_features * 2) + width[0] - self.base_width
+        width = history_frames * (len(WORLD_NAMES) * self.numeric_width + player_features * 2
+                                  + self.context_width) + width[0] - self.base_width
         self.output = nn.Sequential(nn.Linear(width, features_dim), nn.Tanh())
         self.register_buffer("object_indices", torch.arange(MAX_OBJECTS), persistent=False)
 
     def numeric_features(self, records):
         return records
+
+    def frame_context(self, frames):
+        return frames.new_empty((frames.shape[0], 0))
 
     def forward(self, observations):
         batch = observations.shape[0]
@@ -44,7 +49,8 @@ class PrivilegedFeatures(BaseFeaturesExtractor):
         # selecting nearest objects, or averaging different objects together.
         encoded = self.object_encoder(self.numeric_features(objects)) * present.unsqueeze(-1)
         players = self.player_encoder(torch.cat((self.numeric_features(fighters), encoded.flatten(1)), dim=1))
-        frames = torch.cat((self.numeric_features(world), players.reshape(batch * self.history_frames, -1)), dim=1)
+        frames = torch.cat((self.numeric_features(world), players.reshape(batch * self.history_frames, -1),
+                            self.frame_context(frames)), dim=1)
         return self.output(torch.cat((frames.reshape(batch, -1), observations[:, self.base_width:]), dim=1))
 
 
