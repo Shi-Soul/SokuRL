@@ -60,6 +60,7 @@ def main(cfg):
     output.mkdir(parents=True, exist_ok=False)
     # Persist the actual source contract and opponent setups, not train defaults.
     config.update(source_training=training, evaluation_opponents=population,
+        policy_inference="grouped_greedy_dqn_v1_other_actors_sequential",
         checkpoint_sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
         training_config_sha256=hashlib.sha256(training_path.read_bytes()).hexdigest())
     (output / "config.yaml").write_text(OmegaConf.to_yaml(OmegaConf.create(config)), encoding="utf-8")

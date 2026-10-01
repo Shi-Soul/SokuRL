@@ -7,6 +7,7 @@ import numpy as np
 
 from soku_rl.env.encoding import AGENTS
 from soku_rl.evaluation.tournament import make_plan, summarize
+from soku_rl.policy.batch import episode_actions
 
 
 def benchmark(env, strategies, candidate, config, game_identity, directory):
@@ -44,8 +45,9 @@ def run_plan(env, strategies, plan, config, directory, reset_batch):
         traces = {s: [] for s in trials}
         returns = {s: np.zeros(2) for s in trials}
         while obs:
-            actions = {s: {a: actors[s][i].act(value[a]) for i, a in enumerate(AGENTS)}
-                       for s, value in obs.items()}
+            predicted = episode_actions({(s, a): (actors[s][i], value[a])
+                                         for s, value in obs.items() for i, a in enumerate(AGENTS)})
+            actions = {s: {a: predicted[s, a] for a in AGENTS} for s in obs}
             for slot, joint in actions.items():
                 traces[slot].append([joint[a] for a in AGENTS])
             try:
