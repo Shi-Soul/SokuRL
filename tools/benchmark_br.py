@@ -19,8 +19,10 @@ def main(cfg):
     from soku_rl.policy.loader import load_policy
     from soku_rl.policy.matchups import opponent_interface
     from soku_rl.policy.population import SeatPolicies
+    from soku_rl.rl import configure_runtime
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    configure_runtime(config["rl"])
     source = Path(config["training_directory"]).resolve(strict=True)
     training_path = source / "config.yaml"
     training = OmegaConf.to_container(OmegaConf.load(training_path), resolve=True, throw_on_missing=True)

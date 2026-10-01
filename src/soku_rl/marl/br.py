@@ -48,7 +48,7 @@ def train_response(env, config, opponents, probabilities, device, seed, director
         initial = parameter_hash(model.policy)
         start_steps = model.num_timesteps
         callbacks = CallbackList([
-            EpisodeRecords(directory),
+            EpisodeRecords(directory, config["checkpoint_every"]),
             CheckpointCallback(save_freq=config["checkpoint_every"] // env.num_envs,
                 save_path=str(directory / "checkpoints"), name_prefix="ppo"),
         ])

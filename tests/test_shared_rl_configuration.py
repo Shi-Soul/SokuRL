@@ -6,7 +6,7 @@ from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 import pytest
 
-from soku_rl.rl import ppo_settings, validate_payoff
+from soku_rl.rl import configure_runtime, ppo_settings, validate_payoff
 
 
 @pytest.mark.parametrize("algorithm", ("br", "ppo", "ippo", "nfsp", "psro"))
@@ -39,3 +39,10 @@ def test_shared_payoff_rejects_an_unimplemented_horizon_convention():
     interface = SimpleNamespace(config=SimpleNamespace(health_potential_scale=0.))
     with pytest.raises(ValueError, match="finite-horizon payoff"):
         validate_payoff(interface, {"timeout_payoff": "bootstrap", "ppo": {"gamma": 1.}})
+
+
+@pytest.mark.parametrize("count", [True, 0, -1, 1.5])
+def test_runtime_rejects_invalid_thread_budget(count):
+    pytest.importorskip("torch")
+    with pytest.raises(ValueError, match="cpu_threads"):
+        configure_runtime({"cpu_threads": count})

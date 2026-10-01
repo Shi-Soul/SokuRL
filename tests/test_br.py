@@ -5,6 +5,7 @@ import pytest
 
 from test_shared_ppo import fixture_config, fixture_env, save_contract, torch
 from soku_rl.marl.br import train_br
+from soku_rl.rl.ppo import algorithm_type, parameter_hash
 
 
 @pytest.mark.parametrize("policy_type", ["mlp", "lstm"])
@@ -24,6 +25,11 @@ def test_br_mixture_and_continuation(tmp_path, policy_type):
         report = train_br(env, config, "cpu", 13, first)
         assert report["additional_steps"] == 8
         assert report["initial_policy_hash"] != report["final_policy_hash"]
+        timing = json.loads((first / "timing.json").read_text())
+        assert timing["phase"] == "finished"
+        assert timing["rollouts"][0]["ppo_n_updates"] >= 1
+        updated = algorithm_type(policy_type).load(timing["rollouts"][0]["updated_checkpoint"], device="cpu")
+        assert parameter_hash(updated.policy) == report["final_policy_hash"]
         records = json.loads((first / "progress.json").read_text())["episodes"]
         assert records
         assert all(record["training_context"]["opponent"] == "selected" for record in records)

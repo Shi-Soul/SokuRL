@@ -20,10 +20,11 @@ def main(cfg: DictConfig):
     from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
     from soku_rl.env.worker_pipe import WorkerBackend
     from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
-    from soku_rl.rl import ppo_settings, validate_payoff
+    from soku_rl.rl import configure_runtime, ppo_settings, validate_payoff
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     learner = ppo_settings(config)
+    configure_runtime(config["rl"])
     algorithm = config["algorithm"]["name"]
     if algorithm == "br":
         from soku_rl.marl.br import train_br as train

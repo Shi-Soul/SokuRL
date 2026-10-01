@@ -20,8 +20,10 @@ def run(cfg):
     from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
     from soku_rl.evaluation.benchmark import benchmark
     from soku_rl.env.worker_pipe import WorkerBackend
+    from soku_rl.rl import configure_runtime
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    configure_runtime(config["rl"])
     episode = EpisodeConfig.from_dict(config["episode"])
     learning = LearningConfig(**config["wrappers"])
     interface = LearningInterface(episode, learning)

@@ -1,8 +1,9 @@
 """Lossless observation storage must leave upstream PPO minibatches unchanged."""
 import numpy as np
 import pytest
+import zlib
 
-from soku_rl.rl.storage import PackedArray, PackedObservation
+from soku_rl.rl.storage import PackedArray, PackedObservation, SPARSE_WORDS
 
 
 def test_storage_preserves_every_bit_and_environment_major_order():
@@ -41,3 +42,24 @@ def test_packed_buffer_matches_upstream_returns_and_samples():
         outputs.append(list(buffer.get(3)))
     for first, second in zip(*outputs, strict=True):
         assert all(torch.equal(a, b) for a, b in zip(first, second, strict=True))
+
+
+@pytest.mark.parametrize("dtype", ["<f4", ">f4", "<u4"])
+def test_sparse_words_preserve_nan_payloads_signed_zero_and_byte_order(dtype):
+    values = np.zeros((5, 200), dtype=dtype)
+    words = values.view("<u4")
+    words.flat[[1, 123, 654, 999]] = [0x80000000, 0x7FC01234, 0xFFFFFFFF, 1]
+    packed = PackedObservation.pack(values)
+    assert packed.content.startswith(SPARSE_WORDS)
+    assert packed.unpack().tobytes() == values.tobytes()
+    sliced = values[:, ::2]
+    assert PackedObservation.pack(sliced).unpack().tobytes() == sliced.tobytes()
+    old = PackedObservation(values.shape, values.dtype.str, zlib.compress(values.tobytes(), 1))
+    assert old.unpack().tobytes() == values.tobytes()
+
+
+def test_dense_and_image_observations_keep_legacy_codec():
+    for values in (np.arange(300, dtype=np.float32) + 1, np.full((3, 24, 32), 255, np.uint8)):
+        packed = PackedObservation.pack(values)
+        assert not packed.content.startswith(SPARSE_WORDS)
+        assert packed.unpack().tobytes() == values.tobytes()

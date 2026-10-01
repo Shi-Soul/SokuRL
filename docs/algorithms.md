@@ -14,6 +14,8 @@
 
 底层参数统一通过 `rl.ppo` 修改，例如 `rl.ppo.learning_rate=0.0001`。训练入口会检查各 MARL 配置引用的网络类型、收益约定及 PPO 参数是否与 `rl` 完全一致；单独改写算法分支而造成差异时，启动前立即报错。循环 PPO 的依赖版本也统一记录，不能因选用不同 MARL 组织方式而漏记。
 
+`rl.cpu_threads` 是训练及评测入口共同使用的 PyTorch CPU 线程预算，默认 4；它不属于 PPO 优化器参数。超人观测缓存按原始 32 位数据保存非零项，避免对大量补零区域反复解压，并直接还原到小批次数组；不删字段、不改数值，旧 zlib 缓存仍可读取。密集观测及图像继续使用 zlib。
+
 ## BR 开发与实验
 
 `algorithm=br` 接受 `opponents` 列表，每项包含唯一的 `name`、`probability`、角色 `setup` 和统一加载器的 `policy` 规格。概率须非负、有限且总和为 1；每局抽取并冻结一个对手。规则、已训练模型和种群策略均走同一加载器。PPO 参数仍只在 `rl.ppo` 设置，旧 `algorithm=ppo` 的两座位循环调用同一 BR 训练流程。
@@ -32,6 +34,8 @@ bash scripts/linux.sh tools/train.py algorithm=br rules=god \
 
 BR 输出根目录的 `final.zip`、`progress.json`、`scalars/progress.csv` 和检查点；入口另保存配置、源码身份、运行结果及真实回放。续训使用 `algorithm.initial_policy={kind:checkpoint,path:...,training_config:...}`。训练成功仅表示完成更新，不代表取得足够胜率。
 
+`timing.json` 分开记录采样和 PPO 更新时间，并标记当前阶段。首轮优化结束后额外保存 `checkpoints/updated_<步数>_steps.zip`，以后按检查点间隔保存；这些文件已完成对应批次的优化。原 `ppo_<步数>_steps.zip` 仍在采样回调中保存，不能假设其已使用刚收集的整批数据更新。
+
 加上 `+br_opponents=god_all` 可训练覆盖 20 个角色的原始 27 个神 AI 脚本的均匀混合；不改写其战术或跳过脚本帧。它也可作为逐个脚本 BR 实验的对手配置来源。每局日志保留脚本名、指纹、双方角色、实际座位、种子和基础收益。
 
 单模型 BR 使用专门的角色配对评测入口；旧 `benchmark_training.py` 的固定角色双模型入口不能替代它：
@@ -47,6 +51,12 @@ bash scripts/linux.sh tools/benchmark_br.py \
 需要独立于训练分布的全脚本检查时，加上 `opponent_source=config +br_opponents=god_all`。中途模型只可显式使用 `require_complete=false checkpoint=checkpoints/ppo_<步数>_steps.zip`，不能称为最终模型验收。调参使用 validation；配置和模型固定后再用 `evaluation=test`。评测实现通过模拟后端的配对、角色选择、胜负及超时计数测试，真实策略强度仍须等待完整测评。
 
 仍须用独立种子分别统计神 AI 脚本、角色和双方座位的胜负与超时，并比较超参数实验，才能判断配置是否通用。用户当前要求优先推进此项训练，因此先前验收清单中的调参顺序不再限制本项工作，原人机游玩待办继续保留。
+
+### 更新吞吐诊断
+
+`tools/profile_ppo.py` 通过相同 PPO 工厂和缓冲区运行有明确标识的合成观测诊断，只测性能，不产生策略强度结论。`profile.codec=legacy_zlib` 在诊断进程内选择旧压缩方式；默认使用当前存储实现。配置、源码哈希和每轮时间均保存到 `logs/diagnostics/`。
+
+2026-10-01，在同机其他任务继续运行时，4 个 CPU 线程、每方 8 个活动对象、256 样本、1 个训练 epoch、3 次更新的对照中，旧 zlib 平均更新耗时约 1.88 秒，稀疏原始位存储约 0.26 秒。证据为 `ppo-throughput-20261001-active-zlib` 和 `ppo-throughput-20261001-active-sparse`。这是短的合成诊断，不能直接当作真实训练提速倍数；真实采样、选角重启和 Lua 策略开销仍需单独观察。
 
 ## PPO 更新与时间上限
 

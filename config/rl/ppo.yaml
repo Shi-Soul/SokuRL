@@ -1,4 +1,5 @@
 policy_type: mlp
+cpu_threads: 4
 timeout_payoff: zero_at_horizon
 ppo:
   learning_rate: 0.0003

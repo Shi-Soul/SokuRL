@@ -1,0 +1,19 @@
+defaults:
+  - train
+  - override algorithm: br
+  - override wrappers: superhuman_learning
+  - override track: superhuman
+  - _self_
+
+num_envs: 8
+profile:
+  cpu_threads: [1, 4, 16]
+  updates: 3
+  active_objects: 8
+  codec: installed
+rl:
+  ppo:
+    n_steps: 32
+    batch_size: 256
+    n_epochs: 1
+output: logs/diagnostics/ppo-throughput-${now:%Y%m%d-%H%M%S}

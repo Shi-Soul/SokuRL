@@ -1,6 +1,14 @@
 """Shared reinforcement-learning settings, independent of MARL scheduling."""
 
 
+def configure_runtime(config):
+    import torch
+    count = config["cpu_threads"]
+    if type(count) is not int or count < 1:
+        raise ValueError("rl.cpu_threads must be a positive integer")
+    torch.set_num_threads(count)
+
+
 def ppo_settings(config):
     shared = config["rl"]
     algorithm = config["algorithm"]
