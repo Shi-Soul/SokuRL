@@ -21,6 +21,8 @@ add_library(SokuRLBridge MODULE
     HeldInput.cpp
     FrameState.hpp
     FrameState.cpp
+    FrameRecords.hpp
+    FrameRecords.cpp
     FramePresentation.hpp
     FramePresentation.cpp
     ProfileDeck.hpp
@@ -65,6 +67,10 @@ set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PR
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(FrameRecordsTest tests/FrameRecordsTest.cpp FrameRecords.cpp FrameState.cpp)
+    target_link_libraries(FrameRecordsTest PRIVATE SokuLib)
+    target_compile_definitions(FrameRecordsTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+    add_test(NAME FrameRecords COMMAND FrameRecordsTest)
     add_executable(FrameStateHashTest tests/FrameStateHashTest.cpp FrameState.cpp)
     target_link_libraries(FrameStateHashTest PRIVATE SokuLib)
     target_compile_definitions(FrameStateHashTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)

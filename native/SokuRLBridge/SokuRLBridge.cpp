@@ -1,5 +1,6 @@
 #include "ControlBlock.hpp"
 #include "FrameState.hpp"
+#include "FrameRecords.hpp"
 #include "FramePresentation.hpp"
 #include "ImageCapture.hpp"
 #include "AudioMute.hpp"
@@ -29,12 +30,16 @@
 #include <algorithm>
 #include <cwchar>
 #include <cstring>
+#include <optional>
 
 namespace
 {
 using SokuRLBridge::stateHash;
 using SokuRLBridge::captureState;
-using SokuRLBridge::simplePatchFrom;
+using SokuRLBridge::load32;
+using SokuRLBridge::store32;
+using SokuRLBridge::beginStatusWrite;
+using SokuRLBridge::endStatusWrite;
 using SokuRLBridge::applySimpleState;
 using SokuRLBridge::isValidSimplePlayerState;
 
@@ -120,30 +125,7 @@ struct CheckpointIdentity {
 };
 
 CheckpointIdentity g_checkpoint{};
-std::size_t g_recordedFrameCount = 0;
-
-std::uint32_t load32(const volatile std::uint32_t *value)
-{
-    return static_cast<std::uint32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile LONG *>(const_cast<volatile std::uint32_t *>(value)), 0, 0));
-}
-
-void store32(volatile std::uint32_t *target, std::uint32_t value)
-{
-    InterlockedExchange(reinterpret_cast<volatile LONG *>(target), static_cast<LONG>(value));
-}
-
-void beginStatusWrite()
-{
-    InterlockedIncrement(reinterpret_cast<volatile LONG *>(&g_control->statusSeq));
-    MemoryBarrier();
-}
-
-void endStatusWrite()
-{
-    MemoryBarrier();
-    InterlockedIncrement(reinterpret_cast<volatile LONG *>(&g_control->statusSeq));
-}
+std::optional<SokuRLBridge::FrameRecords> g_records;
 
 bool isPracticeGameplay()
 {
@@ -274,70 +256,6 @@ bool identityMatchesCheckpoint()
     return std::memcmp(&current, &g_checkpoint, sizeof(current)) == 0;
 }
 
-void setCheckpointValid(bool valid)
-{
-    store32(&g_control->checkpointValid, valid ? 1U : 0U);
-}
-
-void invalidateCheckpoint(SokuRLBridge::ResultCode reason)
-{
-    if (!load32(&g_control->checkpointValid))
-        return;
-    setCheckpointValid(false);
-    g_recordedFrameCount = 0;
-    publishResult(reason);
-}
-
-void publishReconstructionFrame(const SokuRLBridge::RawFrameState &state)
-{
-    if (state.frameId >= SokuRLBridge::INPUT_HISTORY_CAPACITY)
-        return;
-    auto &target = g_mapping->history[state.frameId];
-    target.p1Input = state.p1.input;
-    target.p2Input = state.p2.input;
-    target.simple = simplePatchFrom(state);
-    target.stateHash = state.stateHash;
-}
-
-void publishLatest(const SokuRLBridge::RawFrameState &state)
-{
-    beginStatusWrite();
-    g_control->currentFrame = state.frameId;
-    g_control->latest = state;
-    g_control->recordedFrames = g_recordedFrameCount;
-    g_control->stepsRemaining = g_stepsRemaining;
-    endStatusWrite();
-}
-
-void pushRing(const SokuRLBridge::RawFrameState &state)
-{
-    const auto write = load32(&g_control->ringWriteSeq);
-    const auto read = load32(&g_control->ringReadSeq);
-    if (write - read >= SokuRLBridge::FRAME_RING_CAPACITY) {
-        InterlockedIncrement(reinterpret_cast<volatile LONG *>(&g_control->droppedFrames));
-        return;
-    }
-    g_mapping->frames[write % SokuRLBridge::FRAME_RING_CAPACITY] = state;
-    MemoryBarrier();
-    store32(&g_control->ringWriteSeq, write + 1);
-}
-
-void appendRecordedFrame(const SokuRLBridge::RawFrameState &state)
-{
-    if (load32(&g_control->checkpointValid)) {
-        if (g_recordedFrameCount != state.frameId) {
-            invalidateCheckpoint(SokuRLBridge::ResultCode::CheckpointInvalidated);
-        } else if (g_recordedFrameCount < SokuRLBridge::INPUT_HISTORY_CAPACITY) {
-            ++g_recordedFrameCount;
-            publishReconstructionFrame(state);
-        } else {
-            invalidateCheckpoint(SokuRLBridge::ResultCode::HistoryFull);
-        }
-    }
-    publishLatest(state);
-    pushRing(state);
-}
-
 void clearControlledInput(SokuRLBridge::ResultCode result, bool neutral)
 {
     g_activeInputs[0] = {};
@@ -414,8 +332,8 @@ void consumeCommand(bool gameplay)
         auto &manager = SokuLib::getBattleMgr();
         applySimpleState(manager, g_control->commandPatch);
         const auto patched = captureState(&manager, g_currentFrame, g_segmentId, g_effectiveInputs);
-        publishLatest(patched);
-        pushRing(patched);
+        g_records->publishLatest(patched, g_stepsRemaining);
+        g_records->pushRing(patched);
         publishResult(SokuRLBridge::ResultCode::Complete);
     } else if (type == SokuRLBridge::CommandType::EstablishCheckpoint && !g_battleActive) {
         g_checkpointArmed = true;
@@ -608,7 +526,7 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         return 0;
     if (!gameplay) {
         g_battleActive = false;
-        invalidateCheckpoint(SokuRLBridge::ResultCode::CheckpointInvalidated);
+        g_records->invalidateCheckpoint(SokuRLBridge::ResultCode::CheckpointInvalidated);
         return (manager->*g_originalBattleManagerProcess)();
     }
     if (!g_battleActive) {
@@ -628,27 +546,24 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
             g_checkpointArmed = false;
             g_checkpointSeedRequested = false;
             g_checkpoint = readIdentity();
-            g_recordedFrameCount = 0;
-            ++g_recordedFrameCount;
-            publishReconstructionFrame(initial);
-            setCheckpointValid(true);
+            g_records->recordInitial(initial);
             g_paused = true;
             store32(&g_control->validationState,
                 static_cast<std::uint32_t>(SokuRLBridge::ValidationState::Unknown));
             g_control->lastVerifiedFrame = SokuRLBridge::NO_FRAME;
             g_control->firstDivergentFrame = SokuRLBridge::NO_FRAME;
-            publishLatest(initial);
-            pushRing(initial);
+            g_records->publishLatest(initial, g_stepsRemaining);
+            g_records->pushRing(initial);
             publishResult(SokuRLBridge::ResultCode::Complete);
             store32(&g_control->runState,
                 static_cast<std::uint32_t>(SokuRLBridge::RunState::Paused));
             return 0;
         }
-        publishLatest(initial);
-        pushRing(initial);
+        g_records->publishLatest(initial, g_stepsRemaining);
+        g_records->pushRing(initial);
     }
     if (load32(&g_control->checkpointValid) && !identityMatchesCheckpoint())
-        invalidateCheckpoint(SokuRLBridge::ResultCode::CheckpointInvalidated);
+        g_records->invalidateCheckpoint(SokuRLBridge::ResultCode::CheckpointInvalidated);
     if (g_paused && !g_stepsRemaining) {
         store32(&g_control->runState, static_cast<std::uint32_t>(SokuRLBridge::RunState::Paused));
         return 0;
@@ -659,14 +574,11 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         g_stepsRemaining ? SokuRLBridge::RunState::Stepping : SokuRLBridge::RunState::Running));
     int result = 0;
     for (std::uint32_t i = 0; i < updates; ++i) {
-        if (load32(&g_control->checkpointValid) && g_recordedFrameCount > g_currentFrame + 1) {
-            g_recordedFrameCount = static_cast<std::size_t>(g_currentFrame + 1);
-            store32(&g_control->validationState,
-                static_cast<std::uint32_t>(SokuRLBridge::ValidationState::Unknown));
-        }
+        g_records->trim(g_currentFrame);
         result = callSimulationUpdate(manager);
         ++g_currentFrame;
-        appendRecordedFrame(captureState(manager, g_currentFrame, g_segmentId, g_effectiveInputs));
+        g_records->appendRecordedFrame(
+            captureState(manager, g_currentFrame, g_segmentId, g_effectiveInputs), g_stepsRemaining);
         SokuRLBridge::setRenderPending(true);
         if (g_stepsRemaining)
             --g_stepsRemaining;
@@ -744,12 +656,12 @@ int __fastcall battleOnProcess(SokuLib::Battle *battle)
         g_checkpointSeedRequested = false;
         g_currentFrame = 0;
         ++g_segmentId;
-        g_recordedFrameCount = 0;
+        g_records->clear();
         g_effectiveInputs[0] = {};
         g_effectiveInputs[1] = {};
         g_neutralPending = false;
         SokuRLBridge::setRenderPending(true);
-        beginStatusWrite();
+        beginStatusWrite(g_control);
         g_control->inGameplay = 0;
         g_control->checkpointValid = 0;
         g_control->reconstructing = 0;
@@ -761,7 +673,7 @@ int __fastcall battleOnProcess(SokuLib::Battle *battle)
         g_control->droppedFrames = 0;
         g_control->lastVerifiedFrame = SokuRLBridge::NO_FRAME;
         g_control->firstDivergentFrame = SokuRLBridge::NO_FRAME;
-        endStatusWrite();
+        endStatusWrite(g_control);
         SokuRLBridge::resetImageCapture();
         return SokuLib::SCENE_TITLE;
     }
@@ -798,6 +710,7 @@ bool createMapping()
     }
     std::memset(g_mapping, 0, sizeof(*g_mapping));
     g_control = &g_mapping->control;
+    g_records.emplace(*g_mapping);
     g_control->magic = SokuRLBridge::CONTROL_MAGIC;
     g_control->version = SokuRLBridge::CONTROL_VERSION;
     g_control->structSize = sizeof(SokuRLBridge::ControlBlock);
@@ -816,6 +729,7 @@ void closeMapping()
     SokuRLBridge::closeImageCapture();
     if (g_control)
         store32(&g_control->connected, 0);
+    g_records.reset();
     if (g_mapping)
         UnmapViewOfFile(g_mapping);
     if (g_fileMapping)
