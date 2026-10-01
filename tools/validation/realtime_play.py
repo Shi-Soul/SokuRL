@@ -32,11 +32,12 @@ def case(cfg, seat, character):
     os.environ["SOKURL_REALTIME_SEAT"] = str(seat)
     selections = [PlayerSetup(character, 0, 0), PlayerSetup(character, 1, 1)]
     processes = sokurl._launch_vs_group_from_title(1, cfg.runtime.launch_timeout,
-        headless=False, unlimited=False, seeds=(cfg.seed,), pause_at_start=False,
+        headless=not cfg.validation.render, unlimited=False, seeds=(cfg.seed,), pause_at_start=False,
         capture_images=False, capture_state=False, match=MatchConfig(*selections))
     process = processes[0]
     history = channel = None
-    result = {"seat": seat, "character": character, "pid": process.pid, "success": False}
+    result = {"seat": seat, "character": character, "pid": process.pid,
+              "render": cfg.validation.render, "success": False}
     try:
         history, channel = RealtimeHistory(process.pid), RealtimeInput(process.pid, seat)
         cursor, captures, decoded = 0, [], 0

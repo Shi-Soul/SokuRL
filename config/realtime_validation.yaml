@@ -2,6 +2,7 @@ defaults:
   - local_match
   - _self_
 validation:
+  render: true
   seats: [0, 1]
   characters: [6, 19]
   observation_seconds: 3.0
