@@ -1,0 +1,13 @@
+device: cuda:0
+cpu_threads: 1
+models: ???
+datasets: ???
+batch_size: 256
+sequence_length: 64
+output: logs/diagnostics/demonstration-fit-${now:%Y%m%d-%H%M%S}
+hydra:
+  run:
+    dir: ${output}/hydra
+  output_subdir: null
+  job:
+    chdir: false
