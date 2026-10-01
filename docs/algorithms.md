@@ -44,7 +44,7 @@ BR 输出根目录的 `final.zip`、`progress.json`、`scalars/progress.csv` 和
 
 ```bash
 bash scripts/linux.sh tools/benchmark_br.py \
-  training_directory=logs/training/br-superhuman-god-all-20261001-v1 \
+  training_directory=logs/training/br-superhuman-god-all-20261001-v2 \
   evaluation=validation output=logs/benchmark/br-god-all-validation
 ```
 
@@ -61,6 +61,8 @@ bash scripts/linux.sh tools/benchmark_br.py \
 `tools/profile_ppo.py` 通过相同 PPO 工厂和缓冲区运行有明确标识的合成观测诊断，只测性能，不产生策略强度结论。`profile.codec=legacy_zlib` 在诊断进程内选择旧压缩方式；默认使用当前存储实现。配置、源码哈希和每轮时间均保存到 `logs/diagnostics/`。
 
 2026-10-01，在同机其他任务继续运行时，4 个 CPU 线程、每方 8 个活动对象、256 样本、1 个训练 epoch、3 次更新的对照中，旧 zlib 平均更新耗时约 1.88 秒，稀疏原始位存储约 0.26 秒。证据为 `ppo-throughput-20261001-active-zlib` 和 `ppo-throughput-20261001-active-sparse`。这是短的合成诊断，不能直接当作真实训练提速倍数；真实采样、选角重启和 Lua 策略开销仍需单独观察。
+
+真实混合神 AI 基线 `br-superhuman-god-all-20261001-v1` 因首轮更新的存储开销主动中止，结果标为 `KeyboardInterrupt`，没有可评测检查点；取消原因和替代运行记录在该目录的 `cancellation.json`。保持 PPO 超参数、种子和对手分布的新运行 `br-superhuman-god-all-20261001-v2` 已完成首批 16,384 步：采样约 187 秒，更新约 111 秒，已生成 `updated_16384_steps.zip`。这是训练推进证据，不是完成全部预算或强度达标。
 
 ## PPO 更新与时间上限
 
