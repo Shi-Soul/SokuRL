@@ -44,7 +44,7 @@ The opt-in VS launcher uses a separate Title-context bootstrap. After the
 original `Title::onProcess` runs, it selects fallback local input ownership,
 calls `setBattleMode(BATTLE_MODE_VSPLAYER, BATTLE_SUBMODE_PLAYING1)`, initializes
 both profiles and effective decks, and returns `SCENE_LOADING`. It is armed only
-by the `SOKURL_VS_BOOTSTRAP` process environment variable from `tools/sokurl.py vs`.
+by the `SOKURL_VS_BOOTSTRAP` process environment variable from `tools/sokurl.py launch.command=vs`.
 
 Action replay starts at frame zero and rebuilds action machines and object
 lists through simulation. The diagnostic `ApplySimpleState` command can write
@@ -52,7 +52,8 @@ timer, weather, player position, speed, facing, HP, spirit, and card counters.
 It cannot restore actions, animation state, hitstop, flags, hands, or objects.
 The RL reset and action replay do not use this command to restore snapshots.
 Historical reconstruction scripts and results are separate from the current
-episode-reset contract.
+episode-reset contract. The bridge keeps the input history in shared memory.
+It tracks the number of recorded frames without a second full-frame array.
 
 ## Shared memory ABI
 

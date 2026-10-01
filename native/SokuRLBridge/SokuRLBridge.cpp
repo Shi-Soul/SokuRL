@@ -30,7 +30,6 @@
 #include <cwchar>
 #include <cstring>
 #include <limits>
-#include <vector>
 
 namespace
 {
@@ -119,7 +118,7 @@ struct CheckpointIdentity {
 };
 
 CheckpointIdentity g_checkpoint{};
-std::vector<SokuRLBridge::RawFrameState> g_history;
+std::size_t g_recordedFrameCount = 0;
 
 std::uint32_t load32(const volatile std::uint32_t *value)
 {
@@ -283,7 +282,7 @@ void invalidateCheckpoint(SokuRLBridge::ResultCode reason)
     if (!load32(&g_control->checkpointValid))
         return;
     setCheckpointValid(false);
-    g_history.clear();
+    g_recordedFrameCount = 0;
     publishResult(reason);
 }
 
@@ -362,7 +361,7 @@ void publishLatest(const SokuRLBridge::RawFrameState &state)
     beginStatusWrite();
     g_control->currentFrame = state.frameId;
     g_control->latest = state;
-    g_control->recordedFrames = g_history.empty() ? 0 : g_history.size();
+    g_control->recordedFrames = g_recordedFrameCount;
     g_control->stepsRemaining = g_stepsRemaining;
     endStatusWrite();
 }
@@ -383,10 +382,10 @@ void pushRing(const SokuRLBridge::RawFrameState &state)
 void appendRecordedFrame(const SokuRLBridge::RawFrameState &state)
 {
     if (load32(&g_control->checkpointValid)) {
-        if (g_history.size() != state.frameId) {
+        if (g_recordedFrameCount != state.frameId) {
             invalidateCheckpoint(SokuRLBridge::ResultCode::CheckpointInvalidated);
-        } else if (g_history.size() < SokuRLBridge::INPUT_HISTORY_CAPACITY) {
-            g_history.push_back(state);
+        } else if (g_recordedFrameCount < SokuRLBridge::INPUT_HISTORY_CAPACITY) {
+            ++g_recordedFrameCount;
             publishReconstructionFrame(state);
         } else {
             invalidateCheckpoint(SokuRLBridge::ResultCode::HistoryFull);
@@ -686,8 +685,8 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
             g_checkpointArmed = false;
             g_checkpointSeedRequested = false;
             g_checkpoint = readIdentity();
-            g_history.clear();
-            g_history.push_back(initial);
+            g_recordedFrameCount = 0;
+            ++g_recordedFrameCount;
             publishReconstructionFrame(initial);
             setCheckpointValid(true);
             g_paused = true;
@@ -717,8 +716,8 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         g_stepsRemaining ? SokuRLBridge::RunState::Stepping : SokuRLBridge::RunState::Running));
     int result = 0;
     for (std::uint32_t i = 0; i < updates; ++i) {
-        if (load32(&g_control->checkpointValid) && g_history.size() > g_currentFrame + 1) {
-            g_history.resize(static_cast<std::size_t>(g_currentFrame + 1));
+        if (load32(&g_control->checkpointValid) && g_recordedFrameCount > g_currentFrame + 1) {
+            g_recordedFrameCount = static_cast<std::size_t>(g_currentFrame + 1);
             store32(&g_control->validationState,
                 static_cast<std::uint32_t>(SokuRLBridge::ValidationState::Unknown));
         }
@@ -802,7 +801,7 @@ int __fastcall battleOnProcess(SokuLib::Battle *battle)
         g_checkpointSeedRequested = false;
         g_currentFrame = 0;
         ++g_segmentId;
-        g_history.clear();
+        g_recordedFrameCount = 0;
         g_effectiveInputs[0] = {};
         g_effectiveInputs[1] = {};
         g_neutralPending = false;
@@ -933,7 +932,6 @@ extern "C" __declspec(dllexport) bool CheckVersion(const BYTE hash[16])
 extern "C" __declspec(dllexport) bool Initialize(HMODULE, HMODULE)
 {
     static_assert(sizeof(void *) == 4, "SokuRLBridge must be built for Win32/x86");
-    g_history.reserve(SokuRLBridge::INPUT_HISTORY_CAPACITY);
     if (!createMapping())
         return false;
     if (!SokuRLBridge::initializeNetworkState() || !SokuRLBridge::initializeNetworkInput()) {
