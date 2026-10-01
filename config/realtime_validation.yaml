@@ -1,0 +1,9 @@
+defaults:
+  - local_match
+  - _self_
+validation:
+  seats: [0, 1]
+  characters: [6, 19]
+  observation_seconds: 3.0
+  stalled_seconds: 3.0
+output: logs/validation/realtime-${now:%Y%m%d-%H%M%S}
