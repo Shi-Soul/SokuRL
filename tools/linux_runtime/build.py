@@ -66,6 +66,7 @@ def build(config):
         folder = REPO / "build/linux" / module
         subprocess.run([*cmake, "-S", windows(REPO / "native" / module), "-B", windows(folder),
             "-G", "NMake Makefiles", "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_TRY_COMPILE_CONFIGURATION=Release",
             "-DCMAKE_MAKE_PROGRAM=" + windows(chain / "msvc/bin/nmake.exe"),
             "-DCMAKE_C_COMPILER=" + windows(chain / "msvc/bin/cl.exe"),
             "-DCMAKE_CXX_COMPILER=" + windows(chain / "msvc/bin/cl.exe")], check=True, env=env)
