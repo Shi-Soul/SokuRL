@@ -38,6 +38,8 @@ BR 输出根目录的 `final.zip`、`progress.json`、`scalars/progress.csv` 和
 
 加上 `+br_opponents=god_all` 可训练覆盖 20 个角色的原始 27 个神 AI 脚本的均匀混合；不改写其战术或跳过脚本帧。它也可作为逐个脚本 BR 实验的对手配置来源。每局日志保留脚本名、指纹、双方角色、实际座位、种子和基础收益。
 
+训练对某个策略的 BR 时，使用 `+br_opponents=god_target algorithm.target.character=6`，例如这里选择蕾米莉亚的标准脚本。`algorithm.target.script=character` 表示按角色自动选择标准脚本；也可明确指定原始脚本文件名训练某个变体。所有目标继续复用 `rl.ppo`，不为每个对手维护一套训练算法。比较通用 BR 配置时，应在多个固定目标上用相同预算分别训练；只在混合对手上训练一次不能证明逐目标 BR 的通用性。
+
 单模型 BR 使用专门的角色配对评测入口；旧 `benchmark_training.py` 的固定角色双模型入口不能替代它：
 
 ```bash

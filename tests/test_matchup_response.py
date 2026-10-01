@@ -126,3 +126,16 @@ def test_mismatched_god_character_is_rejected_before_policy_load(tmp_path):
                 "cpu", 1, tmp_path)
     finally:
         env.close()
+
+
+@pytest.mark.parametrize("character,script", [(6, "character"), (1, "01_marisa_main.ai")])
+def test_target_strategy_preset_keeps_shared_ppo_settings(character, script):
+    with initialize_config_dir(config_dir=str(Path(__file__).parents[1] / "config"), version_base="1.3"):
+        cfg = compose(config_name="train", overrides=["algorithm=br", "rules=god",
+            "wrappers=superhuman_learning", "track=superhuman", "+br_opponents=god_target",
+            f"algorithm.target.character={character}", f"algorithm.target.script={script}"])
+        opponent, = OmegaConf.to_container(cfg.algorithm.opponents, resolve=True)
+        assert OmegaConf.to_container(cfg.algorithm.ppo, resolve=True) == OmegaConf.to_container(cfg.rl.ppo, resolve=True)
+    assert opponent["setup"]["character"] == character
+    assert opponent["policy"]["rules"]["god"]["script"] == script
+    assert opponent["probability"] == 1.
