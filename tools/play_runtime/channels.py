@@ -2,6 +2,7 @@
 import ctypes as C
 from dataclasses import dataclass
 import struct
+import threading
 
 import bridge_shared
 from game_runtime.snapshot_memory import SnapshotMemory
@@ -115,8 +116,7 @@ class RealtimeInput(_Mapping):
             self.close()
             raise ValueError("realtime input ABI or AI seat differs")
         self.seat, self.sequence = seat, 0
-        self.kernel.InterlockedIncrement.argtypes = [C.POINTER(C.c_int32)]
-        self.kernel.InterlockedIncrement.restype = C.c_int32
+        self.writer = threading.get_ident()
 
     def status(self):
         if not self.view:
@@ -133,6 +133,8 @@ class RealtimeInput(_Mapping):
                     frame=frame, applied=applied, applied_at=at, pending=pending, held=tuple(held))
 
     def submit(self, state, keys, latency, lifetime):
+        if threading.get_ident() != self.writer:
+            raise RuntimeError("realtime input has exactly one writer thread")
         if (len(keys) != 8 or any(type(k) is not int for k in keys) or
                 any(k not in (-1, 0, 1) for k in keys[:2]) or any(k not in (0, 1) for k in keys[2:])):
             raise ValueError("eight valid logical axes and buttons are required")
@@ -146,9 +148,12 @@ class RealtimeInput(_Mapping):
         target = state.frame + latency
         data = COMMAND.pack(sequence, state.match, state.round, self.seat,
                             state.frame, target, target + lifetime, *keys)
-        guard = C.cast(self.view + 16, C.POINTER(C.c_int32))
-        self.kernel.InterlockedIncrement(guard)
+        # One producer, aligned uint32 stores, x86/x64 Windows/Wine. Store order
+        # is preserved on these architectures; no read-modify-write API is needed.
+        # InterlockedIncrement is an intrinsic, not a portable kernel32 export.
+        guard = C.c_uint32.from_address(self.view + 16)
+        guard.value = (guard.value + 1) & 0xFFFFFFFF
         C.memmove(self.view + 20, data, COMMAND.size)
-        self.kernel.InterlockedIncrement(guard)
+        guard.value = (guard.value + 1) & 0xFFFFFFFF
         self.sequence = sequence
         return True

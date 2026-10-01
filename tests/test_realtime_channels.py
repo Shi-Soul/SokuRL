@@ -3,6 +3,7 @@ import ctypes as C
 import mmap
 import struct
 import sys
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -80,10 +81,7 @@ def test_input_has_native_offsets_and_never_waits_for_acknowledgement():
     client = object.__new__(channels.RealtimeInput)
     client.view, client.seat, client.sequence = C.addressof(buffer), 1, 0
 
-    def increment(pointer):
-        pointer.contents.value += 1
-
-    client.kernel = SimpleNamespace(InterlockedIncrement=increment)
+    client.writer = threading.get_ident()
     state = MatchState(7, 2, 30, (0, 0), (10000, 10000), "battle")
     keys = (-1, 0, 1, 0, 0, 0, 0, 0)
     assert client.submit(state, keys, 5, 8)
