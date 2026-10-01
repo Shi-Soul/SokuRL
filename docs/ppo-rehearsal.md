@@ -92,3 +92,20 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
 平均每次 0.674 秒，占优化时间 22.51%、完整采样/更新周期 4.98%。
 该运行的完整周期吞吐为 75.71 步/秒；节点负载及对局重置次数不同，不能据此声称相对基线加速。
 课程和耗时核对保存在 `.dev/audit-recurrent-rehearsal-curves-20261001.log` 及图目录 `audit.json`。
+
+## 65536 步的固定教师验证
+
+新只读验证入口对两个 65536 步检查点评分，完整四局及其哈希、世界种子完全配对：
+
+| 模型 | NLL | 总准确率 | 变化帧准确率 | 价值 MSE |
+| --- | --- | --- | --- | --- |
+| 原循环 BC 起点 | 0.35580 | 91.847% | 46.581% | 0.12841 |
+| 不复习 PPO，65536 步 | 1.53217 | 57.538% | 37.957% | 0.11694 |
+| 带复习 PPO，65536 步 | 0.43370 | 89.625% | 43.009% | 0.11743 |
+
+本次单种子对照中，复习明显减少教师标签拟合的丢失，但相对 BC 起点仍有下降。
+这尚不是完整神 AI 胜率改善的证据；相同四局真实游戏评估另行运行。
+复习检查点 SHA256 为 `ef70f293d7633b88d09a0e02fd7098387c564d4640e7564c1e6985dc55dda5d6`，
+课程 sidecar 匹配：累计 8 局、EMA=0、uniform=0.90。
+输出 `logs/diagnostics/recurrent-rehearsal-midpoint-retention-20261001` 保存两座位指标、来源和核对结果，
+日志 `.dev/audit-recurrent-rehearsal-midpoint-retention-20261001.log`。

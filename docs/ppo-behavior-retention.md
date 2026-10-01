@@ -223,6 +223,12 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
   output=logs/pretraining/god-marisa-reimu-recurrent-aggregate-20261001
 ```
 
+该拟合已启动；初始检查点与扩充循环 best 的全部策略参数哈希相同，优化器为空、PPO 步数为零。
+三个数据 manifest 与只读验证报告完全一致，总训练/验证帧数分别为 314540/107847。
+初始混合验证 NLL 1.00583、准确率 82.044%，与三个固定数据集按帧数加权的分数一致。
+核对见 `.dev/audit-recurrent-aggregate-initialization-20261001.log` 和
+`logs/diagnostics/recurrent-aggregate-initialization-20261001/summary.json`。
+
 ## 最新课程及优化曲线快照
 
 `logs/diagnostics/br-retention-curves-20261001-v2` 保存带源文件 SHA256 的三个运行快照，
