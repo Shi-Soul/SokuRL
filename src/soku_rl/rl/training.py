@@ -83,6 +83,8 @@ class EpisodeRecords(BaseCallback):
     def _finish_update(self):
         self.timings[-1].update(update_seconds=time.perf_counter() - self.rollout_finished,
                                ppo_n_updates=self.model._n_updates)
+        if hasattr(self.model, "rehearsal_state"):
+            self.timings[-1]["rehearsal"] = dict(self.model.rehearsal_state["last_update"])
         steps = self.model.num_timesteps
         if (not self.last_saved_steps
                 or steps // self.checkpoint_every > self.last_saved_steps // self.checkpoint_every):

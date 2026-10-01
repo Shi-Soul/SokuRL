@@ -1,0 +1,60 @@
+# PPO 在线更新后的示范复习
+
+共享和分离特征的循环 PPO 都在在线训练后丢失了较多教师动作拟合能力，
+完整神 AI 对照仍未获得胜局。现在增加一个可选的、计算预算明确的监督复习实验，
+暂不视为已找到有效 BR 配置。
+
+`rl=recurrent_rehearsal` 保留 `recurrent_demonstration_transfer` 的 PPO 参数和网络。
+每次调用共享模型的 `train()`，先执行上游 SB3/RecurrentPPO 更新，再进行配置数量的
+教师动作交叉熵更新。没有复制 PPO 损失、优势估计或采样实现；BR、IPPO、PSRO 和
+NFSP 的 PPO 创建入口相同。NFSP 原有的前馈模型约束仍适用。
+这是交替优化的 PPO + BC，不是联合损失，也不是已实现 PPG 或 Kickstarting。
+
+默认每个 1024 帧在线 rollout 后复习一次，抽取四段、每段最多 64 帧，
+监督学习率 1e-4。它复用策略 Adam 优化器及其动量，临时设置监督学习率，更新后恢复
+PPO 学习率；监督次数、样本数和耗时单独计数，不计入 PPO epoch 或环境步数。
+不拟合示范回报。独立 critic 分支没有监督梯度；共享 actor/critic 特征仍可能影响 critic。
+监督学习率和更新频率会约束偏离教师的速度，可能也妨碍超过教师，后续需依据实战调节。
+
+只从严格验证后的数据集 train split 中均匀抽取窗口起始帧，有放回；
+窗口在本局末尾截断，损失按实际有效帧数平均。长局按帧数获得更大采样概率，
+窗口末尾截断也意味着这不是每帧等概率的完整监督 epoch。
+验证局仅做完整性检查，不能进入复习存储。
+循环模型对每个窗口从本局起点重新计算全部历史，使用当前参数、关闭梯度，
+然后只对窗口反向传播。历史恢复按最多 256 帧分块，不缩短历史，不复用旧参数产生的缓存状态。
+多个窗口累积梯度后才更新，彼此不共享记忆。恢复历史和窗口均使用 eval mode，
+避免 dropout 或 BatchNorm 修改前缀状态；窗口仍启用梯度。
+这部分计算上界取决于最长对局，必须把 `burn_in_frames` 和耗时计入效率判断。
+
+检查点保存数据集 manifest/config 哈希、完整复习设置、采样随机数状态及累计计数，
+不打包示范样本。通过共享 factory 续训时重新严格验证文件，并要求身份和设置一致。
+仅导入权重则重置复习计数、采样随机数和优化器。
+标准策略加载器仍可直接推断，不需要示范数据。直接加载扩展模型后自行训练会明确报错，
+要求从共享 factory 附加已验证数据。
+标量日志记录 `rehearsal/*`；BR 的 `timing.json` 也保存每次复习指标，含最终一次，
+避免 SB3 下一轮才输出标量而遗漏最后更新。对手课程继续由长期 EMA 水平决定 uniform 混合比例，
+没有改回固定阶段。
+
+初次针对性检查 24 项通过，增加双座位联合采样和私有 critic 优化器隔离后 33 项通过，
+日志为 `.dev/pytest-rehearsal-20261001.log` 和 `-v2.log`。
+涵盖实际短 PPO 更新、前馈/循环共享入口、窗口与逐帧历史一致性、监督梯度、
+保存/加载、恢复采样序列和优化器更新的一致性、权重初始化重置。
+这些测试使用模拟环境，不代表真实游戏强度已改善。
+全量回归为 986 passed、12 skipped、1 deselected、2 subtests passed，耗时 59.14 秒；
+三条警告来自已有 TorchRL/PettingZoo 版本提示。日志 `.dev/pytest-rehearsal-full-20261001.log`。
+
+首轮实战对照计划从原循环 BC best 初始化，保持原在线对照的种子、网络、
+131072 步预算和自适应课程，仅增加复习原教师训练集：
+
+```bash
+bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
+  rl=recurrent_rehearsal rl.cpu_threads=1 rules=god \
+  wrappers=superhuman_learning track=superhuman_combat \
+  +br_opponents=god_target algorithm.target.character=0 +curriculum=adaptive_noise \
+  num_envs=4 algorithm.timesteps=131072 \
+  '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-20261001/config.yaml}' \
+  output=logs/training/br-superhuman-reimu-recurrent-rehearsal-adaptive-20261001
+```
+
+实际总计算量和样本复用量会增加，不能把相同在线步数说成相同计算预算。
+完整神 AI 测评使用原对手，不带训练课程的 uniform 扰动。

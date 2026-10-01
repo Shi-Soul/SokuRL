@@ -25,14 +25,18 @@ def create_ppo(env, interface, config, source, device, seed):
     policy = ("MultiInput" if isinstance(env.observation_space, spaces.Dict) else
               "Cnn" if len(env.observation_space.shape) == 3 else "Mlp")
     policy += "LstmPolicy" if config["policy_type"] == "lstm" else "Policy"
-    return initialize_ppo(algorithm, policy, env, interface, config, source, device, seed)
+    model, metadata = initialize_ppo(algorithm, policy, env, interface, config, source, device, seed)
+    if "rehearsal" in config:
+        from soku_rl.rl.rehearsal import attach_rehearsal
+        attach_rehearsal(model, interface, config["rehearsal"], source["kind"] == "checkpoint")
+    return model, metadata
 
 
 def snapshot(name, model, path):
     from soku_rl.policy.population import PPOPolicy
     from soku_rl.policy.recurrent import RecurrentPPOPolicy
     model.save(path)
-    policy = PPOPolicy if type(model) is PPO else RecurrentPPOPolicy
+    policy = PPOPolicy if isinstance(model, PPO) else RecurrentPPOPolicy
     return policy(name, model, Path(path))
 
 
@@ -78,6 +82,10 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
     elif algorithm is PPO and interface.episode.observation_mode == "privileged_state":
         from soku_rl.rl.buffers import PackedRolloutBuffer
         parameters["rollout_buffer_class"] = PackedRolloutBuffer
+    if "rehearsal" in config:
+        from soku_rl.rl.rehearsal import rehearsal_algorithm, validate_rehearsal
+        validate_rehearsal(config["rehearsal"])
+        algorithm = rehearsal_algorithm(algorithm)
     if source == {"kind": "fresh"}:
         model = algorithm(policy_type, env, seed=seed, device=device, **parameters)
         if "initial_action_prior" in config["ppo"]:
@@ -91,6 +99,10 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         raise ValueError("PPO initialization requires the same policy type and payoff")
     if source["kind"] == "checkpoint" and previous["ppo"] != config["ppo"]:
         raise ValueError("continued PPO must retain its algorithm and optimizer configuration")
+    if source["kind"] == "checkpoint" and (
+            {key: previous[key] for key in ("rehearsal",) if key in previous}
+            != {key: config[key] for key in ("rehearsal",) if key in config}):
+        raise ValueError("continued PPO must retain its rehearsal configuration")
     path = Path(source["path"]).resolve(strict=True)
     if source["kind"] == "weights":
         heads = ("action_persistence", "action_factorization")
