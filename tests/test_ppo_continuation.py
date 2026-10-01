@@ -32,6 +32,9 @@ def test_continuation_restores_optimizer_and_supports_new_vector_size(tmp_path, 
 
     config = {"name": "ppo", "policy_type": policy_type, "timeout_payoff": "zero_at_horizon",
               "ppo": {"n_steps": 2, "batch_size": 2, "gamma": 1., "policy_kwargs": architecture}}
+    with pytest.raises(ValueError, match="requires gamma=1"):
+        initialize_ppo(algorithm, policy, make_env(), contract,
+            config | {"ppo": config["ppo"] | {"gamma": .9}}, {"kind": "fresh"}, "cpu", 7)
     initial, source = initialize_ppo(algorithm, policy, make_env(), contract, config,
                                      {"kind": "fresh"}, "cpu", 7)
     assert source == {"kind": "fresh"}
@@ -63,7 +66,7 @@ def test_continuation_restores_optimizer_and_supports_new_vector_size(tmp_path, 
             initialize_ppo(algorithm, policy, env, changed, config, spec, "cpu", 19)
         with pytest.raises(ValueError, match="optimizer configuration"):
             initialize_ppo(algorithm, policy, env, contract,
-                config | {"ppo": config["ppo"] | {"gamma": .9}}, spec, "cpu", 19)
+                config | {"ppo": config["ppo"] | {"learning_rate": .0001}}, spec, "cpu", 19)
         tuning = config | {"ppo": config["ppo"] | {"gae_lambda": .995, "learning_rate": .0001}}
         weights = spec | {"kind": "weights"}
         initialized, metadata = initialize_ppo(algorithm, policy, env, contract, tuning, weights, "cpu", 19)

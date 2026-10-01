@@ -20,7 +20,6 @@ def algorithm_type(policy_type):
 
 
 def create_ppo(env, interface, config, source, device, seed):
-    validate_payoff(interface, config)
     algorithm = algorithm_type(config["policy_type"])
     policy = ("MultiInput" if isinstance(env.observation_space, spaces.Dict) else
               "Cnn" if len(env.observation_space.shape) == 3 else "Mlp")
@@ -45,6 +44,7 @@ def parameter_hash(policy):
 
 
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
+    validate_payoff(interface, config)
     parameters = dict(config["ppo"])
     architecture = dict(parameters["policy_kwargs"])
     if "features_extractor_class" in architecture:
