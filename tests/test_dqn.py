@@ -330,3 +330,45 @@ def test_br_runtime_failure_preserves_recoverable_dqn_without_claiming_success(t
         assert model._n_updates==4 and model.replay_buffer.size()*model.n_envs==16
     finally:
         env.close()
+
+
+def test_br_mid_update_failure_keeps_adam_and_update_counter_aligned(tmp_path, monkeypatch):
+    from soku_rl.marl.br import train_br
+    torch.set_num_threads(1)
+    env = fixture_env()
+    config = dqn_config() | {"name": "br", "player": 0, "matchups": {"mode": "fixed"},
+        "timesteps": 16, "checkpoint_every": 8, "initial_policy": {"kind": "fresh"},
+        "opponents": [{"name": "random", "probability": 1., "policy": {"kind": "uniform"}}]}
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    original = torch.optim.Adam.step
+    calls = 0
+
+    def interrupted(optimizer, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("injected second optimizer step failure")
+        return original(optimizer, *args, **kwargs)
+
+    monkeypatch.setattr(torch.optim.Adam, "step", interrupted)
+    try:
+        with pytest.raises(RuntimeError, match="injected second optimizer step failure"):
+            train_br(env, config, "cpu", 3, first)
+        recovery = json.loads((first / "interrupted.json").read_text())
+        assert recovery["saved"] is True and recovery["updates"] == 1
+        model = DoubleDQN.load(first / "interrupted.zip", device="cpu")
+        assert model._n_updates == 1
+        assert {int(state["step"]) for state in model.policy.optimizer.state.values()} == {1}
+        source = contract(first, env, config)
+        monkeypatch.setattr(torch.optim.Adam, "step", original)
+        config["initial_policy"] = {"kind": "checkpoint", "path": recovery["checkpoint"],
+                                    "training_config": source}
+        config["timesteps"] = 8
+        train_br(env, config, "cpu", 4, second)
+        model = DoubleDQN.load(second / "final.zip", device="cpu")
+        assert model._n_updates == 3
+        assert {int(state["step"]) for state in model.policy.optimizer.state.values()} == {3}
+    finally:
+        env.close()

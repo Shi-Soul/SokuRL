@@ -38,10 +38,12 @@ class DoubleDQN(DQN):
             torch.nn.utils.clip_grad_norm_(self.q_net.parameters(), self.max_grad_norm,
                                            error_if_nonfinite=True)
             self.policy.optimizer.step()
+            # Count completed optimizer steps even if a later update in this
+            # block fails and BR saves an interrupted recovery checkpoint.
+            self._n_updates += 1
             losses.append(loss.detach())
             errors.append((estimates.detach() - targets).abs().mean())
             values.append(estimates.detach().mean())
-        self._n_updates += gradient_steps
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         if losses:
             stats = torch.stack([torch.stack(items).mean() for items in (losses, errors, values)]).cpu().tolist()

@@ -179,3 +179,11 @@ SHA256 及参数有限值通过，实际物理 GPU 5；记录为
 `logs/benchmark/br-dqn-five-step-65536-validation-20261001`，64 局计划已落盘；
 stdout 为 `logs/benchmark-dqn-five-step-65536-20261001.txt`。截至本记录仍在运行，
 尚无完整评测结论。
+
+异常检查点的更新计数进一步按每次已成功返回的 Adam 更新累计，避免同一批后续
+更新失败时漏记先前完成的更新。正常训练规则与批末计数不变。新增测试在第二次
+优化器调用前注入异常，核对保存时 Adam/DQN 均为 1 次，续训后均为 3 次；
+DQN、BR 和曲线对齐回归共 32 passed，日志为
+`logs/pytest-dqn-interrupted-update-20261001.txt`。当前长任务沿用各自已加载版本，
+没有为计数边界修复重启训练。该测试不承诺硬件故障时部分执行的 Adam 操作具有
+事务原子性。
