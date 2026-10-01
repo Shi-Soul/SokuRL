@@ -52,277 +52,175 @@ bash scripts/linux.sh tools/train.py algorithm=br rl=dqn \
 继承训练观测和对手，按双方座位报告胜/负/超时。仅完成单元测试或更新不能证明
 策略强度。本文件下方只登记实际完成的实机结果。
 
-## 当前证据
+## 验证与恢复
 
-新 worktree `SokuRL-dqn`，分支 `feat/dqn-marl`。环境检查确认 GPU 1 为
-RTX 3080 Ti，Torch 2.9.1+cu128 和 Wine 工作进程依赖可用。第一轮 DQN 专项
-13 测试通过，包括 CUDA BR 更新/恢复、回放与上游逐项一致、IPPO/NFSP/PSRO
-更新/续训；原 PPO 接口回归 30 测试通过。随后增加字典观测和截断边界覆盖测试，
-补齐本地原始神 AI 资源后，全量检查为 859 passed、12 skipped、1 deselected、
-2 subtests passed（`logs/pytest-dqn-full-resources.txt`）。后续新增配置和图像更新
-测试后，DQN 专项 21 passed（`logs/pytest-dqn-extra.txt`），相关合并回归
-47 passed（`logs/pytest-dqn-final-core.txt`）。跳过项沿用 Windows/CRT/外部回放
-限制。上述早期检查验证实现；最新真实训练和评测结果见下方记录。
+工作位于独立 worktree `SokuRL-dqn`、分支 `feat/dqn-marl`。最终代码全量回归为
+880 passed、12 skipped、1 deselected、2 subtests passed，耗时 63.36 秒；见
+`logs/pytest-dqn-release-20261001.txt`（代码提交 `7813eb5`，后续仅更新文档）。
+3 条警告来自 TorchRL 的 PettingZoo 版本提示，相应接口测试通过。跳过项为既有
+Windows/CRT/外部回放限制，不能用这些单元测试替代真实游戏验证。
 
-2026-10-01：实现提交 `20e362a` 已推送到远端 `feat/dqn-marl`。真实基线启动于
-`logs/training/br-dqn-reimu-baseline-20261001`：GPU 1、8 环境、2 个 Torch CPU
-线程、seed 1732、262144 转移预算。配置、完整源码哈希及运行 DLL 身份保存在该
-目录，stdout 为 `logs/train-dqn-baseline-20261001.txt`。启动时已确认独立 Wine
-工作进程及 8 个该会话的游戏进程；尚不能据此宣称已完成训练。
+`tests/test_dqn.py` 覆盖 Double Q 动作选择/评价、终局停止自举、上游 n-step
+逐项等价、环形覆盖和续训边界、数值/图像/字典/历史观测、CPU/CUDA BR 更新与
+恢复、IPPO 双座位采样、NFSP 分类平均策略、PSRO 种群保存与继续，以及所有
+调度器的 Hydra 配置。终局 bandit 测试学得 Q 接近已知 [-1, 1, -1]（误差不超过
+0.12），并选择正确动作；不仅检查权重是否变化。
 
-另有终局 bandit 学习检查，固定种子下不仅权重变化，而且学得的三个 Q 值接近
-已知的 [-1, 1, -1]（误差不超过 0.12），选出正确动作。该检查及 NFSP 旧配置
-兼容调整后的恢复回归共 2 passed，日志 `logs/pytest-dqn-learning.txt`。
+真实 GPU 训练的首次更新与恢复也已核验：
 
-预先选定的单因素调参候选是 `rl=dqn_five_step`：只将三步回报改为五步，保持
-网络、学习率、采样预算、种子、座位和神灵梦对手一致。先核对基线真实更新的显存
-及吞吐，再安排并行运行；不因候选存在就认为它更强。后续仍需完成两组训练、
-同种子双座位 validation 对照、选定模型的独立 test，以及真实检查点续训验证。
+- `logs/diagnostics/dqn-first-update-20261001/result.json`：4352 转移、32 次
+  DQN/Adam 更新，模型与经验哈希、CPU 重载和有限参数通过。
+- `logs/diagnostics/dqn-real-resume-20261001/result.json`：从上述检查点新增
+  256 转移、32 次更新，得到 4608 步/64 次更新；在线权重变化，目标网络在同步
+  间隔内保持，探索率续接为 0.9666015625。
+- `logs/diagnostics/dqn-more-replay-first-update-20261001/result.json`：更多
+  回放组的 4352 步检查点完成 64 次 DQN/Adam 更新。
 
-基线已经完成真实更新：首个已更新检查点为 4352 转移，Adam 和 DQN 更新计数均为
-32；模型/回放 SHA256 校验、全部参数有限值检查、CPU 重新加载和经验数量核对均
-通过。证据为 `logs/diagnostics/dqn-first-update-20261001/result.json`。随后推进到
-10240 转移、768 次更新。预热后的 256 转移采样约 2.5–2.9 秒，32 次梯度更新约
-0.84–1.15 秒，GPU 1 显存观测约 3438 MiB；这是当前并发机器负载下的早期观测。
+BR 遇到训练异常会尽力保存 `interrupted.zip`、经验和校验清单，并在
+`interrupted.json` 记录原错误与保存状态，随后抛出原错误；不会写成功结果。
+更新计数按每次成功返回的 Adam 更新累计。第二次优化器调用前注入异常的测试
+核对保存时 Adam/DQN 均为 1，恢复后均为 3，见
+`logs/pytest-dqn-interrupted-update-20261001.txt`（相关回归 32 passed）。这不
+承诺硬件故障时部分执行的 Adam 操作具有事务原子性。
 
-显存余量允许后，已在同一 GPU 1 启动单因素五步回报对照
-`logs/training/br-dqn-reimu-five-step-20261001`，同为 8 环境、2 CPU 线程、
-262144 转移、seed 1732；stdout 为 `logs/train-dqn-five-step-20261001.txt`。
-两组独立工作进程将采样和更新交错，继续观察吞吐与资源占用。此时五步组仍在
-初始化，不能写成已通过真实更新，更不能从前述执行证据推断胜率。
+继续训练需使用新增 Hydra 字段，例如：
 
-训练诊断现已支持 DQN：`tools/analyze_training.py --config-name analyze_dqn`。
-原脚本按 PPO 的 epochs 换算 CSV 更新步数，会错误解释 DQN；现在直接把 CSV
-中的梯度更新计数对应到 `timing.json` 的实际已更新步数，也支持 PPO 的同一计数。
-顺序快照若有更新的 CSV 行暂时找不到对应时序，保留原始行并列入
-`unaligned_train_counters`，不猜测横轴。DQN 显示 epsilon、Huber loss、TD 误差
-和平均 Q 值；吞吐使用每批 `train_freq * num_envs` 转移，而不是 PPO rollout
-大小。2 项测试覆盖两种学习器的计数对齐及快照边界。
+```bash
+bash scripts/linux.sh tools/train.py algorithm=br rl=dqn \
+  rules=god wrappers=superhuman_learning track=superhuman_combat \
+  +br_opponents=god_target algorithm.target.character=0 \
+  '++algorithm.initial_policy={kind:checkpoint,path:logs/training/br-dqn-reimu-baseline-20261001/checkpoints/updated_4352_steps.zip,training_config:logs/training/br-dqn-reimu-baseline-20261001/config.yaml}' \
+  algorithm.timesteps=257792 algorithm.checkpoint_every=8192 \
+  num_envs=8 rl.cpu_threads=2 \
+  linux.cuda_devices=1 output=logs/training/br-dqn-resume-example
+```
 
-首份已检查图为 `logs/diagnostics/dqn-curves-20261001-b/`，含 PNG/PDF、原始
-配置/CSV/JSON 快照及 SHA256。缺少标量时仍保留正确的运行图例，各面板共用环境
-步数横轴。`-a` 是尚缺图例的初稿。SB3 DQN 每完成 4 局才输出标量 CSV，因此
-早期图的优化/探索指标可能尚无记录，不能当作零损失或零探索率。后续实机进展
-观测为基线 28416 转移、3040 次更新，已完成 2 局全负；五步组 15616 转移、
-1440 次更新，尚无完整局。两组有更新的采样周期各约 66 转移/秒，含本次各自
-经历的重置；机器并发条件不同，不能据此将吞吐差异归因于 n-step 参数。
+`algorithm.timesteps` 是本次新增预算；该例从 4352 累计到 262144。请使用新的
+输出目录。初始化为 `weights` 时只继承权重，经验、优化器及训练进度重新开始。
 
-资源短采样（`dqn-curves-20261001-b/gpu-samples.csv` / `gpu-summary.json`）
-在 17:20:43–17:21:07 UTC 共 25 点，GPU 1 平均利用率 19.96%、范围 1–62%，
-显存最大 6853 MiB；此前 97% 只是更新阶段的单点峰值，不能当作持续利用率。
-后续 CPU 两秒采样为全机 38%（64 个逻辑核），可用内存约 152 GiB。GPU 1 的
-显存随后达到 8183 MiB，因此不在这张卡上叠第三个训练进程。
+## 实验协议与完整训练
 
-据此增加一项有明确用途的单因素候选 `rl=dqn_more_replay`：三步回报保持不变，
-每 256 个新转移执行 64 次梯度更新，batch=256，即样本复用量从约 32 增至 64。
-预算仍为 262144 转移。这会增加优化成本，是否提高样本效率由相同 validation
-对局判断，不能把更多更新本身当作改善。第三组选择已检查有约 6 GiB 可用显存的
-GPU 5，继续保留其他任务进程；运行入口显式 `linux.cuda_devices=5`。
+2026-10-01 的三组固定 seed=1732、8 环境、2 个 Torch CPU 线程、原规则灵梦、
+魔理沙随机座位、每次决策 1 帧、7200 帧有限时域。三组均保留 262144 个训练
+转移，使用相同两层网络、观测/动作及收益约定，仅改变表中的一个参数。
 
-第三组已启动于 `logs/training/br-dqn-reimu-more-replay-20261001`，stdout 为
-`logs/train-dqn-more-replay-20261001.txt`，启动前再次检查 GPU 5 可用显存不少于
-5500 MiB；8 环境、2 CPU 线程，source commit `97e9240`。截至本条记录只确认
-训练进程存活及配置落盘，首个真实更新仍待核对。三组最终样本预算保持一致；
-第三组所在物理 GPU 和并发条件不同，墙钟差异不能全部归因于回放更新次数。
-`config/analyze_dqn.yaml` 已包含三组路径，等待第三组产生时序日志后再运行。
+| 候选 | 配置 | 唯一参数变化 | 最终 DQN/Adam 更新 | 完成训练局 |
+| --- | --- | --- | ---: | --- |
+| 三步恢复基线 | `rl=dqn` | 无 | 32256 | 1 胜、65 负 |
+| 五步 | `rl=dqn_five_step` | `n_steps: 3 → 5` | 32256 | 68 负 |
+| 更多回放 | `rl=dqn_more_replay` | `gradient_steps: 32 → 64` | 64512 | 65 负、1 超时 |
 
-实机检查发现并修复延迟标量输出中的缺测问题：DQN 多个 rollout 共用一次 logger
-输出时，当前 rollout 没有结束对局，旧 `combat/*` 均值可能残留，而对局计数已
-更新成零。回调现在每轮先将该命名空间设为缺测，再写本轮真实测量；CSV 保留
-空值，不伪造零伤害/零胜率，也不清除 `train/*`。33 项相关测试通过，日志为
-`logs/pytest-dqn-empty-rollout.txt`，包含有对局后接空 rollout 的真实 logger
-输出回归，以及 PPO/DQN 的更新和继续训练。
+训练目录依次为：
 
-此修复没有替换三个已运行进程的代码。它们的早期标量 CSV 中 `combat/*` 可能
-有上述残留，不能据该列做均值比较；逐局 `progress.json` 正确，曲线工具的战斗
-统计始终从该完整逐局记录重算。损失、Q 值、模型更新和最终独立评测不受此标量
-显示问题影响。恢复或新启动的训练才使用修复后的回调。
+- `logs/training/br-dqn-reimu-baseline-resumed-20261001/`
+- `logs/training/br-dqn-reimu-five-step-20261001/`
+- `logs/training/br-dqn-reimu-more-replay-20261001/`
 
-基线在约 17:33 UTC 因换边重建游戏时的 `Title bootstrap timeout` 退出，
-`result.json` 明确为失败；最后完整记录为 48384 转移、5536 次更新、8 局全负。
-新游戏停在 scene=0，尚未确定启动停滞的根因。该进程已退出，未产生最终模型；
-失败日志保留。可恢复检查点只有 4352 转移，因此计划从它继续 257792 转移，
-累计模型步数达到 262144。此前丢失的至少 44032 转移另计入实际采样成本，
-不能把恢复后的模型步数解释为实验总成本，也不是原游戏现场或随机数流恢复。
+三组 `result.json` 均成功，最终 replay 均为 131072 条；模型/回放 SHA256、Adam
+计数、全部参数/优化器状态及抽样 TD 目标有限值检查通过，私有 Wine 进程和服务
+正常退出，游戏副本及前缀已清理。审计分别为
+`logs/diagnostics/dqn-baseline-final-audit-20261001/`、
+`logs/diagnostics/dqn-five-step-final-audit-20261001/` 和
+`logs/diagnostics/dqn-more-replay-final-audit-20261001/`。
 
-BR 现在在训练异常时尽力保存 `interrupted.zip` 及 DQN 经验/校验清单，
-`interrupted.json` 记录原错误、步数及保存状态，随后继续抛出原错误；不会写成功
-结果或冒充 `final.zip`。注入故障后恢复模型、Adam 与经验的测试及 BR 回归
-共 7 passed（`logs/pytest-dqn-recovery.txt`）。恢复基线会将周期检查点缩短为
-8192 转移，保留原 DQN 超参数。另两组进程仍继续运行，不为刷新回调而重启。
+`logs/diagnostics/dqn-experiment-identity-20261001/result.json` 核对原版游戏、
+DLL、资源、观测/动作/对手/种子/依赖身份。恢复段包含日志与异常保存修复，
+游戏及学习更新源码未变。基线唯一训练胜局在累计 109832 步、世界种子
+1242439449，魔理沙 1P 剩余 4 HP、灵梦 0 HP；它包含探索动作，不是最终贪心
+策略的评估胜率。单个训练种子也不能证明算法普遍优越。
 
-更多回放组首个真实检查点已核对：4352 转移，Adam/DQN 均 64 次更新，经验条数、
-SHA256 及参数有限值通过，实际物理 GPU 5；记录为
-`logs/diagnostics/dqn-more-replay-first-update-20261001/result.json`。
-曲线修订 `logs/diagnostics/dqn-curves-20261001-d/` 补齐所有运行图例，并用
-线性轴显示平均 Q 值；缺少标量的运行不会从图例中消失。
+## 评估与选型
 
-恢复运行目录为 `logs/training/br-dqn-reimu-baseline-resumed-20261001`，
-提交 `1a96b8f`，启动入口的新增初始化字段需要
-`++algorithm.initial_policy={kind:checkpoint,path:...,training_config:...}`。
-第一次命令在 Hydra 配置校验阶段拒绝新增字段，没有启动游戏，错误日志保留；
-修正后的 stdout 为 `logs/train-dqn-baseline-resumed-launch2-20261001.txt`。
+每个候选在 65536 步及最终 262144 步使用同一 validation：32 个世界种子，
+每个种子交换双方座位，共 64 局。只用贪心策略，规则对手行为保持原样。
+中间检查点使用 `require_complete=false`；最终模型要求 `require_complete=true`。
+最终三组均采用同一批量推理入口，实际计划中的世界/策略种子、座位、角色、规则、
+观测与推理设置已核对一致，见
+`logs/diagnostics/dqn-final-validation-plan-audit-20261001/result.json`。
 
-阶段评测计划：对每组 65536 步检查点使用完整 validation 的 32 个世界种子、
-两种座位，共 64 局，贪心策略、原神灵梦、8 环境。显式
-`require_complete=false` 仅表示评估中间检查点，不把未完成的训练记作成功。
-最终模型按相同协议比较，配置确定后才使用独立 test。五步组首先达到该节点，
-先启动其阶段评测；不因先完成而优先选择它。
+选型规则在最终结果产生前固定：先比较完整 64 局的平均有限时域收益（胜 +1、
+负 -1、双 KO/超时 0），再比较胜率；仍打平则优先较少梯度更新，最后保留三步
+基线。伤害量只作诊断。独立 test 在配置锁定之后使用，不据部分座位结果选型。
+两个座位按世界种子配对，不能把 64 局当作 64 个独立种子。
 
-真实续训已验证：新检查点 4608 步、64 次 DQN/Adam 更新、4608 条经验，
-相对源检查点新增 256 转移及 32 次更新。在线网络确实变化，目标网络在两次同步
-之间保持原值，探索率续接为 0.9666015625；模型/回放哈希及全部参数有限值
-通过。记录为 `logs/diagnostics/dqn-real-resume-20261001/result.json`。
-曲线配置将失败基线与恢复段分开显示，避免把它们拼成未中断的训练。
+| 候选 | 65536 步 validation 胜/负/超时 | 平均收益 | 最终 validation |
+| --- | --- | ---: | --- |
+| 三步恢复基线 | 0 / 64 / 0 | -1.000000 | 运行中 |
+| 五步 | 0 / 64 / 0 | -1.000000 | 0 胜、64 负、0 超时；收益 -1 |
+| 更多回放 | 0 / 49 / 15 | -0.765625 | 运行中 |
 
-五步组中间评测已在 GPU 0 启动，输出为
-`logs/benchmark/br-dqn-five-step-65536-validation-20261001`，64 局计划已落盘；
-stdout 为 `logs/benchmark-dqn-five-step-65536-20261001.txt`。截至本记录仍在运行，
-尚无完整评测结论。
+阶段评测全部成功且无双 KO；更多回放的阶段收益差来自超时，不是胜利。
+三份阶段审计为 `logs/diagnostics/dqn-{baseline,five-step,more-replay}-stage-validation-audit-20261001/`。
+每份均核对全部试验、32 个配对种子、checkpoint 哈希和 64 份动作回放。
+固定网格零胜不能证明真实胜率等于零；现有基于 32 个独立种子块的 95% Hoeffding
+上界约为 0.240。
 
-异常检查点的更新计数进一步按每次已成功返回的 Adam 更新累计，避免同一批后续
-更新失败时漏记先前完成的更新。正常训练规则与批末计数不变。新增测试在第二次
-优化器调用前注入异常，核对保存时 Adam/DQN 均为 1 次，续训后均为 3 次；
-DQN、BR 和曲线对齐回归共 32 passed，日志为
-`logs/pytest-dqn-interrupted-update-20261001.txt`。当前长任务沿用各自已加载版本，
-没有为计数边界修复重启训练。该测试不承诺硬件故障时部分执行的 Adam 操作具有
-事务原子性。
+五步最终评估成功，耗时约 2131.9 秒，双座位各 32 负；同样通过全部计划、回放
+种子/帧数/动作范围、模型哈希与私有进程清理审计，见
+`logs/diagnostics/dqn-five-step-final-validation-audit-20261001/result.json`。
+该配置未显示出战胜规则灵梦的能力。其余两组最终 validation、模型选型与独立
+test 仍未完成。
 
-评测推理诊断使用五步组 65536 步检查点的 128 个真实回放观测，固定抽样种子
-7819。GPU 0 上逐条约 479 动作/秒，8 条合批约 1210 动作/秒；16/32 条为
-1044/1119 动作/秒。抽样动作全部一致；这不是端到端游戏吞吐或所有输入逐位
-一致的证明。原始记录为 `logs/diagnostics/dqn-inference-batching-20261001/result.json`。
-评测入口现在按同一个模型合批无状态、贪心 DQN 推理，其他策略仍逐次调用，并
-保持它们之间的调用顺序。不同模型不会混批。21 项测试覆盖真实数值/图像字典
-DQN 的逐条与批量动作一致、不同模型、规则策略状态顺序和 BR/通用评测回归；
-日志为 `logs/pytest-dqn-batched-evaluation-20261001.txt`。
-
-正在运行的两组中间评测仍使用逐条推理；新启动的评测将记录
-`policy_inference=grouped_greedy_dqn_v1_other_actors_sequential`。最终三组评测
-统一使用新入口；不把中间评测入口或并发条件不同造成的墙钟差异归因于参数。
-
-选型规则在最终评测前固定：先比较完整 64 局、两座位的平均有限时域收益
-（胜 +1、负 -1、双 KO/超时 0），再比较胜率。打平时优先较少的梯度更新次数，
-仍打平则保留三步基线。伤害量作为诊断，不替代对局收益；不根据未完成的单座位
-评测提前选型。使用现有按世界种子配对的区间报告不确定性，不能把 64 局当作
-64 个独立种子。阶段评测用于观察，最终选型比较相同的 262144 模型步数；基线
-故障丢失的采样仍单独报告。
-
-五步组 131072 步检查点已重新加载核对：15872 次 DQN/Adam 更新，131072 条
-经验池已满，探索率约 0.05；模型、优化器状态及抽样目标均为有限值，配套哈希
-通过。抽样 Q 范围为 0.686–1.315、目标为 -0.248–1.289；这是抽样状态的数值
-检查，不证明价值预测准确或策略强度。记录为
-`logs/diagnostics/dqn-five-step-midpoint-20261001/result.json`。
-
-其余两组 65536 步阶段评测也已启动：更多回放组在
-`logs/benchmark/br-dqn-more-replay-65536-validation-20261001`，基线在
-`logs/benchmark/br-dqn-baseline-65536-validation-20261001`；各自的 `launch.json`
-记录实际进程、版本和 GPU。基线来自恢复目录的 65536 步/7680 更新检查点，
-模型及回放哈希通过。启动前 GPU 0 有约 11 GiB 空闲，节点可用内存约 222 GiB、
-CPU 两秒观测约 47%，故三组评测共用 GPU 0；三组训练仍使用 GPU 1/5。
-截至 18:04 UTC，两组先启动的评测分别完成 24/64 和 14/64 局，尚不足以选型。
-
-实验条件审计保存在 `logs/diagnostics/dqn-experiment-identity-20261001/result.json`：
-四次训练尝试的原版游戏、DLL、配置资源哈希一致，观测/动作/对手/种子/依赖相同；
-五步与更多回放的 DQN 参数分别仅有 `n_steps` 和 `gradient_steps` 不同。恢复段
-额外包含日志缺测修复和异常保存，游戏/学习更新源码未变。采样重启的限制仍保留。
-后半程曲线快照为 `logs/diagnostics/dqn-curves-20261001-f/`；快照中三组完成对局
-仍全负，不能因平均 Q 值上升就宣称策略改善。
-
-最终 validation 从独立 Linux 入口启动，例如五步组：
+最终评估输出依次为 `logs/benchmark/br-dqn-baseline-final-validation-20261001/`、
+`logs/benchmark/br-dqn-five-step-final-validation-direct-20261001/` 和
+`logs/benchmark/br-dqn-more-replay-final-validation-20261001/`。独立启动示例：
 
 ```bash
 bash scripts/linux.sh tools/benchmark_br.py \
   training_directory=logs/training/br-dqn-reimu-five-step-20261001 \
   checkpoint=final.zip require_complete=true evaluation=validation \
   num_envs=8 rl.cpu_threads=2 linux.cuda_devices=0 \
-  output=logs/benchmark/br-dqn-five-step-final-validation-direct-20261001
+  output=logs/benchmark/br-dqn-five-step-final-validation-example
 ```
 
-此前尝试的本地子进程队列在五步组完成后启动了评测，但 CUDA 初始化报错误
-304，尚未建立评测目录或启动游戏。队列已退出，其配置、状态、启动清单和错误
-保存在 `logs/diagnostics/dqn-final-validation-queue-20261001/`，源码保留于 Git
-提交 `e3cc5e7`。4 项模拟门禁测试只覆盖预算/文件校验和 PID 身份，不验证嵌套
-CUDA。实机复测确认独立入口 CUDA 可用、嵌套入口不可用，日志为
-`logs/diagnostic-dqn-direct-cuda-20261001.txt` 与
-`logs/diagnostic-dqn-nested-cuda-20261001.txt`。已移除不适用的队列代码及配置；
-继续由独立受限入口启动后续评测。每次仍先核对成功结果、完整预算、检查点哈希
-与资源余量。选型和独立 test 在完整 validation 结果核对后进行。
+## 效率与诊断
 
-同步主仓库 `b44c075` 的私有 Wine 清理修复及测试：确认专属服务已退出后，
-对 NAS 目录删除的 `ENOTEMPTY` / `EBUSY` / 并发 `ENOENT` 作有界重试，权限
-错误立即抛出，始终保存清理结果。7 项测试通过，日志为
-`logs/pytest-dqn-worker-cleanup-20261001.txt`。该问题在主仓库的真实 16 实例
-诊断中已出现；本分支未修改游戏或学习算法。修复用于后续启动的最终评测，
-当前已加载旧代码的六个任务保持运行。没有停止共享 Wine 服务或其他任务。
+DQN 训练与评估实际使用 CUDA。三组训练分配在 GPU 1/5，评估在 GPU 0；先检查
+资源再并行运行，各自使用私有 Wine 会话，没有操作其他任务。早期 25 次采样中
+GPU 1 平均利用率 19.96%、范围 1–62%，不能把更新阶段 97% 的单点峰值当作
+持续利用率；证据位于 `logs/diagnostics/dqn-curves-20261001-b/gpu-summary.json`。
+采样与换局仍是主要耗时，增加优化工作不等于提高样本效率。
 
-首份完整阶段评测为五步组 65536 步模型：64 局全负，两个座位各 32 负，
-无双 KO 或超时。`result.json` 成功，实际耗时约 3524.6 秒，评测进程已退出。
-核对了 32 个成对世界种子、完整试验 ID 集合、未变的检查点 SHA256，以及全部
-64 份回放的种子、动作范围和动作数/帧数一致性。审计在
-`logs/diagnostics/dqn-five-step-stage-validation-audit-20261001/result.json`。
-该阶段没有胜率优势证据；固定种子网格的观测胜率为 0，现有按独立种子块计算的
-95% Hoeffding 上界约为 0.240，不能宣称真实胜率已被证明等于零。最终训练和
-其他候选的完整评测仍未完成。
+评估按相同模型合批无状态贪心 DQN，其他有状态策略保留调用顺序，不混合不同
+模型。128 个真实回放观测的推理诊断中，GPU 0 逐条约 479 动作/秒、batch 8
+约 1210 动作/秒，抽样动作相同；这不是端到端游戏速度提升的证明。见
+`logs/diagnostics/dqn-inference-batching-20261001/result.json`，相关 21 项回归
+见 `logs/pytest-dqn-batched-evaluation-20261001.txt`。
 
-三组 65536 步阶段评测现已全部成功结束，均为同一组 32 世界种子的双座位 64 局：
+完整训练曲线、PNG/PDF、原始快照及 SHA256 位于
+`logs/diagnostics/dqn-curves-final-training-20261001/`，已检查渲染与更新计数
+对齐。更多回放完整周期吞吐约 40.4 步/秒，基线及五步约 45.1 步/秒；GPU 与
+并发不同，不能把墙钟差异全部归因于超参数。Q 值上升和五步组末期 TD 误差
+增加尚未形成稳定胜率证据；有限数值不代表收敛。
 
-| 候选 | 胜 | 负 | 超时 | 平均有限时域收益 | 检查点梯度更新 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 三步恢复基线 | 0 | 64 | 0 | -1.000000 | 7680 |
-| 五步 | 0 | 64 | 0 | -1.000000 | 7680 |
-| 三步、更多回放 | 0 | 49 | 15 | -0.765625 | 15360 |
+```bash
+bash scripts/linux.sh tools/analyze_training.py --config-name analyze_dqn \
+  output=logs/diagnostics/dqn-curves-new
+```
 
-三组均无双 KO。更多回放的超时为 1P 8 局、2P 7 局；超时收益按训练合同取 0，
-不能记作胜利。该阶段的观测收益差来自减少失利，不证明已能击败神灵梦，也不能
-从单个训练种子推断算法普遍更强。基线采样重启及额外丢失成本仍是比较限制。
-新增审计为 `logs/diagnostics/dqn-baseline-stage-validation-audit-20261001/` 与
-`logs/diagnostics/dqn-more-replay-stage-validation-audit-20261001/`：同样核对成功结果、
-全部试验 ID、32 个配对种子、检查点哈希以及 64 份动作回放。最终 262144 步
-比较和独立 test 尚待完成，不据阶段结果提前锁定配置。
+诊断将 CSV 梯度计数与 `timing.json` 的实际已更新步数对齐，不按 PPO epochs
+解释 DQN；无法对齐的顺序快照行保留并列入 `unaligned_train_counters`，不猜测
+横轴。完整训练快照没有未对齐计数。DQN CSV 延迟输出曾导致旧 `combat/*` 均值
+残留，现已修复；早期运行的战斗 CSV 均值不可用于比较，所有战斗曲线从正确的
+逐局 `progress.json` 重算。相关回归为 `logs/pytest-dqn-empty-rollout.txt`。
 
-五步组完整训练已成功完成 262144 步、32256 次 DQN/Adam 更新；最终经验池为
-131072 条，模型/优化器及抽样目标均为有限值，模型和回放哈希通过。私有 Wine
-服务与工作进程均正常退出，临时游戏和前缀已移除。完整审计为
-`logs/diagnostics/dqn-five-step-final-audit-20261001/result.json`。最终验证从上述
-独立入口启动，已建立 64 局计划；尚不能由训练成功推断策略强度。
+## 失败与运行限制
 
-撤回嵌套队列、合入清理修复后，代码提交 `7813eb5` 的全量回归为 880 passed、
-12 skipped、1 deselected、2 subtests passed，耗时 63.36 秒。日志为
-`logs/pytest-dqn-release-20261001.txt`；3 条警告来自 TorchRL 对 PettingZoo 版本的
-提示，相应接口测试通过。跳过项保留既有 Windows/CRT/外部回放限制。
+原基线 `logs/training/br-dqn-reimu-baseline-20261001/` 在换边重建游戏时出现
+`Title bootstrap timeout`，新游戏停在 scene=0；根因尚未确定。失败结果原样
+保留，没有最终模型。最后完整记录为 48384 步、5536 更新，只有 4352 步检查点
+可恢复，因此至少额外丢失 44032 条采样，必须单独计入实际成本。恢复后周期
+检查点缩短为 8192 步，其他 DQN 参数不变。首次恢复命令因缺少 `++` 在 Hydra
+校验阶段失败，未启动游戏；正确运行 stdout 为
+`logs/train-dqn-baseline-resumed-launch2-20261001.txt`。
 
-三组完整训练现均成功达到 262144 个有效训练步。恢复基线与五步组各完成
-32256 次 DQN/Adam 更新，更多回放组完成 64512 次；三组最终经验池均为
-131072 条。新增产物审计为 `logs/diagnostics/dqn-baseline-final-audit-20261001/`
-及 `logs/diagnostics/dqn-more-replay-final-audit-20261001/`：模型/回放 SHA256、
-优化器计数、有限参数及抽样目标全部通过，私有 Wine 工作进程与服务正常退出，
-私有游戏和前缀清理完成。基线失败尝试额外丢失的至少 44032 条采样仍计入成本，
-不能用有效步数掩盖该开销。
+尝试过的嵌套评估队列在子进程 CUDA 初始化时错误 304，尚未启动游戏。独立
+Linux 入口可用，嵌套入口不可用；未放宽存储限制，已删除不可用的队列代码、
+配置及模拟测试。失败证据在 `logs/diagnostics/dqn-final-validation-queue-20261001/`，
+源码历史为 `e3cc5e7`，实机诊断为 `logs/diagnostic-dqn-{direct,nested}-cuda-20261001.txt`。
+后续任务都直接从独立的 `scripts/linux.sh` 入口启动。
 
-三组最终 validation 均已从独立 Linux 入口启动，每组同一套 32 个世界种子的
-双座位 64 局，统一使用批量贪心推理。输出分别为
-`logs/benchmark/br-dqn-baseline-final-validation-20261001/`、
-`logs/benchmark/br-dqn-five-step-final-validation-direct-20261001/` 和
-`logs/benchmark/br-dqn-more-replay-final-validation-20261001/`。
-当前仍需完成三组最终 validation、按既定规则锁定模型，以及独立 test；
-训练产物完整不代表已能击败规则灵梦。
-
-完整训练曲线（PNG/PDF）及带哈希的原始日志快照位于
-`logs/diagnostics/dqn-curves-final-training-20261001/`，已检查渲染与计数对齐。
-恢复基线实际完成局为 1 胜 65 负，五步组 68 负，更多回放组 65 负、1 超时。
-基线唯一训练胜局发生在累计第 109832 步、世界种子 1242439449，魔理沙 1P
-剩余 4 HP，灵梦 0 HP；这是带探索动作的训练局，不能作为最终贪心策略胜率。
-三组日志中均无未对齐的梯度计数。更多回放组的完整周期吞吐约 40.4 步/秒，
-基线与五步组约 45.1 步/秒；运行期间的 GPU/并发不同，不能据此归因参数的纯耗时
-效应。采样时间仍占主要部分，换局产生耗时峰值。数值有限不等于收敛：Q 值上升、
-五步 TD 误差末期增加，均未形成稳定胜率证据。
-
-五步组的 262144 步最终 validation 已成功完成：双座位各 32 局，共 0 胜、64 负，
-无双 KO 或超时，平均有限时域收益 -1。实际耗时约 2131.9 秒。审计为
-`logs/diagnostics/dqn-five-step-final-validation-audit-20261001/result.json`，
-核对全部计划试验、32 个配对种子、checkpoint 哈希和 64 份回放的种子/动作范围/
-帧数；私有 Wine 工作进程退出及目录清理通过。此结果未显示五步配置能战胜规则
-灵梦。三组实际评估计划与规则/观测/推理设置一致的证据位于
-`logs/diagnostics/dqn-final-validation-plan-audit-20261001/result.json`。
-其余两组最终 validation 和选定模型的独立 test 仍未完成。
+从主仓库 `b44c075` 选择性同步私有 Wine 清理修复：专属服务退出后，对 NAS
+删除的 ENOTEMPTY/EBUSY/并发 ENOENT 作有界重试，权限错误立即抛出，始终保存
+清理结果。7 项回归见 `logs/pytest-dqn-worker-cleanup-20261001.txt`。这不涉及
+共享 Wine 服务、其他任务或游戏/学习算法修改。
