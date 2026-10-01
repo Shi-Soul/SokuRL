@@ -229,19 +229,25 @@ CPU 两秒观测约 47%，故三组评测共用 GPU 0；三组训练仍使用 GP
 后半程曲线快照为 `logs/diagnostics/dqn-curves-20261001-f/`；快照中三组完成对局
 仍全负，不能因平均 Q 值上升就宣称策略改善。
 
-本次最终 validation 使用本地队列：
+最终 validation 从独立 Linux 入口启动，例如五步组：
 
 ```bash
-bash scripts/linux.sh tools/queue_br_evaluations.py
+bash scripts/linux.sh tools/benchmark_br.py \
+  training_directory=logs/training/br-dqn-reimu-five-step-20261001 \
+  checkpoint=final.zip require_complete=true evaluation=validation \
+  num_envs=8 rl.cpu_threads=2 linux.cuda_devices=0 \
+  output=logs/benchmark/br-dqn-five-step-final-validation-direct-20261001
 ```
 
-`config/queue_dqn_validation.yaml` 列出三组来源和各自新输出目录。队列核对训练
-进程身份；只有原进程退出、成功结果存在、累计模型步数恰为 262144 且最终模型/
-回放哈希一致才允许入队。包括仍在运行的阶段评测在内，最多三组并行评测，启动前
-要求 GPU 0 至少 2048 MiB 空闲、节点至少 16 GiB 可用内存。每次启动的命令、PID、
-源码版本和检查点清单保存在队列目录的 `*.launch.json`，stdout 也在该目录。
-队列的 `all_evaluations_launched` 仅代表已启动，不能解释成评测完成或任务成功。
-选型和独立 test 仍在完整结果核对后进行。
+此前尝试的本地子进程队列在五步组完成后启动了评测，但 CUDA 初始化报错误
+304，尚未建立评测目录或启动游戏。队列已退出，其配置、状态、启动清单和错误
+保存在 `logs/diagnostics/dqn-final-validation-queue-20261001/`，源码保留于 Git
+提交 `e3cc5e7`。4 项模拟门禁测试只覆盖预算/文件校验和 PID 身份，不验证嵌套
+CUDA。实机复测确认独立入口 CUDA 可用、嵌套入口不可用，日志为
+`logs/diagnostic-dqn-direct-cuda-20261001.txt` 与
+`logs/diagnostic-dqn-nested-cuda-20261001.txt`。已移除不适用的队列代码及配置；
+继续由独立受限入口启动后续评测。每次仍先核对成功结果、完整预算、检查点哈希
+与资源余量。选型和独立 test 在完整 validation 结果核对后进行。
 
 同步主仓库 `b44c075` 的私有 Wine 清理修复及测试：确认专属服务已退出后，
 对 NAS 目录删除的 `ENOTEMPTY` / `EBUSY` / 并发 `ENOENT` 作有界重试，权限
@@ -274,3 +280,9 @@ bash scripts/linux.sh tools/queue_br_evaluations.py
 `logs/diagnostics/dqn-more-replay-stage-validation-audit-20261001/`：同样核对成功结果、
 全部试验 ID、32 个配对种子、检查点哈希以及 64 份动作回放。最终 262144 步
 比较和独立 test 尚待完成，不据阶段结果提前锁定配置。
+
+五步组完整训练已成功完成 262144 步、32256 次 DQN/Adam 更新；最终经验池为
+131072 条，模型/优化器及抽样目标均为有限值，模型和回放哈希通过。私有 Wine
+服务与工作进程均正常退出，临时游戏和前缀已移除。完整审计为
+`logs/diagnostics/dqn-five-step-final-audit-20261001/result.json`。最终验证从上述
+独立入口启动，已建立 64 局计划；尚不能由训练成功推断策略强度。
