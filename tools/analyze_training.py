@@ -9,6 +9,7 @@ import hydra
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
 import numpy as np
 from omegaconf import OmegaConf
 
@@ -112,7 +113,8 @@ def plot_combat(labels, output, window, palette, styles):
     if axes[0, 0].lines:
         axes[0, 0].legend(fontsize=9)
     figure.suptitle(f"Training combat metrics — mean over last {window} completed episodes\n"
-        "Missing measurements excluded; HP loss is not attributed attack damage; entries are not confirmed casts",
+        "Missing measurements excluded; HP loss is not attributed attack damage; entries are not confirmed casts\n"
+        "Adaptive runs change opponent noise; these are not full god-AI evaluations",
         fontsize=12)
     figure.savefig(output / "combat.png", dpi=150)
     figure.savefig(output / "combat.pdf")
@@ -173,6 +175,7 @@ def plot_curriculum(labels, output):
                     margin = (end - start) / 1000 * .015
                     axis.set_xlim(start / 1000 - margin, end / 1000 + margin)
                     axis.set_ylim(-.04, 1.04)
+                    axis.yaxis.set_major_formatter(PercentFormatter(xmax=1))
                     axis.set_xlabel("PPO environment steps (thousands)")
                     axis.grid(alpha=.2)
                     axis.spines[["top", "right"]].set_visible(False)
@@ -238,6 +241,7 @@ def main(cfg):
     axes[0, 2].axhline(np.log(576), color="#444444", linewidth=1, linestyle=":")
     axes[0, 2].text(.02, .88, "Dotted line: uniform over 576 actions", transform=axes[0, 2].transAxes, fontsize=8)
     axes[1, 2].set_yscale("symlog", linthresh=1)
+    axes[1, 1].yaxis.set_major_formatter(PercentFormatter(xmax=1))
     # Do not magnify floating-point noise around an all-loss return of -1.
     axes[0, 0].set_ylim(min(return_limits) - .05, max(return_limits) + .05)
     for axis in (axes[0, 1], axes[0, 2], axes[1, 0], axes[1, 1], *axes[2]):
