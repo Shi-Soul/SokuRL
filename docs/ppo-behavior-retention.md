@@ -80,3 +80,26 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
   '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-separate-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-separate-20261001/config.yaml}' \
   output=logs/training/br-superhuman-reimu-recurrent-separate-adaptive-20261001
 ```
+
+## 独立的数据量对照
+
+新增原教师控制数据 `logs/demonstrations/god-marisa-reimu-expanded-20261001` 已完整收集：
+32 局、204952 帧、1985.52 秒，16 胜、1 负、15 超时。角色、神 AI 规则和接口与原数据一致；
+两座位各 16 局，各留 4 局验证。全部种子避开旧的三个数据集以及正式验证/测试种子。
+合并原教师数据后共 48 局、305821 帧，训练 227277 帧、验证 78544 帧；
+保留各自的整局划分，不加入先前学习者控制的数据。
+完整 loader 的分片哈希、契约和数据集互斥检查通过；私有 worker 与服务正常退出并清理。
+记录为 `.dev/audit-expanded-teacher-data-20261001.log` 和
+`logs/diagnostics/expanded-teacher-data-20261001/summary.json`。
+
+扩充对照从头训练原共享特征循环结构，仍为 20 轮、原学习率和批次参数，
+按合并验证集 NLL 选择 best。数据量与监督更新总量均增加，不是等计算量比较。
+完整神 AI 评估仍使用独立的同一组配对验证种子。
+
+```bash
+bash scripts/linux.sh tools/pretrain_demonstrations.py \
+  --config-name pretrain_recurrent_demonstrations linux.cuda_devices=1 rl.cpu_threads=1 \
+  pretraining.dataset=logs/demonstrations/god-marisa-reimu-20261001 \
+  'pretraining.additional_datasets=[logs/demonstrations/god-marisa-reimu-expanded-20261001]' \
+  output=logs/pretraining/god-marisa-reimu-recurrent-expanded-20261001
+```
