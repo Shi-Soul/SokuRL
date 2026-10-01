@@ -34,3 +34,19 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 检查覆盖全部物体位置的梯度、padding 不影响输出、完整字段保留、带符号数值变换、
 镜像朝向的相对几何、历史帧与检查点往返，以及离线/在线 Hydra 网络及接口配置一致性。
 相关 28 项检查通过，日志 `.dev/pytest-numeric-combat-features-20261001-v2.log`。
+
+真实拟合已从源码 `69496d5` 在 GPU 1 完成：20 轮、20273 次监督更新、750.89 秒。
+与原扩充循环 BC 的数据 manifest、种子、观察/动作契约、PPO/监督设置及逐 epoch 更新次数
+全部配对核对，只有编码器设置改变。原基线耗时 549.66 秒；共享节点负载不同，
+不能把两次耗时差完全归因于额外通道。
+核对记录 `.dev/audit-numeric-combat-configuration-20261001.log` 和
+`logs/diagnostics/numeric-combat-configuration-20261001/summary.json`。
+
+仍按总验证 NLL 选择第 18 轮 best：NLL 0.22036、准确率 94.336%、
+变化帧准确率 65.762%、价值 MSE 0.57602。
+原扩充基线相应为 0.24373、93.741%、62.019%、0.39906。
+因此当前仅观察到策略标签拟合改善，价值误差反而更高；不能据此宣布网络全面更优。
+best SHA256 为 `78f862c3cc1e171663678b3ad019649bbd903e33f6f214b0161c853535d06982`，
+记录 `.dev/audit-numeric-combat-fit-20261001.log` 及同诊断目录 `fit.json`。
+完整神 AI 配对测评 `br-reimu-recurrent-numeric-combat-zero-shot-20261001` 已启动，
+另用固定三个验证集检查学习者状态泛化及攻击/卡片命令指标。

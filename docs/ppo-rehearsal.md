@@ -138,3 +138,26 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
 私有 worker `0d86e636ca434dc39809f377d7ab758c` 正常退出并清理，不再继续该配置。
 记录 `logs/diagnostics/recurrent-rehearsal-final-20261001/training.json`，核对日志
 `.dev/audit-recurrent-rehearsal-final-training-20261001.log`。
+
+最终完整神 AI 配对测评完成：187.37 秒、4 局全负，平均自身/对手 HP 下降
+10286.50/2562.50，双方符卡动作进入均为 0。
+与同预算不复习对照的对手 HP 下降 310.25 相比，该小样本的伤害代理量更高，仍未取得胜局。
+相同种子/角色/座位及模型哈希已核对；私有 worker `dfeda7c9352b40338edbc415cefbc97f`
+正常退出并清理。结果位于 `logs/diagnostics/recurrent-rehearsal-final-20261001/full_god_evaluation.json`，
+日志 `.dev/audit-recurrent-rehearsal-final-evaluation-20261001.log`。
+
+最终教师验证 NLL 0.52094、总准确率 88.215%、变化帧准确率 39.408%、价值 MSE 0.06811。
+新增命令分组诊断使用完全相同的四局 28800 帧，并单独核对按座位加权结果：
+
+| 检查点 | 攻击命令平均概率 | 攻击标签上的完整命令准确率 | 符卡标签上的完整命令准确率 |
+| --- | --- | --- | --- |
+| 原 BC | 5.266% | 72.785% | 63.636% |
+| 复习 65536 步 | 4.306% | 68.897% | 68.182% |
+| 复习 131072 步 | 8.189% | 66.184% | 65.152% |
+
+验证标签中攻击为 1106 帧（3.840%），符卡为 66 帧，换卡为 46 帧。
+中点在教师状态的攻击概率并不低于标签频率，但实际游戏攻击输入频率更低，
+所以这些结果不足以用全局攻击概率压低来单独解释失败。
+保留行为、命令正确性和真实访问状态需要分别判断；极少的卡片标签也限制结论。
+来源 `logs/diagnostics/recurrent-rehearsal-command-retention-20261001`，核对日志
+`.dev/audit-recurrent-rehearsal-command-retention-20261001.log`。
