@@ -162,7 +162,7 @@ def main(cfg):
     for axis in (axes[0, 1], axes[0, 2], axes[1, 0], axes[1, 1], *axes[2]):
         axis.set_ylim(bottom=0)
     figure.suptitle("Superhuman BR snapshots — one seed per run\n"
-                     "Steps within each run; earlier pretraining is excluded and opponents may differ", fontsize=14)
+                     "PPO step counter includes checkpoint continuation; weight-only pretraining is excluded", fontsize=14)
     axes[0, 0].legend(fontsize=9)
     figure.savefig(output / "curves.png", dpi=150)
     figure.savefig(output / "curves.pdf")
