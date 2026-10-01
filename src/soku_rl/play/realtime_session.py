@@ -16,6 +16,7 @@ class RealtimePolicy:
         self.lifecycle = MatchLifecycle(2)
         self.seat, self.seed, self.instances = seat, seed, 0
         self.match, self.frame = 0, -1
+        self.live.prepare((seed + seat) % 0xFFFFFFFF)
 
     def advance(self, frame):
         state = frame.match
@@ -30,6 +31,8 @@ class RealtimePolicy:
         kinds = {event.kind for event in events}
         if "match_started" in kinds or state.phase != "battle":
             self.live.stop()
+        if state.phase != "battle":
+            self.live.prepare((self.seed + 2 * self.instances + self.seat) % 0xFFFFFFFF)
         continuous = self.live.active and not self.live.reset_each_round
         if state.phase == "battle":
             if self.lifecycle.can_act:
@@ -50,12 +53,12 @@ class RealtimePolicy:
 
     def stop(self):
         self.live.stop()
+        self.live.prepared.clear()
 
 
-def run_session(connection, policy, interface, seat, seed, matches, timeout, record):
+def run_session(connection, controller, matches, timeout, record):
     if type(matches) is not int or matches < 0 or timeout < 0:
         raise ValueError("matches and timeout must be nonnegative; zero means wait for player exit")
-    controller = RealtimePolicy(policy, interface, seat, seed)
     started = time.monotonic()
     completed, decisions, frames, scores = 0, 0, 0, (0, 0)
     submitted, busy = 0, 0
@@ -87,9 +90,9 @@ def run_session(connection, policy, interface, seat, seed, matches, timeout, rec
                     if matches and completed == matches:
                         return result("matches_completed")
                 if step.inputs:
-                    reply = connection.request("submit", {"state": state, "keys": step.inputs[seat]})
+                    reply = connection.request("submit", {"state": state, "keys": step.inputs[controller.seat]})
                     record({"kind": "command", "match": state.match, "round": state.round,
-                            "observed": state.frame, "keys": step.inputs[seat],
+                            "observed": state.frame, "keys": step.inputs[controller.seat],
                             "inference_ms": inference_ms, **reply})
                     decisions += 1
                     submitted += reply["submitted"]

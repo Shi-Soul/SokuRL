@@ -13,7 +13,7 @@ from soku_rl.env.worker_pipe import WorkerConnection
 from soku_rl.play.loader import load_play_policy, play_interface, warm_play_policy
 from soku_rl.play.menu import play_menu
 from soku_rl.play.opponents import opponent_catalog
-from soku_rl.play.realtime_session import run_session
+from soku_rl.play.realtime_session import RealtimePolicy, run_session
 from soku_rl.play.settings import client_plan
 from soku_rl.policy.god.package import ScriptPackage
 
@@ -50,10 +50,12 @@ def main(cfg):
     print("正在准备 AI；完成后才建立网络连接。", flush=True)
     policy = load_play_policy(candidate, interface, rules, config["device"], ai["seat"])
     warmed = warm_play_policy(policy, interface, config["seed"])
+    controller = RealtimePolicy(policy, interface, ai["seat"], config["seed"])
     print(f"AI 准备完成，已预热 {warmed} 个模型。", flush=True)
     cfg.episode = OmegaConf.create(asdict(interface.episode))
     cfg.wrappers = OmegaConf.create(asdict(interface.config))
     if config["operation"] == "check":
+        controller.stop()
         print(f"配置和策略检查通过：{config['opponent']}；不会启动游戏。", flush=True)
         return
     output = Path(config["output"]).resolve()
@@ -76,13 +78,14 @@ def main(cfg):
                         for transition in event["events"]:
                             if transition["kind"] == "match_finished":
                                 print(f"本场结束，比分 {transition['scores'][0]}:{transition['scores'][1]}。", flush=True)
-                report["result"] = run_session(connection, policy, interface, ai["seat"], config["seed"],
+                report["result"] = run_session(connection, controller,
                     config["session"]["matches"], config["session"]["timeout"], record)
             report["success"] = report["result"]["termination"] in {"matches_completed", "game_closed", "disconnected"}
     except BaseException as error:
         report["error"] = repr(error)
         raise
     finally:
+        controller.stop()
         (output / "result.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
 

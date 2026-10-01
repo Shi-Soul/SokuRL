@@ -50,6 +50,8 @@ def test_network_rounds_reuse_training_cadence_and_never_hold_old_decisions(seat
                                   LearningConfig("combat", True, 8, 1.))
     policy = RecordingPolicy()
     controller = RealtimePolicy(policy, interface, seat, 20)
+    assert [seed for seed, _ in policy.episodes] == [20+seat]
+    assert policy.episodes[0][1] == []
     decisions = []
     for frame in range(1, 13):
         state = MatchState(1, int(frame >= 7), frame, (int(frame >= 6), 0),

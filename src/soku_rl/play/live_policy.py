@@ -27,6 +27,18 @@ class LivePolicy:
         self.history = ObservationHistory(interface.episode, (self.agent,))
         self.features = LearningEpisode(interface)
         self.active = False
+        self.prepared = {}
+
+    def prepare(self, seed):
+        """Create independent actor memory while the game is still in its menus."""
+        if self.active:
+            raise RuntimeError("cannot prepare an actor during an active round")
+        if type(seed) is not int or not 0 <= seed < 0xFFFFFFFF:
+            raise ValueError("round seed must be a supported uint32")
+        if self.prepared and seed not in self.prepared:
+            raise RuntimeError("prepared actor seed differs from the next round")
+        if not self.prepared:
+            self.prepared[seed] = self.policy.spawn_play(seed)
 
     def start_round(self, frame, observations, seed):
         if type(seed) is not int or not 0 <= seed < 0xFFFFFFFF:
@@ -35,7 +47,9 @@ class LivePolicy:
         self.origin = self.next_decision = frame
         self.history.reset(frame, self._round_observations(frame, observations))
         self.features.reset_agent(self.agent, self.history.observations()[self.agent])
-        self.actor = self.policy.spawn_play(seed)
+        if self.prepared and seed not in self.prepared:
+            raise RuntimeError("prepared actor seed differs from the next round")
+        self.actor = self.prepared.pop(seed) if self.prepared else self.policy.spawn_play(seed)
         self.active = True
 
     def _round_observations(self, frame, observations):
