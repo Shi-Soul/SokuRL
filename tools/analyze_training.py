@@ -15,6 +15,28 @@ from omegaconf import OmegaConf
 from soku_rl.rl.episode_metrics import grouped_episode_metrics
 
 
+def align_update_metrics(rows, rollouts):
+    """Match delayed SB3 scalars to recorded updates, including resumed/early-stop runs."""
+    steps_by_update = {}
+    for rollout in rollouts:
+        if "update_seconds" not in rollout:
+            continue
+        update = int(rollout["ppo_n_updates"])
+        if update in steps_by_update:
+            raise ValueError(f"duplicate completed PPO update counter: {update}")
+        steps_by_update[update] = rollout["steps"]
+    updates = []
+    for row in rows:
+        if not row.get("train/n_updates"):
+            continue
+        counter = float(row["train/n_updates"])
+        if not counter.is_integer() or int(counter) not in steps_by_update:
+            raise ValueError(f"PPO scalar update {counter} has no recorded completed rollout")
+        updates.append({"steps": steps_by_update[int(counter)],
+            **{key: float(value) for key, value in row.items() if key.startswith("train/") and value}})
+    return updates
+
+
 def snapshot_run(label, source, output):
     target = output / label
     target.mkdir()
@@ -28,16 +50,7 @@ def snapshot_run(label, source, output):
     progress = json.loads((target / "progress.json").read_text())
     rows = list(csv.DictReader(io.StringIO((target / "progress.csv").read_text())))
     rollout_size = config["rl"]["ppo"]["n_steps"] * config["num_envs"]
-    epochs = config["rl"]["ppo"]["n_epochs"]
-    updates = []
-    for row in rows:
-        if row.get("train/n_updates"):
-            # SB3 dumps the previous update at the end of the NEXT rollout.
-            # These runs have fixed n_epochs and no target_kl early stopping.
-            if config["rl"]["ppo"].get("target_kl") is not None:
-                raise ValueError("update-step inference requires fixed epochs without target_kl")
-            updates.append({"steps": float(row["train/n_updates"]) / epochs * rollout_size,
-                **{key: float(value) for key, value in row.items() if key.startswith("train/") and value}})
+    updates = align_update_metrics(rows, timing["rollouts"])
     completed = [row for row in timing["rollouts"] if "update_seconds" in row]
     summary = {"source": str(source.resolve()), "sha256": files, "phase": timing["phase"],
         "sampled_steps": progress["steps"], "finished_updates": len(completed),
