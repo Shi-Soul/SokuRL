@@ -107,6 +107,74 @@ def plot_combat(labels, output, window, palette, styles):
     (output / "combat_series.json").write_text(json.dumps({"window": window, "runs": series}, indent=2))
 
 
+def plot_curriculum(labels, output):
+    """Keep feedback and applied episode difficulty separate, on the same step axis."""
+    series = {}
+    for label in labels:
+        progress = json.loads((output / label / "progress.json").read_text())
+        state = progress.get("curriculum", {"kind": "fixed"})
+        if state["kind"] != "adaptive_action_noise":
+            continue
+        config = OmegaConf.to_container(OmegaConf.load(output / label / "config.yaml"), resolve=True)
+        timing = json.loads((output / label / "timing.json").read_text())
+        start = timing["rollouts"][0]["steps"] - config["rl"]["ppo"]["n_steps"] * config["num_envs"]
+        end = progress["steps"]
+        points = {row["name"]: [] for row in state["opponents"]}
+        for episode in progress["episodes"]:
+            event = episode["curriculum_event"]
+            points[event["opponent"]].append({"end_steps": episode["end_steps"],
+                "learner_seat": episode["training_context"]["player"], **event})
+        series[label] = {"start_steps": start, "end_steps": end, "state": state, "opponents": points}
+        names = list(points)
+        for offset in range(0, len(names), 4):
+            selected = names[offset:offset + 4]
+            figure, axes = plt.subplots(len(selected), 2, figsize=(12, 3.2 * len(selected) + 1),
+                squeeze=False, layout="constrained")
+            for row, name in enumerate(selected):
+                probability, performance = axes[row]
+                events = points[name]
+                x = [event["end_steps"] / 1000 for event in events]
+                if events:
+                    probability.step([start / 1000, *x, end / 1000],
+                        [events[0]["previous_random_probability"],
+                         *[event["next_random_probability"] for event in events],
+                         events[-1]["next_random_probability"]], where="post",
+                        color="#2563a6", label="Probability for future games")
+                    probability.scatter(x, [event["episode_random_probability"] for event in events],
+                        color="#b57427", marker="x", s=28, label="Probability used in finished game", zorder=3)
+                    performance.plot(x, [event["ema_win_rate"] for event in events],
+                        color="#2563a6", marker="o", markersize=3)
+                else:
+                    probability.plot([start / 1000, end / 1000],
+                        [state["states"][name]["random_probability"]] * 2,
+                        color="#2563a6", label="Probability for future games")
+                    performance.text(.5, .72, "No completed episodes in this run", ha="center",
+                        transform=performance.transAxes)
+                target, band = state["config"]["target_win_rate"], state["config"]["deadband"]
+                performance.axhspan(target - band, target + band, color="#777777", alpha=.12)
+                performance.axhline(target, color="#444444", linestyle=":", linewidth=1)
+                probability.set_title(f"{name} — uniform probability", fontsize=10)
+                performance.set_title(f"EMA win rate — {len(events)} completed games in this run", fontsize=10)
+                probability.legend(fontsize=8, loc="lower left")
+                for axis in (probability, performance):
+                    margin = (end - start) / 1000 * .015
+                    axis.set_xlim(start / 1000 - margin, end / 1000 + margin)
+                    axis.set_ylim(-.04, 1.04)
+                    axis.set_xlabel("PPO environment steps (thousands)")
+                    axis.grid(alpha=.2)
+                    axis.spines[["top", "right"]].set_visible(False)
+            figure.suptitle(f"{label}: adaptive training curriculum through {end:,} steps\n"
+                f"EMA half-life {state['config']['ema_half_life']:g} games; shaded band is controller deadband\n"
+                "Episode points are placed at completion; training win rate is not full god-AI evaluation",
+                fontsize=11)
+            stem = f"curriculum-{label}-{offset // 4 + 1}"
+            figure.savefig(output / f"{stem}.png", dpi=150)
+            figure.savefig(output / f"{stem}.pdf")
+            plt.close(figure)
+    if series:
+        (output / "curriculum_series.json").write_text(json.dumps(series, indent=2))
+
+
 @hydra.main(version_base="1.3", config_path="../config", config_name="analyze_training")
 def main(cfg):
     output = Path(cfg.output)
@@ -168,6 +236,7 @@ def main(cfg):
     figure.savefig(output / "curves.pdf")
     plt.close(figure)
     plot_combat(list(cfg.runs), output, cfg.combat_window, palette, styles)
+    plot_curriculum(list(cfg.runs), output)
     (output / "summary.json").write_text(json.dumps(summaries, indent=2))
     print(json.dumps(summaries, indent=2))
 
