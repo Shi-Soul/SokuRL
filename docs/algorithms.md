@@ -163,6 +163,12 @@ bash scripts/linux.sh tools/train.py algorithm=br rl=ppo_long_credit \
 前馈与循环 IPPO 的更新、保存、加载、继续训练已由接口测试覆盖；NFSP 检查样本池和平均模型的恢复；PSRO 检查继续扩展种群时旧收益与成员文件的保留。完整神 AI 的真实游戏行为验证单独记录在[行为核对文档](community-ai.md)。这些检查不代表新版策略已经完成正式训练或强度验收。
 # 战斗指标与后续效率实验
 
+直接训练组 `br-superhuman-reimu-sparse-fresh-20261001` 首轮 8192 步采样后，
+首次优化因 GPU 2 的另一进程占用约 10.65 GiB 而 OOM，未得到已更新检查点。
+原目录保留失败结果，不能计作策略失利或成功训练。已从头在 GPU 3 重试到
+`br-superhuman-reimu-sparse-fresh-20261001-v2`，和课程迁移共享有余量的设备；
+学习参数不变。额外失败采样的 8192 步应计入消耗，另列于模型训练预算之外。
+
 静止对手预训练已正常完成：`br-superhuman-idle-warmup-20261001/result.json`
 为 success，65536 步、13 局训练对局全胜、总耗时 1151.05 秒，最终权重已保存。
 对手每局 HP 减少 10000，自身为 0；这只是训练对局，不是独立测试。已经以
