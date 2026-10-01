@@ -68,7 +68,7 @@ def validate(cfg, report):
                     if [p["char"] for p in observations[0].players] != list(cfg.validation.characters):
                         raise AssertionError("network selected the wrong characters")
                     frames[seat][frame.match.frame] = compare(frame.raw)
-                if batch and not submitted[seat]:
+                if batch and batch[-1].match.frame >= cfg.validation.submit_frame and not submitted[seat]:
                     keys = (1 if seat == 0 else -1, 0, 1, 0, 0, 0, 0, 0)
                     submitted[seat] = channels[seat].submit(batch[-1].match, keys, 5, 12)
                 current = status(channels[seat])
