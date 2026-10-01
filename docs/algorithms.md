@@ -188,7 +188,7 @@ bash scripts/linux.sh tools/train.py algorithm=br rl=ppo_long_credit \
 `rl=ppo_sparse_transfer`、默认 PPO 参数与逐帧完整观测/动作，不同时引入网络或
 熵系数改变。目标是检验弱对手初始化是否改善神 AI 对局，而非把静止对手胜率
 当成课程成功。运行目录分别为 `br-superhuman-idle-to-reimu-20261001` 和
-`br-superhuman-reimu-sparse-fresh-20261001`；实际结果以各目录成功记录为准。
+`br-superhuman-reimu-sparse-fresh-20261001-v2`；实际结果以各目录成功记录为准。
 
 用户授权停止旧无胜场实验后，已停止混合神 AI、灵梦默认、长 GAE、数值特征四组。
 每个原训练目录保留 `cancellation.json`（原因、最后已更新检查点哈希、中断时耗时）、
@@ -279,3 +279,16 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=1 algorithm=br \
 后续效率实验需分别比较：基于训练对局表现的对手课程（保留完整神 AI 目标评测），
 以及网络结构/数值特征改变；使用相同环境步数、双方位置与固定验证种子，除胜率外
 同时比较双方 HP 损失和耗时。当前尚无证据证明这些候选提高了胜率。
+
+训练现在还记录每局结束的累计环境步数 `end_steps`，以及 `episode_summary`：
+全局、学习者实际座位、对手策略、对手角色、三者联合分组的胜负与战斗均值。
+未知角色的旧记录不伪造角色；缺失 HP/动作指标的对局不进入对应均值分母。
+`rollout_episode_summary` 只统计本轮采样完成的对局，同步写入标量 CSV 的
+`combat/*`，零完成对局时只写计数，不伪造零伤害或零胜率。统计不改变训练奖励。
+已经运行的进程继续采用启动时日志格式；`analyze_training.py` 可从历史逐局
+记录生成分组摘要，但无法补回未记录的事件或结束步数。
+
+静止对手预训练模型直接面对神 AI 灵梦的独立筛选为 0 胜 / 4 负，双方位置各 2 局，
+对手 HP 平均减少 725.5，学习者符卡动作进入共 1 次。结果保存在
+`logs/benchmark/br-idle-warmup-reimu-zero-shot-20261001`，使用 `common_roles` 随机种子。
+这说明静止对手训练胜率不能替代目标强度评测；课程迁移仍需等完整对照结束。

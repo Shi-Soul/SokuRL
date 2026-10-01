@@ -7,6 +7,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 from soku_rl.policy.loader import load_policy
 from soku_rl.env.combat_metrics import summarize_combat
+from soku_rl.rl.episode_metrics import grouped_episode_metrics, summarize_episodes
 
 
 from soku_rl.rl.ppo import initialize_ppo, parameter_hash
@@ -21,17 +22,20 @@ class EpisodeRecords(BaseCallback):
         self.timings = []
         self.pending_update = False
         self.last_saved_steps = 0
+        self.rollout_record_start = 0
 
     def _on_rollout_start(self):
         if self.pending_update:
             self._finish_update()
         self.rollout_started = time.perf_counter()
+        self.rollout_record_start = len(self.records)
 
     def _on_step(self):
         for done, info in zip(self.locals["dones"], self.locals["infos"], strict=True):
             if done:
                 self.records.append({key: info[key] for key in (
                     "episode", "frame", "outcome", "decision_frames", "latency_frames", "training_context")})
+                self.records[-1]["end_steps"] = self.num_timesteps
                 if "combat_metrics" in info:
                     self.records[-1]["combat_metrics"] = info["combat_metrics"]
         return True
@@ -41,8 +45,19 @@ class EpisodeRecords(BaseCallback):
         self.timings.append({"steps": self.num_timesteps,
             "rollout_seconds": self.rollout_finished - self.rollout_started})
         self.pending_update = True
+        metrics = grouped_episode_metrics(self.records)
+        rollout_metrics = summarize_episodes(self.records[self.rollout_record_start:])
+        self.logger.record("combat/episodes", rollout_metrics["episodes"])
+        self.logger.record("combat/measured_episodes", rollout_metrics["combat"]["measured_episodes"])
+        self.logger.record("combat/action_measured_episodes", rollout_metrics["combat"]["action_measured_episodes"])
+        if rollout_metrics["episodes"]:
+            self.logger.record("combat/win_rate", rollout_metrics["win_rate"])
+        for section in ("means", "action_means"):
+            for key, value in rollout_metrics["combat"].get(section, {}).items():
+                self.logger.record(f"combat/{key}", value)
         (self.directory / "progress.json").write_text(json.dumps({
             "steps": self.num_timesteps, "episodes": self.records,
+            "episode_summary": metrics, "rollout_episode_summary": rollout_metrics,
             "combat_summary": summarize_combat([record["combat_metrics"] for record in self.records
                 if "combat_metrics" in record])}, indent=2), encoding="utf-8")
         self._write_timings("updating")

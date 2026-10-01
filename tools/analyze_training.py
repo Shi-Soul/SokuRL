@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from omegaconf import OmegaConf
 
+from soku_rl.rl.episode_metrics import grouped_episode_metrics
+
 
 def snapshot_run(label, source, output):
     target = output / label
@@ -41,6 +43,7 @@ def snapshot_run(label, source, output):
         "sampled_steps": progress["steps"], "finished_updates": len(completed),
         "episodes": len(progress["episodes"]), "outcomes": {}, "learner_results": {},
         "rollout_size": rollout_size, "seed": config["seed"]}
+    summary["episode_metrics"] = grouped_episode_metrics(progress["episodes"])
     for episode in progress["episodes"]:
         name = episode["outcome"]
         summary["outcomes"][name] = summary["outcomes"].get(name, 0) + 1

@@ -30,11 +30,15 @@ def test_br_mixture_and_continuation(tmp_path, policy_type):
         assert timing["rollouts"][0]["ppo_n_updates"] >= 1
         updated = algorithm_type(policy_type).load(timing["rollouts"][0]["updated_checkpoint"], device="cpu")
         assert parameter_hash(updated.policy) == report["final_policy_hash"]
-        records = json.loads((first / "progress.json").read_text())["episodes"]
+        progress = json.loads((first / "progress.json").read_text())
+        records = progress["episodes"]
         assert records
         assert all(record["training_context"]["opponent"] == "selected" for record in records)
         assert all(record["training_context"]["player"] == 1 for record in records)
         assert all(record["outcome"] == "time_limit" for record in records)
+        assert all(0 < record["end_steps"] <= 8 for record in records)
+        assert progress["episode_summary"]["overall"]["counts"]["time_limit"] == len(records)
+        assert progress["rollout_episode_summary"]["episodes"] == len(records)
         contract = save_contract(first, env, config)
         config["initial_policy"] = {"kind": "checkpoint", "path": report["checkpoint"],
                                     "training_config": contract}
