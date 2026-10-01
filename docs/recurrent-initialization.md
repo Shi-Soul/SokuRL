@@ -49,7 +49,9 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 价值 MSE 0.12841。原前馈 BC 相应为 0.34456、92.233%、41.111%、0.33809。
 序列更新批次因整局长度和补齐而变化，不能将不同监督更新次数视为相同计算预算。
 第 20 轮变化帧准确率虽更高，仍按预先规定的总验证 NLL 使用第 17 轮 `best.zip`。
-完整对局评估输出为 `logs/benchmark/br-reimu-recurrent-zero-shot-20261001`，尚待完成。
+完整对局评估 `logs/benchmark/br-reimu-recurrent-zero-shot-20261001` 已成功完成，耗时 185.86 秒。
+两座位各 2 局，全部失败；平均自身/对手 HP 下降 10000/1403.25，双方符卡动作进入均为 0。
+动作变化帧拟合提高还没有转化为完整神 AI 胜局。
 
 另外使用最佳模型核对四局验证数据各前 128 帧，共 512 帧的批量与逐帧 GPU 推断。
 默认 cuDNN TF32 下，初次严格容差检查失败；进一步只改变该精度开关进行诊断：
@@ -59,3 +61,19 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 正式训练和测评仍使用原默认精度；诊断未修改它们。
 失败日志 `.dev/audit-recurrent-online-probabilities-20261001.log`、后续
 `.dev/audit-recurrent-precision-20261001.log` 与模型目录的 `online_probability_audit.json` 均保留。
+
+下一项在线对照使用 `rl=recurrent_demonstration_transfer`：保留同一网络，
+学习率 1e-4、3 epoch、entropy_coef=0.001、target_kl=0.015，
+从 recurrent best 权重初始化，优化器和自适应课程从零开始。
+rollout 为 256 步 × 4 环境、minibatch=128，采用既有 RecurrentPPO 的状态和序列更新路径。
+该在线预算为 131072 步，额外计入前面的 100869 示范帧；不能宣称比无示范实验使用更少总样本。
+
+```bash
+bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
+  rl=recurrent_demonstration_transfer rl.cpu_threads=1 rules=god \
+  wrappers=superhuman_learning track=superhuman_combat \
+  +br_opponents=god_target algorithm.target.character=0 +curriculum=adaptive_noise \
+  num_envs=4 algorithm.timesteps=131072 \
+  '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-20261001/config.yaml}' \
+  output=logs/training/br-superhuman-reimu-recurrent-bc-adaptive-20261001
+```
