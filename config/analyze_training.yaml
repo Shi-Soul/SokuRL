@@ -3,6 +3,7 @@ runs:
   baseline: logs/training/br-superhuman-god-reimu-default-20261001
   long_gae: logs/training/br-superhuman-god-reimu-long-credit-20261001
   numeric: logs/training/br-superhuman-god-reimu-numeric-20261001
+combat_window: 10
 output: logs/diagnostics/training-curves-${now:%Y%m%d-%H%M%S}
 hydra:
   run:

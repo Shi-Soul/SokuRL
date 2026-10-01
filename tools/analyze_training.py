@@ -59,6 +59,54 @@ def snapshot_run(label, source, output):
     return rows, updates, timing["rollouts"], summary
 
 
+def plot_combat(labels, output, window, palette, styles):
+    if type(window) is not int or window < 1:
+        raise ValueError("combat_window must be a positive episode count")
+    metrics = (
+        ("own_hp_loss", "Learner HP decreases per episode"),
+        ("opponent_hp_loss", "Opponent HP decreases per episode"),
+        ("own_hp_loss_frames", "Learner frames with HP decrease"),
+        ("opponent_hp_loss_frames", "Opponent frames with HP decrease"),
+        ("own_spell_action_entries", "Learner spell action entries (proxy)"),
+        ("opponent_spell_action_entries", "Opponent spell action entries (proxy)"))
+    figure, axes = plt.subplots(3, 2, figsize=(12, 10), layout="constrained")
+    series = {}
+    for index, label in enumerate(labels):
+        records = json.loads((output / label / "progress.json").read_text())["episodes"]
+        series[label] = {}
+        for axis, (metric, title) in zip(axes.flat, metrics, strict=True):
+            points = []
+            for end in range(1, len(records) + 1):
+                measured = [record["combat_metrics"][metric] for record in records[max(0, end-window):end]
+                    if record.get("combat_metrics", {}).get("available") is True and metric in record["combat_metrics"]]
+                point = {"episode": end, "window_episodes": min(end, window), "measured_episodes": len(measured)}
+                if measured:
+                    point["mean"] = sum(measured) / len(measured)
+                points.append(point)
+            series[label][metric] = points
+            if any(point["measured_episodes"] for point in points):
+                axis.plot([point["episode"] for point in points],
+                    [point["mean"] if point["measured_episodes"] else np.nan for point in points],
+                    color=palette[index], linestyle=styles[index], label=label, marker="o", markersize=3)
+            axis.set_title(title, fontsize=10)
+            axis.set_xlabel("Completed training episode (not environment steps)")
+            axis.grid(alpha=.2)
+            axis.spines[["top", "right"]].set_visible(False)
+    for axis in axes.flat:
+        axis.set_ylim(bottom=0)
+        if not axis.lines:
+            axis.text(.5, .5, "No recorded measurements", ha="center", transform=axis.transAxes)
+    if axes[0, 0].lines:
+        axes[0, 0].legend(fontsize=9)
+    figure.suptitle(f"Training combat metrics — mean over last {window} completed episodes\n"
+        "Missing measurements excluded; HP loss is not attributed attack damage; entries are not confirmed casts",
+        fontsize=12)
+    figure.savefig(output / "combat.png", dpi=150)
+    figure.savefig(output / "combat.pdf")
+    plt.close(figure)
+    (output / "combat_series.json").write_text(json.dumps({"window": window, "runs": series}, indent=2))
+
+
 @hydra.main(version_base="1.3", config_path="../config", config_name="analyze_training")
 def main(cfg):
     output = Path(cfg.output)
@@ -79,6 +127,7 @@ def main(cfg):
         ("update_seconds", "Optimization seconds per rollout"),
         ("throughput", "Completed cycle throughput (steps/s)"))
     summaries = {}
+    return_limits = [-1., 1.]
     for index, (label, path) in enumerate(cfg.runs.items()):
         rows, updates, timing, summary = snapshot_run(label, Path(path), output)
         summaries[label] = summary
@@ -95,6 +144,8 @@ def main(cfg):
                 step = float(row["time/total_timesteps"] if key.startswith("rollout/") else row["steps"])
                 if np.isfinite(value):
                     pairs.append((step, value))
+                    if key == "rollout/ep_rew_mean":
+                        return_limits.append(value)
             if pairs:
                 x, y = zip(*pairs)
                 axis.plot(np.asarray(x) / 1000, y, label=label, color=palette[index],
@@ -106,6 +157,8 @@ def main(cfg):
     axes[0, 2].axhline(np.log(576), color="#444444", linewidth=1, linestyle=":")
     axes[0, 2].text(.02, .88, "Dotted line: uniform over 576 actions", transform=axes[0, 2].transAxes, fontsize=8)
     axes[1, 2].set_yscale("symlog", linthresh=1)
+    # Do not magnify floating-point noise around an all-loss return of -1.
+    axes[0, 0].set_ylim(min(return_limits) - .05, max(return_limits) + .05)
     for axis in (axes[0, 1], axes[0, 2], axes[1, 0], axes[1, 1], *axes[2]):
         axis.set_ylim(bottom=0)
     figure.suptitle("Superhuman BR snapshots — one seed per run\n"
@@ -114,6 +167,7 @@ def main(cfg):
     figure.savefig(output / "curves.png", dpi=150)
     figure.savefig(output / "curves.pdf")
     plt.close(figure)
+    plot_combat(list(cfg.runs), output, cfg.combat_window, palette, styles)
     (output / "summary.json").write_text(json.dumps(summaries, indent=2))
     print(json.dumps(summaries, indent=2))
 
