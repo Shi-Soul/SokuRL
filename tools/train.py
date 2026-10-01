@@ -20,7 +20,7 @@ def main(cfg: DictConfig):
     from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
     from soku_rl.env.worker_pipe import WorkerBackend
     from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
-    from soku_rl.rl import ppo_settings
+    from soku_rl.rl import ppo_settings, validate_payoff
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     learner = ppo_settings(config)
@@ -55,10 +55,7 @@ def main(cfg: DictConfig):
         raise ValueError("the NFSP average-policy reservoir requires numeric state observations")
     if algorithm == "ppo" and episode.observation_mode == "image":
         raise ValueError("fixed-rule PPO requires state observations; image self-play uses IPPO or PSRO")
-    if learning.health_potential_scale:
-        discount = learner["ppo"]["gamma"]
-        if discount != 1.:
-            raise ValueError("the finite-horizon health potential requires gamma=1")
+    validate_payoff(interface, learner)
     if config["track"] == "human" and episode.observation_mode in {"diagnostic_state", "privileged_state"}:
         raise ValueError("the human track cannot expose privileged diagnostic state")
     if config["track"] not in {"human", "superhuman"}:

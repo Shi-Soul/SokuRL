@@ -7,6 +7,7 @@ from hydra.utils import get_class
 from stable_baselines3 import PPO
 
 from soku_rl.policy.contract import read_training_contract
+from soku_rl.rl import validate_payoff
 
 
 def algorithm_type(policy_type):
@@ -19,8 +20,7 @@ def algorithm_type(policy_type):
 
 
 def create_ppo(env, interface, config, source, device, seed):
-    if config["timeout_payoff"] != "zero_at_horizon":
-        raise ValueError("PPO requires the declared finite-horizon payoff")
+    validate_payoff(interface, config)
     algorithm = algorithm_type(config["policy_type"])
     policy = ("MultiInput" if isinstance(env.observation_space, spaces.Dict) else
               "Cnn" if len(env.observation_space.shape) == 3 else "Mlp")

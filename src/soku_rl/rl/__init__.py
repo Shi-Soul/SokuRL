@@ -13,3 +13,11 @@ def ppo_settings(config):
     if shared["timeout_payoff"] != "zero_at_horizon":
         raise ValueError("shared PPO requires zero_at_horizon")
     return shared
+
+
+def validate_payoff(interface, config):
+    """The implemented potential telescopes only for undiscounted episode returns."""
+    if config["timeout_payoff"] != "zero_at_horizon":
+        raise ValueError("PPO requires the declared finite-horizon payoff")
+    if interface.config.health_potential_scale and config["ppo"]["gamma"] != 1.:
+        raise ValueError("the finite-horizon health potential requires gamma=1")
