@@ -48,6 +48,11 @@ class EpisodeRecords(BaseCallback):
         self.pending_update = True
         metrics = grouped_episode_metrics(self.records)
         rollout_metrics = summarize_episodes(self.records[self.rollout_record_start:])
+        # Off-policy learners may collect several rollouts between logger dumps.
+        # Missing means in this rollout must not inherit a previous rollout's data.
+        for key in tuple(self.logger.name_to_value):
+            if key.startswith("combat/"):
+                self.logger.record(key, None)
         self.logger.record("combat/episodes", rollout_metrics["episodes"])
         self.logger.record("combat/measured_episodes", rollout_metrics["combat"]["measured_episodes"])
         self.logger.record("combat/action_measured_episodes", rollout_metrics["combat"]["action_measured_episodes"])
