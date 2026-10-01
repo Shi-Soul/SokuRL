@@ -83,3 +83,12 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
 日志 `.dev/audit-recurrent-rehearsal-first-update-20261001.log`，结构化记录在
 `logs/diagnostics/recurrent-rehearsal-first-update-20261001/summary.json`。
 此时还没有完整训练局，uniform 为 0.90；这只是运行正确性的证据。
+
+49152 步快照在 `logs/diagnostics/recurrent-rehearsal-curves-20261001`，包含原循环、
+分离特征循环和复习对照的训练/战斗/课程 PNG、PDF、原始输入快照与 SHA256。
+五张 PNG 已目视检查，EMA 用历史结果显式加权重新核对，源快照哈希一致；没有声明检查 PDF。
+复习配置此时 8 局为 6 负、2 超时，EMA=0、uniform=0.90，仍处于 20 局预热期。
+48 次更新复习 12169 帧，并恢复 618082 帧历史；复习耗时 32.348 秒，
+平均每次 0.674 秒，占优化时间 22.51%、完整采样/更新周期 4.98%。
+该运行的完整周期吞吐为 75.71 步/秒；节点负载及对局重置次数不同，不能据此声称相对基线加速。
+课程和耗时核对保存在 `.dev/audit-recurrent-rehearsal-curves-20261001.log` 及图目录 `audit.json`。
