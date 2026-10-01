@@ -109,3 +109,16 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
 课程 sidecar 匹配：累计 8 局、EMA=0、uniform=0.90。
 输出 `logs/diagnostics/recurrent-rehearsal-midpoint-retention-20261001` 保存两座位指标、来源和核对结果，
 日志 `.dev/audit-recurrent-rehearsal-midpoint-retention-20261001.log`。
+
+对应完整神 AI 测评已完成：186.94 秒、4 局全负，平均自身/对手 HP 下降为 10000/0，
+双方符卡动作进入均为 0。相同种子、角色和座位与不复习的 65536 步对照配对核对通过，
+模型 SHA256 匹配，私有 worker `53ba50b8627847908370f9a00287f4f0` 正常退出并清理。
+证据为同诊断目录 `full_god_evaluation.json`，日志
+`.dev/audit-recurrent-rehearsal-midpoint-evaluation-20261001.log`。
+行为保留改善没有在该小样本转化为实战提升，因此不扩大当前 131072 步预算。
+
+`logs/diagnostics/recurrent-rehearsal-midpoint-actions-20261001` 进一步检查了实际提交命令。
+复习中点的 A/B/C 按下比例为 0.820%/0.304%/0.144%，原循环 BC 为 2.227%/1.557%/0.749%；
+平均相同命令连续长度分别为 7.508/7.142 帧，重复率 86.710%/86.033%。
+它仍提交少量攻击按键，不能描述成完全不进攻；但攻击输入频率下降、且四局没有观测到
+对手 HP 下降。逻辑按键不等同招式成功或命中，现有指标不能单独确定未命中的具体原因。

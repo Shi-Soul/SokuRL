@@ -229,6 +229,25 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 核对见 `.dev/audit-recurrent-aggregate-initialization-20261001.log` 和
 `logs/diagnostics/recurrent-aggregate-initialization-20261001/summary.json`。
 
+该聚合拟合现已完成 20 轮、32816 次监督更新、797.21 秒，PPO 环境步数为零。
+按总验证 NLL 选择第 5 轮 best：NLL 0.60154、准确率 83.083%、修正帧准确率 44.299%；
+第 20 轮 NLL 0.68716，训练损失虽更低，也不替换预先规则选出的 best。
+best SHA256 为 `756eb8dcdbc44a47218f835ba89a3ede886f9317e759820a983a3ee9f013ceeb`。
+完整神 AI 配对测评 `br-reimu-recurrent-aggregate-zero-shot-20261001` 已启动，尚不据离线指标宣称强度提高。
+
+独立评分入口重新检查三个固定验证集，按帧加权 NLL 与第 5 轮选择结果一致：
+
+| 固定验证集 | 扩充 BC NLL → 聚合 NLL | 总准确率变化 | 变化/修正帧准确率变化 |
+| --- | --- | --- | --- |
+| 原教师，4 局 | 0.23480 → 0.29677 | 93.830% → 91.736% | 62.936% → 63.969% |
+| 扩充教师，8 局 | 0.24890 → 0.30944 | 93.690% → 91.408% | 61.491% → 62.986% |
+| 循环学习者，8 局 | 3.04856 → 1.39694 | 50.691% → 60.444% | 6.493% → 31.927% |
+
+学习者修正帧指教师标签不同于上一实际执行命令，与教师自己动作切换帧的分母不同。
+聚合改善了学习者状态上的拟合，但教师集总准确率下降；不能只报道改善的一侧。
+输出 `logs/diagnostics/recurrent-aggregate-by-dataset-and-seat-20261001` 保留逐座位结果及身份，
+核对日志 `.dev/audit-recurrent-aggregate-by-dataset-and-seat-20261001.log`。
+
 ## 最新课程及优化曲线快照
 
 `logs/diagnostics/br-retention-curves-20261001-v2` 保存带源文件 SHA256 的三个运行快照，
