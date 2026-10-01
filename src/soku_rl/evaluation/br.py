@@ -1,6 +1,6 @@
 """Evaluate one BR on paired seats with the correct character in each seat."""
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 
@@ -25,6 +25,8 @@ def reset_matchup_trials(env, trials):
 def matchup_plan(strategies, candidate, learner, setups, config, game_identity):
     if candidate not in strategies or set(setups) != set(strategies) - {candidate}:
         raise ValueError("each evaluated opponent requires a character setup")
+    if config["policy_seed_mode"] not in {"strategy", "common_roles"}:
+        raise ValueError("policy_seed_mode must be strategy or common_roles")
     learner = PlayerSetup(**learner)
     plan = []
     for name, setup in setups.items():
@@ -36,6 +38,16 @@ def matchup_plan(strategies, candidate, learner, setups, config, game_identity):
             if trial.players[0] == trial.players[1]:
                 continue
             seat = trial.players.index(candidate)
+            if config["policy_seed_mode"] == "common_roles":
+                # Different candidate models share logical actor randomness;
+                # character setup, opponent and world seed still define a block.
+                key = ["br-common-roles-v1", identity, name, trial.world_seed, config["policy_seed"]]
+                seeds = tuple(int(hashlib.sha256(json.dumps([key, role], sort_keys=True).encode())
+                                  .hexdigest()[:8], 16) for role in ("learner", "opponent"))
+                block = hashlib.sha256(json.dumps([trial.block_id, key, seeds], sort_keys=True).encode()).hexdigest()
+                trial_id = hashlib.sha256(json.dumps([block, trial.swapped]).encode()).hexdigest()
+                trial = replace(trial, block_id=block, trial_id=trial_id,
+                                policy_seeds=seeds if seat == 0 else seeds[::-1])
             match = MatchConfig(learner, opponent) if seat == 0 else MatchConfig(opponent, learner)
             plan.append(MatchupTrial(**asdict(trial), match=asdict(match), learner_seat=seat, opponent=name))
     # Keep identical matchups together to reuse native resets; paired seed

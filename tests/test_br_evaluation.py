@@ -65,7 +65,7 @@ def benchmark_inputs():
     learner = {"character": 1, "palette": 0, "deck": 0}
     setups = {name: {"character": c, "palette": 0, "deck": 0}
               for name, c in (("reimu", 0), ("remilia", 6))}
-    config = {"world_seeds": [101, 103], "policy_seed": 19, "alpha": .05}
+    config = {"world_seeds": [101, 103], "policy_seed": 19, "policy_seed_mode": "common_roles", "alpha": .05}
     return strategies, learner, setups, config
 
 
@@ -81,6 +81,24 @@ def test_pairing_keeps_logical_policy_seeds_and_hashes_character_setup():
         assert trial.match[f"player_{1-trial.learner_seat}"] == setups[trial.opponent]
     changed = matchup_plan(strategies, "learned", learner | {"character": 2}, setups, config, "game")
     assert not {t.trial_id for t in plan} & {t.trial_id for t in changed}
+
+
+def test_common_role_seeds_are_model_independent_but_trial_identity_is_not():
+    strategies, learner, setups, config = benchmark_inputs()
+    changed = strategies | {"learned": SeatPolicies("learned", (
+        UniformPolicy("learned", 5), UniformPolicy("learned", 5)))}
+    first = matchup_plan(strategies, "learned", learner, setups, config, "game")
+    second = matchup_plan(changed, "learned", learner, setups, config, "game")
+    for before, after in zip(first, second, strict=True):
+        assert before.policy_seeds == after.policy_seeds
+        assert before.strategy_ids != after.strategy_ids
+        assert before.trial_id != after.trial_id
+    legacy = config | {"policy_seed_mode": "strategy"}
+    first = matchup_plan(strategies, "learned", learner, setups, legacy, "game")
+    second = matchup_plan(changed, "learned", learner, setups, legacy, "game")
+    assert all(a.policy_seeds != b.policy_seeds for a, b in zip(first, second, strict=True))
+    with pytest.raises(ValueError, match="policy_seed_mode"):
+        matchup_plan(strategies, "learned", learner, setups, config | {"policy_seed_mode": "invalid"}, "game")
 
 
 def test_explicit_screening_panel_keeps_declared_names_and_order():

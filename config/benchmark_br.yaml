@@ -15,5 +15,6 @@ opponent_names: all
 benchmark:
   world_seeds: ${evaluation.world_seeds}
   policy_seed: ${evaluation.policy_seed}
+  policy_seed_mode: common_roles
   alpha: 0.05
 output: logs/benchmark/br-${evaluation.name}-${now:%Y%m%d-%H%M%S}

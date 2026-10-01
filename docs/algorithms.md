@@ -163,6 +163,13 @@ bash scripts/linux.sh tools/train.py algorithm=br rl=ppo_long_credit \
 前馈与循环 IPPO 的更新、保存、加载、继续训练已由接口测试覆盖；NFSP 检查样本池和平均模型的恢复；PSRO 检查继续扩展种群时旧收益与成员文件的保留。完整神 AI 的真实游戏行为验证单独记录在[行为核对文档](community-ai.md)。这些检查不代表新版策略已经完成正式训练或强度验收。
 # 战斗指标与后续效率实验
 
+新 BR 评测默认 `benchmark.policy_seed_mode=common_roles`：根据游戏/选角、对手名、
+世界种子和基准策略种子生成 learner/opponent 随机种子，候选模型哈希不参与随机
+种子生成。换边保留逻辑角色种子，不同候选可用相同随机数流比较；模型指纹仍参与
+对局身份并保存在计划中。`benchmark.policy_seed_mode=strategy` 可复现旧规则。
+旧结果不追溯改写，新旧模式不当作相同随机实验；9 项 BR 评测测试覆盖种子配对、
+模型身份变化、旧模式和失败证据保留。共享随机数不保证两个策略产生相同行为。
+
 直接训练组 `br-superhuman-reimu-sparse-fresh-20261001` 首轮 8192 步采样后，
 首次优化因 GPU 2 的另一进程占用约 10.65 GiB 而 OOM，未得到已更新检查点。
 原目录保留失败结果，不能计作策略失利或成功训练。已从头在 GPU 3 重试到
