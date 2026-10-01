@@ -61,13 +61,25 @@ bash scripts/linux.sh -m pytest -q
 ```yaml
 # @package _global_
 runtime:
-  command: [/workspace/SokuRL/scripts/wine-python.sh, tools/rollout_worker.py]
+  command: [/workspace/SokuRL/scripts/wine-worker.sh, tools/rollout_worker.py]
   cwd: /workspace/SokuRL
   game_directory: Z:/workspace/runtime/game
 ```
 
 `Z:` 是 Wine 对 Linux 文件系统的映射。Linux 训练端传绝对命令路径，游戏目录传 Wine 能读取的路径。
 不要把游戏工作进程命令改成 Linux Python；游戏控制使用 Windows 接口。
+
+并发工作进程使用 `wine-worker.sh`：每次从本机 `prefix_source` 建立独立前缀，在同一 Landlock 沙箱域内启动专属 Wine 服务。工作进程按配置复制游戏运行目录，隔离临时选人 INI、档案和分数文件；独立 Wine 服务之间的 Win32 命名互斥锁不能保护共享配置。全部文件放在 `linux.state/workers/<运行编号>/`。退出时只停止该独立前缀和服务目录的服务，确认退出后删除可重建副本，保留 `session.json`；训练证据和回放仍在输出目录。
+
+不要让多个独立 Landlock 启动的训练共享一个 Wine 服务：已观察到新游戏仍存活，但 `ReadProcessMemory` 被拒绝而导致启动超时。旧训练保持其原服务，隔离入口不会重启它。编译和不启动游戏的依赖检查继续使用 `wine-python.sh`。
+
+按局选角及换边的真实环境诊断：
+
+```bash
+bash scripts/linux.sh tools/validate_matchups.py
+```
+
+诊断检查两个实例、双方视角的真实角色编号、角色变化后的进程重建、相同角色的原生重置及未选中实例的连续帧。它只验证接口，不作为完整对局或策略强度证据。
 
 ```bash
 # 两个真实游戏实例各完成两局，含对局重置。
@@ -143,3 +155,7 @@ PYTHONDONTWRITEBYTECODE=1 .venv-linux/bin/python -B tools/linux.py operation=dep
 
 本页的命令与实现正在 Linux 实机验证。完成的构建、测试、真实环境与训练结果将记录在本节；
 不要将环境检查通过解释为完整训练、全部算法强度或 Windows 游玩已经通过。
+
+2026-10-01：跨座位 BR 改动的 Python 全量检查为 793 passed、12 skipped、1 deselected、2 subtests passed；跳过项涉及 Windows 接口、原版 CRT、HeldInputReference 构建和外部回放。日志在 `.dev/pytest-br-matchups-final-20261001.log`。真实双实例选角诊断 `logs/validation/matchups-20261001-private-game/result.json` 成功，覆盖魔理沙对灵梦/蕾米莉亚，以及诹访子/蕾米莉亚对 2P 魔理沙；四阶段同时核对双方视角、原生重置和未重置实例的连续帧。独立服务退出码为 0，临时前缀及游戏副本已清理。
+
+旧共享服务的超人基线 `logs/training/br-superhuman-god-baseline-20261001` 在启动阶段失败，未产生 PPO 更新或胜率。不得把该目录记作成功训练；失败配置、源码指纹和错误仍保留。独立服务诊断成功不代表后续长训练或完整对局评估已经达标。

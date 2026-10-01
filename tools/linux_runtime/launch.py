@@ -8,11 +8,16 @@ from linux_runtime.environment import REPO, native_environment, restrict_writes,
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in {"native", "wine"}:
+    if len(sys.argv) < 3 or sys.argv[1] not in {"native", "wine", "worker"}:
         raise ValueError("use scripts/linux.sh or scripts/wine-python.sh with Python arguments")
     config = settings()
     use_workspace_user(config)
     mode, arguments = sys.argv[1], sys.argv[2:]
+    if mode == "worker":
+        from linux_runtime.worker_session import run_worker
+        os.chdir(REPO)
+        restrict_writes(config["root"])
+        raise SystemExit(run_worker(config, arguments))
     if mode == "native":
         env = native_environment(config)
         command = [sys.executable, "-B", *arguments]

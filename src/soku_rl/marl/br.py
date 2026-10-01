@@ -1,12 +1,30 @@
 """Train an approximate best response to an explicit frozen strategy mixture."""
+from dataclasses import dataclass, replace
+from pathlib import PurePosixPath
 import numpy as np
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
 from stable_baselines3.common.logger import configure
 
 from soku_rl.policy.loader import load_policy
 from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
+from soku_rl.rl.matchup_env import MatchupMixtureVecEnv
 from soku_rl.rl.ppo import create_ppo, parameter_hash
 from soku_rl.rl.training import EpisodeRecords
+from soku_rl.env.match import MatchConfig, PlayerSetup
+from soku_rl.env.wrappers.learning import LearningInterface
+
+
+@dataclass(frozen=True)
+class OpponentEntry:
+    name: str
+    policy: object
+
+    @property
+    def fingerprint(self):
+        return self.policy.fingerprint
+
+    def spawn(self, seed):
+        return self.policy.spawn(seed)
 
 
 def train_response(env, config, opponents, probabilities, device, seed, directory):
@@ -15,7 +33,16 @@ def train_response(env, config, opponents, probabilities, device, seed, director
             or type(config["checkpoint_every"]) is not int
             or config["checkpoint_every"] < env.num_envs):
         raise ValueError("invalid BR training or checkpoint interval")
-    view = OpponentMixtureVecEnv(env, config["player"], opponents, probabilities, seed)
+    matchups = config["matchups"]
+    if matchups == {"mode": "fixed"}:
+        if config["player"] not in (0, 1):
+            raise ValueError("random seats require explicit learner and opponent setups")
+        view = OpponentMixtureVecEnv(env, config["player"], opponents, probabilities, seed)
+    elif matchups["mode"] == "sampled":
+        view = MatchupMixtureVecEnv(env, config["player"], opponents, probabilities, seed,
+            matchups["learner"], [entry["setup"] for entry in config["opponents"]])
+    else:
+        raise ValueError("BR matchups must be fixed or sampled")
     try:
         model, source = create_ppo(view, env.interface, config,
             config["initial_policy"], device, seed)
@@ -52,6 +79,18 @@ def train_br(env, config, device, seed, directory):
     if (not np.isfinite(probabilities).all() or (probabilities < 0).any()
             or not np.isclose(probabilities.sum(), 1)):
         raise ValueError("BR opponent probabilities must form a distribution")
-    opponents = [load_policy(entry["name"], entry["policy"], env.interface, device)
-                 for entry in population]
+    opponents = []
+    for entry in population:
+        interface = env.interface
+        if config["matchups"]["mode"] == "sampled":
+            match = MatchConfig(PlayerSetup(**config["matchups"]["learner"]), PlayerSetup(**entry["setup"]))
+            spec = entry["policy"]
+            if spec["kind"] == "rule" and spec["name"] == "god":
+                script = spec["rules"]["god"]["script"]
+                if script != "character":
+                    stem = PurePosixPath(script).name
+                    if not stem[:2].isdigit() or int(stem[:2]) != match.player_1.character:
+                        raise ValueError("BR god script and opponent character do not match")
+            interface = LearningInterface(replace(interface.episode, match=match), interface.config)
+        opponents.append(OpponentEntry(entry["name"], load_policy(entry["name"], entry["policy"], interface, device)))
     return train_response(env, config, opponents, probabilities, device, seed, directory)

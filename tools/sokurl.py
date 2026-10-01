@@ -16,7 +16,7 @@ from ctypes import wintypes
 
 from bridge_shared import BridgeClient, BridgeUnavailable
 from startup_dialogs import blocking_dialogs
-from game_runtime.startup import title_configuration
+from game_runtime.startup import read_match, title_configuration
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -295,11 +295,7 @@ def practice(timeout: float, pid: int | None) -> int:
 
 
 def configured_match():
-    from soku_rl.env.match import MatchConfig, PlayerSetup
-    config = configparser.ConfigParser()
-    config.read_string(SKIPINTRO_INI.read_text(encoding="ascii"))
-    return MatchConfig(*(PlayerSetup(*(config.getint(player, field)
-        for field in ("character", "palette", "deck"))) for player in ("P1", "P2")))
+    return read_match(SKIPINTRO_INI)
 
 
 def _launch_vs_group_from_title(
@@ -315,8 +311,12 @@ def _launch_vs_group_from_title(
     capture_state: bool = False,
     match,
 ) -> list[psutil.Process]:
+    from soku_rl.env.match import MatchConfig
     if worker_count < 1:
         raise ValueError("worker_count must be positive")
+    matches = (match,) * worker_count if isinstance(match, MatchConfig) else tuple(match)
+    if len(matches) != worker_count or any(not isinstance(m, MatchConfig) for m in matches):
+        raise ValueError("provide a validated match per worker")
     if unlimited and not headless:
         raise ValueError("--unlimited requires --headless")
     if seeds is not None:
@@ -342,15 +342,15 @@ def _launch_vs_group_from_title(
         env.pop("SOKURL_VS_SEED", None)
 
     with title_configuration(SKIPINTRO_INI, timeout):
-        env.update(match.environment())
-        return _start_vs_processes(worker_count, timeout, env, seeds)
+        return _start_vs_processes(worker_count, timeout, env, seeds, matches)
 
 
-def _start_vs_processes(worker_count, timeout, env, seeds):
+def _start_vs_processes(worker_count, timeout, env, seeds, matches):
     processes: list[psutil.Process] = []
     try:
         for index in range(worker_count):
             process_env = env.copy()
+            process_env.update(matches[index].environment())
             if seeds is not None:
                 process_env["SOKURL_VS_SEED"] = str(seeds[index])
             process = psutil.Popen([str(GAME_EXE)], cwd=GAME_DIR, env=process_env)

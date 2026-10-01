@@ -12,6 +12,7 @@ def test_br_mixture_and_continuation(tmp_path, policy_type):
     torch.set_num_threads(1)
     env = fixture_env()
     config = fixture_config(policy_type) | {"name": "br", "player": 1,
+        "matchups": {"mode": "fixed"},
         "timesteps": 8, "checkpoint_every": 4, "initial_policy": {"kind": "fresh"},
         "opponents": [
             {"name": "excluded", "probability": 0., "policy": {"kind": "uniform"}},

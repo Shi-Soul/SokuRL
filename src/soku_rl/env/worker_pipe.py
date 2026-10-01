@@ -11,7 +11,7 @@ import json
 from uuid import uuid4
 
 
-PROTOCOL = 3
+PROTOCOL = 4
 MAX_MESSAGE = 64 * 1024 * 1024
 
 
@@ -165,6 +165,9 @@ class WorkerBackend(WorkerConnection):
 
     def reset_slots(self, seeds):
         return self.request("reset", seeds)
+
+    def reset_matchups(self, seeds, matches):
+        return self.request("reset_matchups", {"seeds": seeds, "matches": matches})
 
     def configure_observation(self, mode):
         return self.request("configure_observation", mode)

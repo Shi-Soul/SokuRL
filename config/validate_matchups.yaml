@@ -1,0 +1,15 @@
+defaults:
+  - validate
+  - override wrappers: superhuman_learning
+  - override track: superhuman
+  - _self_
+
+num_envs: 2
+validation:
+  frames_per_stage: 3
+  stages:
+    - {0: [1, 0], 1: [1, 6]}
+    - {0: [19, 1]}
+    - {1: [6, 1]}
+    - {0: [19, 1]}
+output: logs/validation/matchups-${now:%Y%m%d-%H%M%S}

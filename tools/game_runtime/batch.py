@@ -28,6 +28,7 @@ class SokuGameBatch:
         self.recording_enabled = False
         self.recordings = {}
         self.completed_replays = []
+        self.slot_matches = {}
 
     def enable_recording(self):
         if self.processes:
@@ -105,13 +106,29 @@ class SokuGameBatch:
                 self.recordings[slot] = EpisodeRecording(self.processes[slot].pid, slot, seed)
         return states
 
+    def reset_matchups(self, seeds, matches):
+        if not seeds or set(seeds) != set(matches):
+            raise ValueError("one match configuration is required per reset slot")
+        if any(type(s) is not int or s < 0 for s in seeds):
+            raise ValueError("nonnegative slot IDs are required")
+        if any(type(seed) is not int or not 0 <= seed < 0xFFFFFFFF for seed in seeds.values()):
+            raise ValueError("native seed 0xFFFFFFFF is reserved; use a smaller uint32")
+        selected = {slot: MatchConfig(**match) for slot, match in matches.items()}
+        changed = {slot for slot, match in selected.items() if slot in self.processes
+                   and self.slot_matches.get(slot, self.match) != match}
+        # Character selection belongs to process startup. Recreate only the
+        # selected games whose matchup changed; unrelated slots remain paused.
+        self._close_slots(changed)
+        self.slot_matches.update(selected)
+        return self.reset_slots(seeds)
+
     def _launch_slots(self, seeds):
         processes = sokurl._launch_vs_group_from_title(
             len(seeds), self.launch_timeout, headless=True, unlimited=True,
             seeds=tuple(seeds.values()), pause_at_start=True,
             capture_images=self.observation_mode == "image",
             capture_state=self.observation_mode == "state",
-            match=self.match,
+            match=tuple(self.slot_matches.get(slot, self.match) for slot in seeds),
         )
         self.processes.update(zip(seeds, processes, strict=True))
         states = {}

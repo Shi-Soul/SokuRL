@@ -4,6 +4,9 @@ import ctypes
 from ctypes import wintypes
 from pathlib import Path
 import re
+import configparser
+
+from soku_rl.env.match import MatchConfig, PlayerSetup
 
 
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -26,6 +29,13 @@ def configure_game(directory):
     sokurl.GAME_EXE = root / "th123.exe"
     sokurl.SKIPINTRO_INI = root / "modules/SkipIntro/SkipIntro.ini"
     sokurl._validate_game()
+
+
+def read_match(path):
+    config = configparser.ConfigParser()
+    config.read_string(path.read_text(encoding="ascii"))
+    return MatchConfig(*(PlayerSetup(*(config.getint(player, field)
+        for field in ("character", "palette", "deck"))) for player in ("P1", "P2")))
 
 
 @contextmanager

@@ -165,6 +165,11 @@ class LearningVectorEnv:
         results = {slot: self.transforms[slot].reset(observations[slot], infos[slot]) for slot in seeds}
         return tuple({s: r[i] for s, r in results.items()} for i in range(2))
 
+    def reset_matchups(self, seeds, matches):
+        observations, infos = self.env.reset_matchups(seeds, matches)
+        results = {slot: self.transforms[slot].reset(observations[slot], infos[slot]) for slot in seeds}
+        return tuple({s: r[i] for s, r in results.items()} for i in range(2))
+
     def step(self, actions):
         commands = {s: {a: self.interface.command(v) for a, v in players.items()} for s, players in actions.items()}
         result = self.env.step(commands)

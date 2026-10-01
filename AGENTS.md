@@ -27,7 +27,7 @@
 系统程序、驱动与库可读取；GPU 设备访问不等于存储目录权限。需要额外空间时使用任务目录下的空间。
 
 Linux 原生 Python 运行 PyTorch/CUDA 与 RL/MARL；Wine 中的 Windows Python 控制原版游戏。
-`runtime.command` 指向 `scripts/wine-python.sh tools/rollout_worker.py`，不是远程 Windows 服务。
+`runtime.command` 指向 `scripts/wine-worker.sh tools/rollout_worker.py`，使用独立 Wine 前缀和服务，不是远程 Windows 服务。
 原生 DLL 通过 Linux 上的 Wine、MSVC 与 Windows SDK 编译。私有工具链存储在 `linux.toolchain`，不提交工具链二进制。
 构建产物、编译器身份与 DLL 哈希见 `build/linux/artifacts.json`；部署记录见 `linux.state/deployed.json`。
 

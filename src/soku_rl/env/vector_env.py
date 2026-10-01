@@ -1,7 +1,9 @@
 """Explicit partial reset and joint stepping for multiple two-player episodes."""
+from dataclasses import asdict, replace
 from gymnasium import spaces
 from soku_rl.env.encoding import AGENTS, NUM_ACTIONS, observation_space
 from soku_rl.env.hisouten_env import Episode
+from soku_rl.env.match import MatchConfig
 
 
 class TwoPlayerVectorEnv:
@@ -38,6 +40,25 @@ class TwoPlayerVectorEnv:
             raise RuntimeError("backend returned incorrect reset slots")
         results = {s: self.episodes[s].reset(states[s], seeds[s]) for s in seeds}
         return ({s: r[0] for s, r in results.items()}, {s: r[1] for s, r in results.items()})
+
+    def reset_matchups(self, seeds, matches):
+        self._check_slots(seeds)
+        if set(seeds) != set(matches) or any(not isinstance(m, MatchConfig) for m in matches.values()):
+            raise ValueError("one validated match configuration is required per reset slot")
+        if any(type(s) is not int or not 0 <= s < 0xFFFFFFFF for s in seeds.values()):
+            raise ValueError("each seed must be in [0, 0xFFFFFFFF)")
+        for slot in seeds:
+            self.episodes[slot].invalidate()
+        states = self.backend.reset_matchups(seeds, {s: asdict(m) for s, m in matches.items()})
+        if set(states) != set(seeds):
+            raise RuntimeError("backend returned incorrect reset slots")
+        for slot, match in matches.items():
+            previous = self.episodes[slot]
+            episode = Episode(replace(previous.config, match=match))
+            episode.number = previous.number
+            self.episodes[slot] = episode
+        results = {s: self.episodes[s].reset(states[s], seeds[s]) for s in seeds}
+        return tuple({s: r[i] for s, r in results.items()} for i in range(2))
 
     def step(self, actions):
         self._check_slots(actions)

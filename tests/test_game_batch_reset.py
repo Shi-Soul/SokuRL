@@ -4,8 +4,10 @@ from pathlib import Path
 import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
+from dataclasses import asdict
 
 import pytest
+from soku_rl.env.match import LEGACY_MATCH, MatchConfig, PlayerSetup
 
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
@@ -19,6 +21,7 @@ def batch(monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     result = module.SokuGameBatch(180.0)
+    result.match = LEGACY_MATCH
     for slot in (0, 1):
         result.processes[slot] = SimpleNamespace(pid=100 + slot, is_running=lambda: True)
         result.clients[slot] = Mock()
@@ -79,3 +82,33 @@ def test_invalid_seed_does_not_close_any_image_slot(batch):
     game.shutdown.assert_not_called()
     backend.clients[0].close.assert_not_called()
     backend._launch_slots.assert_not_called()
+
+
+def test_changed_match_restarts_only_selected_slot(batch):
+    backend, game = batch
+    changed = MatchConfig(PlayerSetup(6, 0, 0), PlayerSetup(1, 0, 0))
+    peer = backend.clients[1]
+    backend.reset_matchups({0: 7}, {0: asdict(changed)})
+    game.shutdown.assert_called_once_with(5.0, 100)
+    peer.close.assert_not_called()
+    peer.reset_episode.assert_not_called()
+    assert backend.processes[1].pid == 101
+    assert backend.slot_matches[0] == changed
+
+
+def test_unchanged_match_uses_native_reset(batch):
+    backend, game = batch
+    selected = backend.clients[0]
+    backend.reset_matchups({0: 7}, {0: asdict(LEGACY_MATCH)})
+    game.shutdown.assert_not_called()
+    selected.reset_episode.assert_called_once_with(7)
+
+
+def test_invalid_match_is_rejected_before_any_game_changes(batch):
+    backend, game = batch
+    wrong = asdict(LEGACY_MATCH)
+    wrong["player_1"]["character"] = 20
+    with pytest.raises(ValueError, match="character"):
+        backend.reset_matchups({0: 7, 1: 8}, {0: asdict(LEGACY_MATCH), 1: wrong})
+    game.shutdown.assert_not_called()
+    assert not backend.slot_matches

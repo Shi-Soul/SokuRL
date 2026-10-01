@@ -46,7 +46,7 @@ def train_ppo(env, config, device, seed, directory):
         destination.mkdir()
         from soku_rl.marl.br import train_response
         response = config | {"player": player, "timesteps": config["timesteps_per_player"],
-            "initial_policy": config["initial_policies"][f"player_{player}"]}
+            "initial_policy": config["initial_policies"][f"player_{player}"], "matchups": {"mode": "fixed"}}
         results[f"player_{player}"] = train_response(
             env, response, opponents, weights, device, seed + player, destination)
     return results
