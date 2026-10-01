@@ -290,5 +290,20 @@ CUDA。实机复测确认独立入口 CUDA 可用、嵌套入口不可用，日�
 撤回嵌套队列、合入清理修复后，代码提交 `7813eb5` 的全量回归为 880 passed、
 12 skipped、1 deselected、2 subtests passed，耗时 63.36 秒。日志为
 `logs/pytest-dqn-release-20261001.txt`；3 条警告来自 TorchRL 对 PettingZoo 版本的
-提示，相应接口测试通过。跳过项保留既有 Windows/CRT/外部回放限制。当前仍需
-另外两组训练完成、三组最终 validation 和选定模型的独立 test。
+提示，相应接口测试通过。跳过项保留既有 Windows/CRT/外部回放限制。
+
+三组完整训练现均成功达到 262144 个有效训练步。恢复基线与五步组各完成
+32256 次 DQN/Adam 更新，更多回放组完成 64512 次；三组最终经验池均为
+131072 条。新增产物审计为 `logs/diagnostics/dqn-baseline-final-audit-20261001/`
+及 `logs/diagnostics/dqn-more-replay-final-audit-20261001/`：模型/回放 SHA256、
+优化器计数、有限参数及抽样目标全部通过，私有 Wine 工作进程与服务正常退出，
+私有游戏和前缀清理完成。基线失败尝试额外丢失的至少 44032 条采样仍计入成本，
+不能用有效步数掩盖该开销。
+
+三组最终 validation 均已从独立 Linux 入口启动，每组同一套 32 个世界种子的
+双座位 64 局，统一使用批量贪心推理。输出分别为
+`logs/benchmark/br-dqn-baseline-final-validation-20261001/`、
+`logs/benchmark/br-dqn-five-step-final-validation-direct-20261001/` 和
+`logs/benchmark/br-dqn-more-replay-final-validation-20261001/`。
+当前仍需完成三组最终 validation、按既定规则锁定模型，以及独立 test；
+训练产物完整不代表已能击败规则灵梦。
