@@ -45,7 +45,6 @@ PROCESS_VM_READ = 0x0010
 FILE_MAP_READ = 0x0004
 WM_CLOSE = 0x0010
 WAIT_OBJECT_0 = 0
-INFINITE = 0xFFFFFFFF
 
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 user32 = ctypes.WinDLL("user32", use_last_error=True)
