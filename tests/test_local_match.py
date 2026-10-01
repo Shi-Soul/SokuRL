@@ -57,7 +57,7 @@ def test_knockout_uses_original_scores_and_does_not_end_match(game):
     keys = {1: (-1, 0, 1, 0, 0, 0, 0, 0)}
     result.step(keys)
     client.step_controlled.assert_called_once_with(keys)
-    wait.assert_called_once_with([client], [client.step_controlled.return_value], [10], 10.)
+    wait.assert_called_once_with([client], [client.step_controlled.return_value], [10], .05)
     client.drain_frames.assert_called_once_with()
 
 
@@ -74,5 +74,27 @@ def test_window_close_is_detected_before_submitting_inputs(game):
     result, client, _, _, _ = game
     result.process.poll.return_value = 0
     with pytest.raises(EOFError, match="closed"):
+        result.step({0: (0,) * 8})
+    client.step_controlled.assert_not_called()
+
+
+def test_window_close_during_step_does_not_resubmit_input(game):
+    result, client, wait, _, _ = game
+
+    def closing(*args):
+        result.process.poll.return_value = 0
+        raise TimeoutError("observation interval expired")
+
+    wait.side_effect = closing
+    with pytest.raises(EOFError, match="closed"):
+        result.step({0: (0,) * 8})
+    client.step_controlled.assert_called_once_with({0: (0,) * 8})
+    client.drain_frames.assert_not_called()
+
+
+def test_crashed_game_is_not_reported_as_a_normal_window_close(game):
+    result, client, _, _, _ = game
+    result.process.poll.return_value = 7
+    with pytest.raises(RuntimeError, match="exit code 7"):
         result.step({0: (0,) * 8})
     client.step_controlled.assert_not_called()

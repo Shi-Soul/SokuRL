@@ -1,6 +1,7 @@
 """Own one paused local match, with complete observations and selected-seat control."""
 from contextlib import ExitStack
 import struct
+import time
 
 from bridge_shared import BridgeClient, wait_for_steps
 from game_runtime.frames import wait_for_frame_zero
@@ -41,9 +42,16 @@ class LocalMatch:
         if self.process.is_running():
             sokurl.shutdown(5., self.process.pid)
 
+    def _check_process(self):
+        code = self.process.poll()
+        if code is None:
+            return
+        if code != 0:
+            raise RuntimeError(f"the owned local game failed with exit code {code}")
+        raise EOFError("the owned local game closed")
+
     def read(self):
-        if self.process.poll() is not None:
-            raise EOFError("the owned local game closed")
+        self._check_process()
         before = self.client.snapshot()
         raw = before.latest
         if not before.in_gameplay or before.run_state_name != "PAUSED" or before.game_frame != raw.frameId:
@@ -63,11 +71,22 @@ class LocalMatch:
         return MatchFrame(match, state.observations)
 
     def step(self, inputs):
-        if self.process.poll() is not None:
-            raise EOFError("the owned local game closed")
+        self._check_process()
         frame = self.client.snapshot().game_frame
         sequence = self.client.step_controlled(inputs)
-        wait_for_steps([self.client], [sequence], [frame + 1], 10.)
+        deadline = time.monotonic() + 10.
+        while True:
+            self._check_process()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("local game did not complete the requested frame")
+            try:
+                wait_for_steps([self.client], [sequence], [frame + 1], min(.05, remaining))
+                break
+            except TimeoutError:
+                # Recheck the same process and command; never submit a second
+                # action when a short observation interval expires.
+                continue
         self.client.drain_frames()
 
     def replay(self):
