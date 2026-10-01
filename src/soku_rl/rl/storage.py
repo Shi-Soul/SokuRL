@@ -20,8 +20,12 @@ class PackedObservation:
             raise TypeError("observation storage requires a numeric array")
         if values.dtype.itemsize == 4 and values.size < 2**32:
             words = np.ascontiguousarray(values).reshape(-1).view("<u4")
-            indices = np.flatnonzero(words)
-            if 12 + 8 * len(indices) < values.nbytes:
+            # Boolean scans are faster for padded observations. Count first so
+            # dense arrays can go straight to zlib without allocating indices.
+            present = words != 0
+            count = np.count_nonzero(present)
+            if 12 + 8 * count < values.nbytes:
+                indices = np.flatnonzero(present)
                 positions = indices.astype("<u4")
                 content = (SPARSE_WORDS + len(indices).to_bytes(4, "little")
                            + positions.tobytes() + words[indices].tobytes())
