@@ -67,7 +67,11 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 与原循环 BC 使用相同训练/验证帧及分块顺序。按 NLL 选择第 20 轮 best：
 NLL 0.34007、总准确率 92.049%、变化帧准确率 50.461%、价值 MSE 0.07127。
 此处没有新增在线 PPO 步数，完整神 AI 对照在
-`logs/benchmark/br-reimu-recurrent-separate-zero-shot-20261001`；离线改善不代表已经获胜。
+`logs/benchmark/br-reimu-recurrent-separate-zero-shot-20261001`，已成功完成：
+180.85 秒、4 局全负，平均自身/对手 HP 下降 10000/1246.25，双方符卡动作进入均为 0。
+原循环 BC 同一配对对照平均对手 HP 下降 1403.25，离线改善尚未转化为实战提升。
+种子/角色配对、模型哈希和私有 worker 清理核对在
+`.dev/audit-recurrent-separate-zero-shot-20261001.log`。
 
 后续在线对照使用该 best 初始化独立特征架构，优化器、步数和课程从零开始，预算仍为 131072 步：
 
@@ -80,6 +84,12 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
   '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-separate-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-separate-20261001/config.yaml}' \
   output=logs/training/br-superhuman-reimu-recurrent-separate-adaptive-20261001
 ```
+
+该在线运行已从源码 `e9ae470` 在 GPU 7 启动，首个 1024 步真实采样用时 9.38 秒、
+PPO 更新 2.77 秒，KL 提前停止后完成 2 个 epoch。
+检查点相对 BC best 的 actor/critic 特征及 LSTM 参数均已改变，课程 sidecar 哈希匹配。
+核对记录 `.dev/audit-recurrent-separate-first-update-20261001.log`；
+6144 步时还没有完整对局，课程按约定保持初始 uniform 0.90，不补造胜率。
 
 ## 独立的数据量对照
 
@@ -103,3 +113,6 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
   'pretraining.additional_datasets=[logs/demonstrations/god-marisa-reimu-expanded-20261001]' \
   output=logs/pretraining/god-marisa-reimu-recurrent-expanded-20261001
 ```
+
+扩充拟合已从源码 `1c84514` 在 GPU 1 启动，首轮完成 1017 次监督更新，
+合并验证 NLL 0.73536、动作准确率 84.024%；尚在拟合，不能使用早期指标宣称效果改善。
