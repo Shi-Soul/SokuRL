@@ -11,6 +11,7 @@ training_directory: ???
 checkpoint: final.zip
 require_complete: true
 opponent_source: training
+opponent_names: all
 benchmark:
   world_seeds: ${evaluation.world_seeds}
   policy_seed: ${evaluation.policy_seed}

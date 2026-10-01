@@ -6,6 +6,7 @@ import pytest
 from soku_rl.evaluation.br import benchmark_br, matchup_plan
 from soku_rl.policy.population import SeatPolicies, UniformPolicy
 from test_matchup_response import SeatGame
+from soku_rl.policy.matchups import select_opponents
 
 
 class EvaluationGame(SeatGame):
@@ -47,6 +48,15 @@ def test_pairing_keeps_logical_policy_seeds_and_hashes_character_setup():
         assert trial.match[f"player_{1-trial.learner_seat}"] == setups[trial.opponent]
     changed = matchup_plan(strategies, "learned", learner | {"character": 2}, setups, config, "game")
     assert not {t.trial_id for t in plan} & {t.trial_id for t in changed}
+
+
+def test_explicit_screening_panel_keeps_declared_names_and_order():
+    population = [{"name": "reimu"}, {"name": "remilia"}, {"name": "suwako"}]
+    assert select_opponents(population, ["suwako", "reimu"]) == [population[2], population[0]]
+    assert select_opponents(population, "all") == population
+    for names in ([], ["reimu", "reimu"], "reimu", ["unknown"]):
+        with pytest.raises(ValueError):
+            select_opponents(population, names)
 
 
 @pytest.mark.parametrize("outcome", ["p1_win", "p2_win", "double_ko", "time_limit"])

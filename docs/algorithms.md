@@ -50,6 +50,8 @@ bash scripts/linux.sh tools/benchmark_br.py \
 
 需要独立于训练分布的全脚本检查时，加上 `opponent_source=config +br_opponents=god_all`。中途模型只可显式使用 `require_complete=false checkpoint=checkpoints/ppo_<步数>_steps.zip`，不能称为最终模型验收。调参使用 validation；配置和模型固定后再用 `evaluation=test`。评测实现通过模拟后端的配对、角色选择、胜负及超时计数测试，真实策略强度仍须等待完整测评。
 
+开发期可以显式选择固定筛选面板，例如 `'opponent_names=[god:reimu,god:marisa,god:remilia,god:suwako]'`；配置保存实际名单，未知名称或重复名称会报错。默认 `opponent_names=all`。小面板和少量验证种子只供尽早发现退化，不能替代全部对手及独立测试。
+
 仍须用独立种子分别统计神 AI 脚本、角色和双方座位的胜负与超时，并比较超参数实验，才能判断配置是否通用。用户当前要求优先推进此项训练，因此先前验收清单中的调参顺序不再限制本项工作，原人机游玩待办继续保留。
 
 ### 更新吞吐诊断

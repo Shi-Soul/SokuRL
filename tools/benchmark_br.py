@@ -17,7 +17,7 @@ def main(cfg):
     from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
     from soku_rl.evaluation.br import benchmark_br
     from soku_rl.policy.loader import load_policy
-    from soku_rl.policy.matchups import opponent_interface
+    from soku_rl.policy.matchups import opponent_interface, select_opponents
     from soku_rl.policy.population import SeatPolicies
     from soku_rl.rl import configure_runtime
 
@@ -39,8 +39,7 @@ def main(cfg):
         population = config["algorithm"]["opponents"]
     else:
         raise ValueError("opponent_source must be training or config")
-    if not population or len({p["name"] for p in population}) != len(population):
-        raise ValueError("evaluation opponents must have distinct names")
+    population = select_opponents(population, config["opponent_names"])
     model_path = (source / config["checkpoint"]).resolve(strict=True)
     if not model_path.is_relative_to(source):
         raise ValueError("checkpoint must belong to training_directory")
