@@ -7,8 +7,24 @@
 #include <algorithm>
 #include <cstring>
 #include <iterator>
+#include <limits>
 
 namespace {
+void applySimplePlayerState(SokuLib::CharacterManager &manager,
+    const SokuRLBridge::SimplePlayerState &state)
+{
+    manager.objectBase.position.x = state.x;
+    manager.objectBase.position.y = state.y;
+    manager.objectBase.speed.x = state.speedX;
+    manager.objectBase.speed.y = state.speedY;
+    manager.objectBase.direction = static_cast<SokuLib::Direction>(state.facing);
+    manager.objectBase.hp = static_cast<short>(state.hp);
+    manager.currentSpirit = static_cast<unsigned short>(static_cast<std::int16_t>(state.spirit));
+    manager.maxSpirit = static_cast<unsigned short>(static_cast<std::int16_t>(state.maxSpirit));
+    manager.cardGauge = static_cast<unsigned short>(state.cardGauge);
+    manager.cardCount = static_cast<unsigned char>(state.cardCount);
+}
+
 constexpr std::uint64_t FNV_OFFSET = 14695981039346656037ULL;
 constexpr std::uint64_t FNV_PRIME = 1099511628211ULL;
 
@@ -121,6 +137,50 @@ void capturePlayer(const SokuLib::CharacterManager &manager, const SokuRLBridge:
 }
 
 namespace SokuRLBridge {
+SokuRLBridge::SimpleStatePatch simplePatchFrom(const SokuRLBridge::RawFrameState &state)
+{
+    SokuRLBridge::SimpleStatePatch patch{};
+    patch.timeElapsedRaw = state.timeElapsedRaw;
+    patch.activeWeather = state.activeWeather;
+    patch.displayedWeather = state.displayedWeather;
+    patch.weatherCounter = state.weatherCounter;
+    const auto copyPlayer = [](const SokuRLBridge::PlayerState &source,
+        SokuRLBridge::SimplePlayerState &target) {
+        target.x = source.x;
+        target.y = source.y;
+        target.speedX = source.speedX;
+        target.speedY = source.speedY;
+        target.facing = source.facing;
+        target.hp = source.hp;
+        target.spirit = source.spirit;
+        target.maxSpirit = source.maxSpirit;
+        target.cardGauge = source.cardGauge;
+        target.cardCount = source.cardCount;
+    };
+    copyPlayer(state.p1, patch.p1);
+    copyPlayer(state.p2, patch.p2);
+    return patch;
+}
+
+bool isValidSimplePlayerState(const SokuRLBridge::SimplePlayerState &state)
+{
+    constexpr auto minimum = std::numeric_limits<std::int16_t>::min();
+    constexpr auto maximum = std::numeric_limits<std::int16_t>::max();
+    return state.spirit >= minimum && state.spirit <= maximum &&
+        state.maxSpirit >= minimum && state.maxSpirit <= maximum;
+}
+
+void applySimpleState(SokuLib::BattleManager &manager,
+    const SokuRLBridge::SimpleStatePatch &state)
+{
+    *reinterpret_cast<std::uint32_t *>(SokuLib::ADDR_TIME_ELAPSED) = state.timeElapsedRaw;
+    SokuLib::activeWeather = static_cast<SokuLib::Weather>(state.activeWeather);
+    SokuLib::displayedWeather = static_cast<SokuLib::Weather>(state.displayedWeather);
+    SokuLib::weatherCounter = static_cast<unsigned short>(state.weatherCounter);
+    applySimplePlayerState(manager.leftCharacterManager, state.p1);
+    applySimplePlayerState(manager.rightCharacterManager, state.p2);
+}
+
 std::uint64_t stateHash(const SokuRLBridge::RawFrameState &state)
 {
     std::uint64_t hash = FNV_OFFSET;
