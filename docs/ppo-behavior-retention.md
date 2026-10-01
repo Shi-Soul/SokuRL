@@ -150,6 +150,11 @@ NLL 0.24373、总准确率 93.741%、变化帧准确率 62.019%（9805 帧）、
 不能宣称分离结构全面胜出。相对自身 BC 起点，两者都明显偏离教师标签。
 该检查点累计 9 局训练全负，uniform 仍为预热期的 0.90。
 记录在 `.dev/audit-recurrent-separate-midpoint-retention-20261001.log`。
+对应完整神 AI 测评 `br-reimu-recurrent-separate-adaptive-65536-20261001` 成功完成，
+181.40 秒、4 局全负，平均自身/对手 HP 下降 10000/376.75，双方符卡动作进入均为 0。
+种子/角色配对、模型/课程哈希及 worker 清理已核对，记录
+`.dev/audit-recurrent-separate-midpoint-evaluation-20261001.log`。
+仅继续原定 131072 步预算，不因离线保留相对较好就延长该配置。
 
 ### 扩充循环模型的学习者状态采样
 
@@ -166,6 +171,13 @@ bash scripts/linux.sh tools/collect_demonstrations.py linux.cuda_devices=6 rl.cp
   'excluded_datasets=[logs/demonstrations/god-marisa-reimu-20261001,logs/demonstrations/learner-marisa-reimu-20261001,logs/demonstrations/learner-marisa-reimu-iteration2-20261001,logs/demonstrations/god-marisa-reimu-expanded-20261001]' \
   output=logs/demonstrations/learner-recurrent-marisa-reimu-20261001
 ```
+
+采样已从源码 `f8f5061` 在 GPU 6 启动，行为策略指纹与扩充 best 的 SHA256 相同，
+identity 明确标记学习者控制、教师只标注。
+发现原采样身份记录未列出学习策略的 SB3 依赖，现已补充：学习策略采样记录
+stable-baselines3，循环模型再记录 sb3-contrib；不改变实际采样算法。
+已运行任务保留原 identity，另写 `behavior-runtime-audit.json` 明确注明启动后核对，
+两包均为 2.9.0，见 `.dev/audit-recurrent-collection-runtime-20261001.log`。
 
 ## 最新课程及优化曲线快照
 

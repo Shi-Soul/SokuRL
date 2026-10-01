@@ -63,7 +63,9 @@ def main(cfg):
         "sampling": "teacher controls" if behavior is teacher else "learner controls; teacher only labels",
         "behavior_fingerprint": behavior.fingerprint, "excluded_plans": prior_plans,
         "device": config["device"], "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
-        "packages": {name: version(name) for name in ("torch", "numpy", "gymnasium", "lupa")}}
+        "packages": {name: version(name) for name in ["torch", "numpy", "gymnasium", "lupa",
+            *(["stable-baselines3"] if behavior is not teacher else []),
+            *(["sb3-contrib"] if config["behavior"]["kind"] == "sb3_recurrent" else [])]}}
     (destination / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
     report = {"success": False, "method": "rule_demonstrations"}
     started = time.perf_counter()
