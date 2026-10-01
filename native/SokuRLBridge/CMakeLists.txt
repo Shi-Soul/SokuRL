@@ -71,6 +71,8 @@ set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PR
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(RealtimeInputScheduleTest tests/RealtimeInputScheduleTest.cpp)
+    add_test(NAME RealtimeInputSchedule COMMAND RealtimeInputScheduleTest)
     add_library(HeldInputReference SHARED tests/HeldInputReference.cpp HeldInput.cpp)
     set_target_properties(HeldInputReference PROPERTIES PREFIX "")
     add_executable(ControlledInputTest tests/ControlledInputTest.cpp ControlledInput.cpp FrameRecords.cpp FrameState.cpp)
