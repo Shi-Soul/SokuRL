@@ -1,5 +1,7 @@
 """A BR benchmark must swap characters with the model and count all outcomes."""
 import json
+from pathlib import Path
+import runpy
 
 import pytest
 
@@ -7,6 +9,37 @@ from soku_rl.evaluation.br import benchmark_br, matchup_plan
 from soku_rl.policy.population import SeatPolicies, UniformPolicy
 from test_matchup_response import SeatGame
 from soku_rl.policy.matchups import select_opponents
+
+
+def test_model_load_failure_retains_config_and_result(tmp_path, monkeypatch):
+    from hydra import compose, initialize_config_dir
+    from omegaconf import OmegaConf
+    import soku_rl.policy.loader
+    root = Path(__file__).parents[1]
+    source = tmp_path / "training"
+    source.mkdir()
+    output = tmp_path / "evaluation"
+    with initialize_config_dir(version_base="1.3", config_dir=str(root / "config")):
+        training = compose(config_name="train", overrides=["algorithm=br", "track=superhuman",
+                           "wrappers=superhuman_learning", "rules=god"])
+        cfg = compose(config_name="benchmark_br", overrides=[f"training_directory={source}",
+                      f"output={output}", "device=cpu", "require_complete=false"])
+    (source / "config.yaml").write_text(OmegaConf.to_yaml(training, resolve=True))
+    (source / "final.zip").write_bytes(b"load failure fixture")
+
+    def fail_load(*args):
+        raise RuntimeError("model allocation failed")
+
+    monkeypatch.setattr(soku_rl.policy.loader, "load_policy", fail_load)
+    main = runpy.run_path(str(root / "tools/benchmark_br.py"))["main"]
+    with pytest.raises(RuntimeError, match="model allocation failed"):
+        main.__wrapped__(cfg)
+    report = json.loads((output / "result.json").read_text())
+    assert report["success"] is False
+    assert report["phase"] == "loading_policies"
+    assert "model allocation failed" in report["error"]
+    assert (output / "config.yaml").is_file()
+    assert not (output / "plan.json").exists()
 
 
 class EvaluationGame(SeatGame):

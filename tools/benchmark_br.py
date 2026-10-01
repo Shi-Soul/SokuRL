@@ -54,15 +54,6 @@ def main(cfg):
     if candidate in {p["name"] for p in population}:
         raise ValueError("candidate name collides with an opponent")
     kind = {"mlp": "sb3", "lstm": "sb3_recurrent"}[algorithm["policy_type"]]
-    policy = load_policy(candidate, {"kind": kind, "path": str(model_path),
-        "training_config": str(training_path)}, interface, device)
-    strategies = {candidate: SeatPolicies(candidate, (policy, policy))}
-    setups = {}
-    for entry in population:
-        matched = opponent_interface(interface, learner, entry)
-        opponent = load_policy(entry["name"], entry["policy"], matched, device)
-        strategies[entry["name"]] = SeatPolicies(entry["name"], (opponent, opponent))
-        setups[entry["name"]] = entry["setup"]
     output = Path(config["output"]).resolve()
     output.mkdir(parents=True, exist_ok=False)
     # Persist the actual source contract and opponent setups, not train defaults.
@@ -70,9 +61,19 @@ def main(cfg):
         checkpoint_sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
         training_config_sha256=hashlib.sha256(training_path.read_bytes()).hexdigest())
     (output / "config.yaml").write_text(OmegaConf.to_yaml(OmegaConf.create(config)), encoding="utf-8")
-    report = {"success": False}
+    report = {"success": False, "phase": "loading_policies"}
     started = time.perf_counter()
     try:
+        policy = load_policy(candidate, {"kind": kind, "path": str(model_path),
+            "training_config": str(training_path)}, interface, device)
+        strategies = {candidate: SeatPolicies(candidate, (policy, policy))}
+        setups = {}
+        for entry in population:
+            matched = opponent_interface(interface, learner, entry)
+            opponent = load_policy(entry["name"], entry["policy"], matched, device)
+            strategies[entry["name"]] = SeatPolicies(entry["name"], (opponent, opponent))
+            setups[entry["name"]] = entry["setup"]
+        report["phase"] = "running_games"
         with closing(WorkerBackend(log_path=output / "worker.log", **config["runtime"])) as backend:
             backend.configure_observation(episode.backend_observation())
             report["runtime"] = backend.identity
@@ -80,6 +81,7 @@ def main(cfg):
             report["result"] = benchmark_br(env, strategies, candidate, learner, setups,
                 config["benchmark"], backend.identity["fingerprints"]["game_id"], output)
         report["success"] = True
+        report["phase"] = "finished"
     except BaseException as error:
         report["error"] = repr(error)
         raise
