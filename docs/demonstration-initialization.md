@@ -60,3 +60,19 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=3 \
 切换到既有稀疏传输后，17 项监督初始化及存储测试通过，
 日志 `.dev/pytest-behavior-cloning-sparse-20261001-v2.log`。
 监督拟合真实效果和后续 PPO 保持能力仍待独立对局验证；动作准确率不能替代游戏胜率。
+
+## 后续 PPO 保持诊断
+
+真实动作分析 `logs/diagnostics/adaptive-teacher-actions-20261001` 从成功评估的回放读取输入，
+131072 步自适应 PPO 的平均连续同指令长度为 1.002 帧，重复比例 0.20%，
+同时按至少两个攻击键占 49.96%；教师分别为 8.550 帧、88.32%、0%。
+这是提交的输入统计，不是游戏确认执行的动作或连招。
+纯动作持续性候选最终只达到 1.437 帧，完整神 AI 四局仍全负，
+因此不能把固定重复动作当作学会有效时序的证据。
+
+自适应从零训练在 163840 步记录 approx_kl=0.0695、clip_fraction=0.643，
+提示当前每批 10 epoch 的策略更新需要关注稳定性。
+为示范权重准备共享 `rl=ppo_demonstration_transfer` 配置：学习率 1e-4、3 epoch、
+熵系数 0.001、target_kl 0.015，其余沿用原共享 PPO。
+这些是降低遗忘风险的待验证设置，不是已证明最优的参数；从零自适应实验继续作为原配置对照。
+后续 BR 仍按长期胜率调整 uniform / 神 AI 比例，且会独立评估完整神 AI。
