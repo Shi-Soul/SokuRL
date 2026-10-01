@@ -6,8 +6,8 @@ import struct
 import pytest
 
 pytest.importorskip("unicorn")
-from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
-from unicorn.x86_const import UC_X86_REG_EIP, UC_X86_REG_ESP
+from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
+from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_EIP, UC_X86_REG_ESP
 
 ROOT = Path(__file__).parents[1]
 
@@ -27,13 +27,45 @@ def map_image(cpu, path):
         if raw_size:
             cpu.mem_write(base + rva, data[offset:offset + raw_size])
     export, = struct.unpack_from("<I", data, optional + 96)
-    return base, base + export
+    imports, = struct.unpack_from("<I", data, optional + 104)
+    memset_slots = []
+    if imports:
+        descriptor = base + imports
+        while True:
+            original, _, _, name, first = struct.unpack("<5I", cpu.mem_read(descriptor, 20))
+            if not name:
+                break
+            index = 0
+            while True:
+                entry, = struct.unpack("<I", cpu.mem_read(base + (original or first) + index * 4, 4))
+                if not entry:
+                    break
+                if not entry & 0x80000000:
+                    name = bytes(cpu.mem_read(base + entry + 2, 64)).split(b"\0", 1)[0]
+                    if name == b"memset":
+                        memset_slots.append(base + first + index * 4)
+                index += 1
+            descriptor += 20
+    return base, base + export, memset_slots
 
 
 class Decoder:
-    def __init__(self, cpu, function):
+    def __init__(self, cpu, function, memset_slots):
         self.cpu, self.function = cpu, function
         cpu.mem_map(0x20000000, 0x30000)
+        # Resolve only the adapter's C-runtime zero-fill. All input handling
+        # still executes the compiled adapter and unchanged original game code.
+        for slot in memset_slots:
+            cpu.mem_write(slot, struct.pack("<I", 0x2002E000))
+        cpu.hook_add(UC_HOOK_CODE, self.memset, begin=0x2002E000, end=0x2002E000)
+
+    def memset(self, cpu, address, size, context):
+        stack = cpu.reg_read(UC_X86_REG_ESP)
+        returned, target, value, count = struct.unpack("<4I", cpu.mem_read(stack, 16))
+        cpu.mem_write(target, bytes([value & 255]) * count)
+        cpu.reg_write(UC_X86_REG_EAX, target)
+        cpu.reg_write(UC_X86_REG_ESP, stack + 4)
+        cpu.reg_write(UC_X86_REG_EIP, returned)
 
     def __call__(self, previous, intent):
         cpu = self.cpu
@@ -56,7 +88,7 @@ def decoder():
     assert hashlib.md5(game.read_bytes()).hexdigest() == "df35d1fbc7b583317adabe8cd9f53b2e"
     cpu = Uc(UC_ARCH_X86, UC_MODE_32)
     assert map_image(cpu, game)[0] == 0x400000
-    base, export = map_image(cpu, adapter)
+    base, export, memset_slots = map_image(cpu, adapter)
     count, functions, names, ordinals = struct.unpack("<4I", cpu.mem_read(export + 24, 16))
     for index in range(count):
         name_rva, = struct.unpack("<I", cpu.mem_read(base + names + index * 4, 4))
@@ -64,7 +96,7 @@ def decoder():
         if name.lstrip(b"_") == b"decodeInput":
             ordinal, = struct.unpack("<H", cpu.mem_read(base + ordinals + index * 2, 2))
             address, = struct.unpack("<I", cpu.mem_read(base + functions + ordinal * 4, 4))
-            return Decoder(cpu, base + address)
+            return Decoder(cpu, base + address, memset_slots)
     raise AssertionError("compiled adapter export is missing")
 
 
