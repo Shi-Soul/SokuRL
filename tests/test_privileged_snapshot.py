@@ -76,7 +76,7 @@ def test_every_character_and_card_weather_matches_live_memory(capture, character
         raw = SimpleNamespace(frameId=frame, segmentId=7)
         client = SimpleNamespace(snapshot=lambda: SimpleNamespace(
             run_state_name="PAUSED", game_frame=frame, latest=raw))
-        assert copied.observe(raw, client) == direct.observe(raw, client)
+        assert copied.observe_snapshot(raw) == direct.observe(raw, client)
         before = copied.memory.read(0x101000 + 0xEC, 4)
         memory.write(0x101000 + 0xEC, "f", 500.5 + frame)
         assert copied.memory.read(0x101000 + 0xEC, 4) == before
