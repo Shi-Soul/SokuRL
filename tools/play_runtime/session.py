@@ -82,7 +82,7 @@ class RealtimeSession:
                     raise RuntimeError(f"owned game exited with error {code}")
                 return {"closed": True, "termination": "game_closed"}
         events = []
-        states = {name: game.clients["state"].read(.2) for name, game in self.games.items()}
+        states = {name: self.games[name].clients["state"].read_status(.2) for name in self.menus}
         for name, menu in self.menus.items():
             events.extend(event | {"client": name} for event in menu.poll(states[name]))
         self.cursor, captures = self.history.read_after(self.cursor)
@@ -104,7 +104,7 @@ class RealtimeSession:
                 "engine_inputs": tuple(tuple(getattr(player.input, key) for key, _ in player.input._fields_)
                                        for player in (capture.raw.p1, capture.raw.p2))})
             self.seen_battle = True
-        latest = self.games["ai"].clients["state"].read(.2)
+        latest = self.games["ai"].clients["state"].read_status(.2)
         if not latest.in_battle:
             state = latest.match_state
             if state.phase == "disconnected":
