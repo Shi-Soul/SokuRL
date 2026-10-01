@@ -1,5 +1,6 @@
 #include "ControlBlock.hpp"
 #include "FrameState.hpp"
+#include "FramePresentation.hpp"
 #include "ImageCapture.hpp"
 #include "AudioMute.hpp"
 #include "SceneReset.hpp"
@@ -43,7 +44,6 @@ using BattleManagerProcessMethod = int (SokuLib::BattleManager::*)();
 using SelectProcessMethod = int (SokuLib::Select::*)();
 using TitleProcessMethod = int (SokuLib::Title::*)();
 using ProfileInitializeMethod = void (__thiscall *)(SokuLib::Profile *, char);
-using WaitForSingleObjectFunction = DWORD (WINAPI *)(HANDLE, DWORD);
 
 constexpr DWORD KEYMAP_SET_INPUTS_HOOK = 0x0040A45D;
 constexpr DWORD INPUT_CLUSTER_UPDATE_HOOK = 0x0043E55F;
@@ -56,11 +56,6 @@ constexpr DWORD INPUT_MANAGER_CLUSTER_DEVICE = 0x0089A2BC;
 constexpr DWORD FALLBACK_KEY_MANAGER = 0x008986A8;
 constexpr DWORD PROFILE_INITIALIZE = 0x00434BF0;
 constexpr std::uint32_t LOCAL_BATTLE_SCENE = 5;
-constexpr DWORD RENDER_BRANCH = 0x00407FAE;
-constexpr DWORD RENDER_PATH = 0x00407FB4;
-constexpr DWORD SKIP_RENDER_PATH = 0x00408048;
-constexpr DWORD FRAME_WAIT_CALL_OPERAND = 0x00419689;
-constexpr DWORD WAIT_FOR_SINGLE_OBJECT_IAT = 0x008570A0;
 
 HANDLE g_fileMapping = nullptr;
 SokuRLBridge::BridgeMapping *g_mapping = nullptr;
@@ -71,7 +66,6 @@ BattleProcessMethod g_originalBattleProcess = nullptr;
 BattleRenderMethod g_originalBattleRender = nullptr;
 bool g_captureImages = false;
 bool g_captureStateOnly = false;
-bool g_renderPending = true;
 BattleManagerProcessMethod g_originalBattleManagerProcess = nullptr;
 SelectProcessMethod g_originalSelectProcess = nullptr;
 TitleProcessMethod g_originalTitleProcess = nullptr;
@@ -219,71 +213,6 @@ std::uint32_t environmentValue(const wchar_t *name, std::uint32_t fallback)
     wchar_t *end = nullptr;
     const auto parsed = wcstoul(value, &end, 10);
     return end && *end == L'\0' ? static_cast<std::uint32_t>(parsed) : fallback;
-}
-
-void __declspec(naked) renderBranchDispatch()
-{
-    __asm {
-        // Preserve the original JNE first. The injected JMP does not alter EFLAGS.
-        jne originalSkip
-        cmp dword ptr ds:[008A0044h], 5
-        jne originalRender
-        cmp byte ptr [g_headlessRender], 0
-        jne originalSkip
-        cmp byte ptr [g_captureImages], 0
-        je originalRender
-        cmp byte ptr [g_renderPending], 0
-        je originalSkip
-    originalRender:
-        push 00407FB4h
-        ret
-    originalSkip:
-        push 00408048h
-        ret
-    }
-}
-
-bool installHeadlessRenderHook()
-{
-    if (!g_headlessRender && !g_captureImages)
-        return true;
-
-    auto *branch = reinterpret_cast<unsigned char *>(RENDER_BRANCH);
-    if (branch[0] != 0x0F || branch[1] != 0x85)
-        return false;
-    std::int32_t originalDisplacement = 0;
-    std::memcpy(&originalDisplacement, branch + 2, sizeof(originalDisplacement));
-    if (RENDER_BRANCH + 6 + originalDisplacement != SKIP_RENDER_PATH)
-        return false;
-
-    const auto displacement = static_cast<std::int32_t>(
-        reinterpret_cast<std::uintptr_t>(renderBranchDispatch) - (RENDER_BRANCH + 5));
-    branch[0] = 0xE9;
-    std::memcpy(branch + 1, &displacement, sizeof(displacement));
-    branch[5] = 0x90;
-    return true;
-}
-
-DWORD WINAPI framePacingWait(HANDLE object, DWORD timeout)
-{
-    if (g_unlimitedPacing &&
-        *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID) == LOCAL_BATTLE_SCENE &&
-        SokuLib::mainMode == SokuLib::BATTLE_MODE_VSPLAYER)
-        timeout = 0;
-    return WaitForSingleObject(object, timeout);
-}
-
-WaitForSingleObjectFunction g_framePacingWait = framePacingWait;
-
-bool installUnlimitedPacingHook()
-{
-    if (!g_unlimitedPacing)
-        return true;
-    auto *operand = reinterpret_cast<DWORD *>(FRAME_WAIT_CALL_OPERAND);
-    if (*operand != WAIT_FOR_SINGLE_OBJECT_IAT)
-        return false;
-    *operand = reinterpret_cast<DWORD>(&g_framePacingWait);
-    return true;
 }
 
 bool configureVsPlayer(SokuLib::PlayerInfo &info, bool right, std::uint32_t character,
@@ -796,7 +725,7 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         result = callSimulationUpdate(manager);
         ++g_currentFrame;
         appendRecordedFrame(captureState(manager, g_currentFrame, g_segmentId, g_effectiveInputs));
-        g_renderPending = true;
+        SokuRLBridge::setRenderPending(true);
         if (g_stepsRemaining)
             --g_stepsRemaining;
         if (result > 0 && result < 4)
@@ -877,7 +806,7 @@ int __fastcall battleOnProcess(SokuLib::Battle *battle)
         g_effectiveInputs[0] = {};
         g_effectiveInputs[1] = {};
         g_neutralPending = false;
-        g_renderPending = true;
+        SokuRLBridge::setRenderPending(true);
         beginStatusWrite();
         g_control->inGameplay = 0;
         g_control->checkpointValid = 0;
@@ -904,7 +833,7 @@ int __fastcall battleOnRender(SokuLib::Battle *battle)
     const auto result = (battle->*g_originalBattleRender)();
     if (g_battleActive && g_control && isSupportedGameplay()) {
         SokuRLBridge::captureImage(g_currentFrame);
-        g_renderPending = false;
+        SokuRLBridge::setRenderPending(false);
     }
     return result;
 }
@@ -964,8 +893,8 @@ bool installHooks()
         SokuLib::TamperNearJmpOpr(KEYMAP_SET_INPUTS_HOOK, keymapManagerSetInputs));
     g_originalClusterInputs = SokuLib::union_cast<SetInputsMethod>(
         SokuLib::TamperNearJmpOpr(INPUT_CLUSTER_UPDATE_HOOK, inputClusterUpdate));
-    const bool headlessHookInstalled = installHeadlessRenderHook();
-    const bool unlimitedHookInstalled = installUnlimitedPacingHook();
+    const bool presentationInstalled = SokuRLBridge::installFramePresentation(
+        g_headlessRender, g_captureImages, g_unlimitedPacing);
     DWORD ignored = 0;
     VirtualProtect(reinterpret_cast<void *>(TEXT_SECTION_OFFSET), TEXT_SECTION_SIZE,
         textProtection, &ignored);
@@ -989,7 +918,7 @@ bool installHooks()
     VirtualProtect(reinterpret_cast<void *>(RDATA_SECTION_OFFSET), RDATA_SECTION_SIZE,
         rdataProtection, &ignored);
     FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
-    return g_originalSetInputs && g_originalClusterInputs && headlessHookInstalled && unlimitedHookInstalled &&
+    return g_originalSetInputs && g_originalClusterInputs && presentationInstalled &&
         g_originalBattleManagerProcess && g_originalSelectProcess && g_originalTitleProcess &&
         (!g_captureImages || g_originalBattleRender) &&
         g_originalBattleProcess && resetBarrierInstalled;

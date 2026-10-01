@@ -21,6 +21,8 @@ add_library(SokuRLBridge MODULE
     HeldInput.cpp
     FrameState.hpp
     FrameState.cpp
+    FramePresentation.hpp
+    FramePresentation.cpp
     ProfileDeck.hpp
     SceneReset.hpp
     SceneReset.cpp
