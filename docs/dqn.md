@@ -317,3 +317,12 @@ CUDA。实机复测确认独立入口 CUDA 可用、嵌套入口不可用，日�
 基线与五步组约 45.1 步/秒；运行期间的 GPU/并发不同，不能据此归因参数的纯耗时
 效应。采样时间仍占主要部分，换局产生耗时峰值。数值有限不等于收敛：Q 值上升、
 五步 TD 误差末期增加，均未形成稳定胜率证据。
+
+五步组的 262144 步最终 validation 已成功完成：双座位各 32 局，共 0 胜、64 负，
+无双 KO 或超时，平均有限时域收益 -1。实际耗时约 2131.9 秒。审计为
+`logs/diagnostics/dqn-five-step-final-validation-audit-20261001/result.json`，
+核对全部计划试验、32 个配对种子、checkpoint 哈希和 64 份回放的种子/动作范围/
+帧数；私有 Wine 工作进程退出及目录清理通过。此结果未显示五步配置能战胜规则
+灵梦。三组实际评估计划与规则/观测/推理设置一致的证据位于
+`logs/diagnostics/dqn-final-validation-plan-audit-20261001/result.json`。
+其余两组最终 validation 和选定模型的独立 test 仍未完成。
