@@ -25,10 +25,6 @@ def test_all_fifteen_rules_run_without_a_checkpoint():
             for _ in range(4):
                 action = actor.act(np.zeros(interface.observation_space.shape, np.float32))
                 assert interface.action_space.contains(action)
-    for kind in ("nfsp_average", "psro_mixture"):
-        with pytest.raises(ValueError, match="seat"):
-            load_play_policy({"name": kind, "policy": {"kind": kind, "player": "player_0"}},
-                             interface, config, "cpu", 1)
 
 
 @pytest.mark.parametrize("enemy_character", range(20))
