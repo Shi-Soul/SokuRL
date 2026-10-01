@@ -249,3 +249,12 @@ bash scripts/linux.sh tools/queue_br_evaluations.py
 `logs/pytest-dqn-worker-cleanup-20261001.txt`。该问题在主仓库的真实 16 实例
 诊断中已出现；本分支未修改游戏或学习算法。修复用于后续启动的最终评测，
 当前已加载旧代码的六个任务保持运行。没有停止共享 Wine 服务或其他任务。
+
+首份完整阶段评测为五步组 65536 步模型：64 局全负，两个座位各 32 负，
+无双 KO 或超时。`result.json` 成功，实际耗时约 3524.6 秒，评测进程已退出。
+核对了 32 个成对世界种子、完整试验 ID 集合、未变的检查点 SHA256，以及全部
+64 份回放的种子、动作范围和动作数/帧数一致性。审计在
+`logs/diagnostics/dqn-five-step-stage-validation-audit-20261001/result.json`。
+该阶段没有胜率优势证据；固定种子网格的观测胜率为 0，现有按独立种子块计算的
+95% Hoeffding 上界约为 0.240，不能宣称真实胜率已被证明等于零。最终训练和
+其他候选的完整评测仍未完成。
