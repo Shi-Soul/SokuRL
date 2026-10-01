@@ -6,7 +6,7 @@ import time
 import psutil
 import sokurl
 from bridge_shared import BridgeClient, BridgeUnavailable
-from frame_validation import PracticeInstance
+from game_runtime.stepping import PausedGame
 from startup_dialogs import blocking_dialogs
 from game_runtime.startup import title_configuration
 
@@ -72,7 +72,7 @@ def _start_replay(replay, timeout, unlimited, observation_mode):
                 if not snapshot.checkpoint_valid:
                     raise RuntimeError("replay frame-zero checkpoint is not valid")
                 client.drain_frames()
-                return PracticeInstance(process, client, 0)
+                return PausedGame(process, client, 0)
             time.sleep(0.01)
         values = sokurl._read_process_values(process.pid)
         raise RuntimeError(f"replay battle timeout for PID {process.pid}: "

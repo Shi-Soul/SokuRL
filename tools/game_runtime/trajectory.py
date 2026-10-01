@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 
 import numpy as np
 
-from frame_validation import input_tuple
+from game_runtime.stepping import input_tuple
 from game_runtime.observation import ObservationReader
 from game_runtime.replay import launch_replay
 from game_runtime.privileged import ProcessMemory
