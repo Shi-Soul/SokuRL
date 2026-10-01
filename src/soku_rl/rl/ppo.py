@@ -47,6 +47,14 @@ def parameter_hash(policy):
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
     validate_payoff(interface, config)
     parameters = dict(config["ppo"])
+    if "action_factorization" in parameters:
+        from soku_rl.rl.factorized_policy import FactorizedActorCriticPolicy
+        factorization = parameters.pop("action_factorization")
+        if (algorithm is not PPO or interface.commands != tuple(range(576))
+                or set(factorization) != {"button_probability"}
+                or "action_persistence" in parameters or "initial_action_prior" in parameters):
+            raise ValueError("factorized actions require feedforward full-command PPO without another action-head option")
+        policy_type = FactorizedActorCriticPolicy
     if "action_persistence" in parameters:
         from soku_rl.rl.persistent_policy import PersistentActorCriticPolicy
         persistence = parameters.pop("action_persistence")
@@ -58,6 +66,8 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
     if "initial_action_prior" in parameters:
         prior_logits = logical_action_prior(interface, parameters.pop("initial_action_prior"))
     architecture = dict(parameters["policy_kwargs"])
+    if "action_factorization" in config["ppo"]:
+        architecture["factor_button_probability"] = factorization["button_probability"]
     if "action_persistence" in config["ppo"]:
         architecture["repeat_probability"] = persistence["repeat_probability"]
     if "features_extractor_class" in architecture:
@@ -83,8 +93,10 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         raise ValueError("continued PPO must retain its algorithm and optimizer configuration")
     path = Path(source["path"]).resolve(strict=True)
     if source["kind"] == "weights":
+        heads = ("action_persistence", "action_factorization")
         if (previous["ppo"]["policy_kwargs"] != config["ppo"]["policy_kwargs"]
-                or previous["ppo"].get("action_persistence") != config["ppo"].get("action_persistence")):
+                or {key: previous["ppo"][key] for key in heads if key in previous["ppo"]}
+                != {key: config["ppo"][key] for key in heads if key in config["ppo"]}):
             raise ValueError("policy weights require the same network architecture")
         initial = algorithm.load(path, device=device)
         source_steps = initial.num_timesteps
