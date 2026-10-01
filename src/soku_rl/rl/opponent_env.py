@@ -4,6 +4,7 @@ import numpy as np
 from stable_baselines3.common.vec_env import VecEnv
 
 from soku_rl.env.encoding import AGENTS
+from soku_rl.rl.curriculum import FixedOpponentSchedule
 
 
 class OpponentMixtureVecEnv(VecEnv):
@@ -30,6 +31,7 @@ class OpponentMixtureVecEnv(VecEnv):
         self.observations = {}
         self.pending = None
         self.closed = False
+        self.curriculum = FixedOpponentSchedule()
         self.returns = np.zeros(env.num_envs)
         self.base_returns = np.zeros(env.num_envs)
         self.lengths = np.zeros(env.num_envs, dtype=np.int64)
@@ -42,9 +44,10 @@ class OpponentMixtureVecEnv(VecEnv):
             self.opponent_indices[slot] = index
             opponent = self.opponents[index]
             policy_seed = int(self.rng.integers(0, 0xFFFFFFFF))
-            self.actors[slot] = opponent.spawn(policy_seed)
+            self.actors[slot], curriculum_context = self.curriculum.spawn(opponent, policy_seed)
             self.episode_context[slot] = {"world_seed": seeds[slot], "opponent_seed": policy_seed,
                 "player": self.players[slot], "opponent": opponent.name, "opponent_fingerprint": opponent.fingerprint}
+            self.episode_context[slot].update(curriculum_context)
             self.returns[slot] = self.base_returns[slot] = self.lengths[slot] = 0
         observations, infos = self._reset_game(seeds)
         for slot in seeds:
@@ -109,6 +112,9 @@ class OpponentMixtureVecEnv(VecEnv):
                     if isinstance(self.observation_space, spaces.Dict) else terminal.copy())
                 info["episode"] = {"r": float(self.returns[i]), "l": int(self.lengths[i])}
                 info["training_context"] = self.episode_context[i] | {"base_return": float(self.base_returns[i])}
+                event = self.curriculum.observe(self.episode_context[i], info)
+                if event:
+                    info["curriculum_event"] = event
                 seeds[i] = int(self.rng.integers(0, 0xFFFFFFFF))
             output_infos.append(info)
         self.observations = obs
@@ -131,4 +137,3 @@ class OpponentMixtureVecEnv(VecEnv):
 
     def env_is_wrapped(self, wrapper_class, indices=None):
         return [False for _ in self._get_indices(indices)]
-
