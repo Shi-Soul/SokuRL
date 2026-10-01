@@ -3,7 +3,7 @@ from soku_rl.env.observation.privileged import PrivilegedObservation
 
 
 def observation(hp):
-    return PrivilegedObservation({}, tuple({"hp": value} for value in hp))
+    return PrivilegedObservation({}, tuple({"hp": value, "act": 0} for value in hp))
 
 
 def test_hp_accounting_healing_reset_and_both_seats():
@@ -27,3 +27,19 @@ def test_unavailable_is_not_zero_damage():
     metrics.reset(object())
     metrics.step(object())
     assert metrics.snapshot(0)["available"] is False
+
+
+def test_spell_action_entries_exclude_hold_and_alternate_effect():
+    metrics = CombatMetrics()
+    metrics.reset(observation((10000, 10000)))
+    for action in (600, 600, 600, 650, 650, 0, 600, 690):
+        current = observation((10000, 10000))
+        current.players[0]["act"] = action
+        metrics.step(current)
+    saved = metrics.snapshot(0)
+    assert saved["own_spell_action_entries"] == 2
+    assert saved["opponent_spell_action_entries"] == 0
+    assert saved["own_action_entries"]["650"] == 1
+    metrics.reset(observation((10000, 10000)))
+    assert saved["own_action_entries"]["600"] == 2
+    assert metrics.snapshot(0)["own_spell_action_entries"] == 0
