@@ -17,6 +17,8 @@ endif()
 add_subdirectory("${SOKUMODS_ROOT}/SokuLib" "${CMAKE_BINARY_DIR}/SokuLib" EXCLUDE_FROM_ALL)
 
 add_library(SokuRLBridge MODULE
+    ControlledInput.hpp
+    ControlledInput.cpp
     HeldInput.hpp
     HeldInput.cpp
     FrameState.hpp
@@ -69,6 +71,10 @@ set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PR
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(ControlledInputTest tests/ControlledInputTest.cpp ControlledInput.cpp FrameRecords.cpp FrameState.cpp)
+    target_link_libraries(ControlledInputTest PRIVATE SokuLib)
+    target_compile_definitions(ControlledInputTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+    add_test(NAME ControlledInput COMMAND ControlledInputTest)
     add_executable(FrameRecordsTest tests/FrameRecordsTest.cpp FrameRecords.cpp FrameState.cpp)
     target_link_libraries(FrameRecordsTest PRIVATE SokuLib)
     target_compile_definitions(FrameRecordsTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
