@@ -74,6 +74,12 @@ set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PR
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(RealtimeInputChannelTest tests/RealtimeInputChannelTest.cpp RealtimeInput.cpp
+        ControlledInput.cpp FrameRecords.cpp FrameState.cpp LocalStart.cpp)
+    target_link_libraries(RealtimeInputChannelTest PRIVATE SokuLib)
+    target_compile_definitions(RealtimeInputChannelTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+    add_test(NAME RealtimeInputChannel COMMAND RealtimeInputChannelTest)
+    set_tests_properties(RealtimeInputChannel PROPERTIES TIMEOUT 15)
     add_executable(RealtimeInputScheduleTest tests/RealtimeInputScheduleTest.cpp)
     add_test(NAME RealtimeInputSchedule COMMAND RealtimeInputScheduleTest)
     add_library(HeldInputReference SHARED tests/HeldInputReference.cpp HeldInput.cpp)

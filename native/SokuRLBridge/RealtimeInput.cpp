@@ -40,6 +40,8 @@ bool initializeRealtimeInput() {
     g_block->size = sizeof(RealtimeInputBlock);
     g_block->seat = g_seat;
     g_block->appliedAt = NO_FRAME;
+    g_acknowledged = 0;
+    g_result = RealtimeResult::Idle;
     g_schedule.emplace(g_seat);
     return true;
 }
