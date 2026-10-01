@@ -57,7 +57,7 @@ SokuRL 用原版《东方非想天则》1.10a 引擎运行双人对战，通过 
 | `tools/train.py` | 通过 `algorithm=ppo/recurrent_ppo/ippo/nfsp/psro` 选择训练 |
 | `tools/benchmark_training.py` | 按已保存配置评测完成的训练 |
 | `tools/render_replay.py` | 用真实游戏重放动作并生成视频 |
-| `tools/netplay.py` | 加载策略参加原游戏网络比赛；支持[本机 CPU 人机对战](docs/local-play.md) |
+| `tools/play.py` | 统一人机、AI 建房和加入房间；Windows 启动入口为 `scripts/play.cmd`，见[游玩说明](docs/local-play.md) |
 | `tools/export_policy.py` | 将循环 PPO 导出为经过数值核对的 CPU 推理模型 |
 | `tools/benchmark_inference.py` | 检查本机 CPU 推理耗时和执行设备 |
 | `tools/sokurl.py` | 启动、查询和关闭指定游戏进程 |
