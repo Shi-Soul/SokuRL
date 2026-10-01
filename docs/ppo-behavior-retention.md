@@ -137,6 +137,36 @@ NLL 0.24373、总准确率 93.741%、变化帧准确率 62.019%（9805 帧）、
 `logs/diagnostics/expanded-recurrent-by-dataset-20261001/summary.json`，
 日志 `.dev/audit-expanded-recurrent-by-dataset-20261001.log`。
 
+扩充模型的完整神 AI 配对测评成功完成，240.87 秒、4 局全负；平均自身/对手 HP 下降
+10000/2736.75，双方符卡动作进入均为 0。四局对手 HP 下降为 1138、5348、2421、2040。
+原循环 BC 相同配对的平均对手 HP 下降为 1403.25；小样本显示掉血指标提高，仍没有胜局，
+不足以建立稳定强度结论。种子/角色/座位、模型哈希和私有服务清理均核对通过，
+记录 `.dev/audit-expanded-recurrent-zero-shot-20261001.log`。
+动作回放统计 `logs/diagnostics/expanded-recurrent-actions-20261001` 显示相同命令平均连续
+8.08 帧、重复率 87.64%，B 按下比例 3.10%；仍按提交命令解释，不能等同命中次数。
+
+分离特征 PPO 的 65536 步教师验证准确率下降到 65.576%，NLL 1.22119，
+变化帧准确率 34.971%。同预算共享特征模型总准确率为 57.538%，但变化帧准确率 37.957%；
+不能宣称分离结构全面胜出。相对自身 BC 起点，两者都明显偏离教师标签。
+该检查点累计 9 局训练全负，uniform 仍为预热期的 0.90。
+记录在 `.dev/audit-recurrent-separate-midpoint-retention-20261001.log`。
+
+### 扩充循环模型的学习者状态采样
+
+后续数据由扩充模型 best 实际操作，原神 AI 只标注，完整灵梦神 AI 作为对手。
+计划 32 局、每座位 16 局，各留 4 局验证；显式排除现有四组示范及正式验证/测试种子。
+两个控制器各按真实局内历史推进，保存实际执行命令与教师标签，模型不接收教师内部状态。
+此项没有在线 PPO 更新；后续若聚合这些标签，仍要求 value_coef=0，不能把学习者回报当成教师价值目标。
+
+```bash
+bash scripts/linux.sh tools/collect_demonstrations.py linux.cuda_devices=6 rl.cpu_threads=1 \
+  +br_opponents=god_target algorithm.target.character=0 seed=1462193 num_envs=8 \
+  collection.episodes_per_seat=16 collection.validation_per_seat=4 \
+  '++behavior={kind:sb3_recurrent,path:logs/pretraining/god-marisa-reimu-recurrent-expanded-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-expanded-20261001/config.yaml}' \
+  'excluded_datasets=[logs/demonstrations/god-marisa-reimu-20261001,logs/demonstrations/learner-marisa-reimu-20261001,logs/demonstrations/learner-marisa-reimu-iteration2-20261001,logs/demonstrations/god-marisa-reimu-expanded-20261001]' \
+  output=logs/demonstrations/learner-recurrent-marisa-reimu-20261001
+```
+
 ## 最新课程及优化曲线快照
 
 `logs/diagnostics/br-retention-curves-20261001-v2` 保存带源文件 SHA256 的三个运行快照，
