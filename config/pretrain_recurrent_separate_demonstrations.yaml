@@ -1,0 +1,10 @@
+defaults:
+  - pretrain_recurrent_demonstrations
+  - _self_
+
+# Isolate actor representations from critic gradients; retain separate LSTMs.
+rl:
+  ppo:
+    policy_kwargs:
+      share_features_extractor: false
+output: logs/pretraining/god-recurrent-separate-bc-${now:%Y%m%d-%H%M%S}

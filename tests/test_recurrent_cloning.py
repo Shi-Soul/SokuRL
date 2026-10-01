@@ -61,11 +61,13 @@ def test_sequence_scoring_matches_framewise_online_memory_and_resets():
     env.close()
 
 
-def test_recurrent_fit_loads_as_shared_ppo_and_continues_online(dataset):
+@pytest.mark.parametrize("shared_features", [True, False])
+def test_recurrent_fit_loads_as_shared_ppo_and_continues_online(dataset, shared_features):
     directory, interface, _ = dataset
     torch.set_num_threads(1)
     samples, _, _, _ = load_demonstrations(directory, interface)
     config = fixture_config("lstm") | {"name": "br"}
+    config["ppo"]["policy_kwargs"]["share_features_extractor"] = shared_features
     config["ppo"]["learning_rate"] = .02
     output = directory / "recurrent-fit"
     output.mkdir()
