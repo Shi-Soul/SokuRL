@@ -177,6 +177,20 @@ class PrivilegedReader:
         before = client.snapshot()
         if before.run_state_name != "PAUSED" or before.game_frame != raw.frameId:
             raise RuntimeError("privileged reads require the exact paused simulation frame")
+        observations = self._decode(raw)
+        after = client.snapshot()
+        if (after.run_state_name != "PAUSED" or after.game_frame != raw.frameId
+                or after.latest.segmentId != raw.segmentId):
+            raise RuntimeError("game advanced during privileged observation")
+        return observations
+
+    def observe_snapshot(self, raw):
+        from game_runtime.snapshot_memory import SnapshotMemory
+        if not isinstance(self.memory, SnapshotMemory):
+            raise TypeError("realtime observations require immutable captured memory")
+        return self._decode(raw)
+
+    def _decode(self, raw):
         self.memory.begin_frame()
         if self.segment != raw.segmentId:
             self.previous = [None, None]
@@ -188,10 +202,6 @@ class PrivilegedReader:
         battle = self.value(0x8985E4, "I")
         players = tuple(self.fighter(self.value(battle + 0xC + seat * 4, "I"), seat, world["weather"])
                         for seat in (0, 1))
-        after = client.snapshot()
-        if (after.run_state_name != "PAUSED" or after.game_frame != raw.frameId
-                or after.latest.segmentId != raw.segmentId):
-            raise RuntimeError("game advanced during privileged observation")
         self.previous = players
         return (PrivilegedObservation(world, players), PrivilegedObservation(world, players[::-1]))
 
