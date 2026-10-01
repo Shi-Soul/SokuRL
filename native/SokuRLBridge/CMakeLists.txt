@@ -19,6 +19,8 @@ add_subdirectory("${SOKUMODS_ROOT}/SokuLib" "${CMAKE_BINARY_DIR}/SokuLib" EXCLUD
 add_library(SokuRLBridge MODULE
     HeldInput.hpp
     HeldInput.cpp
+    FrameState.hpp
+    FrameState.cpp
     ProfileDeck.hpp
     SceneReset.hpp
     SceneReset.cpp
@@ -61,6 +63,10 @@ set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PR
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(FrameStateHashTest tests/FrameStateHashTest.cpp FrameState.cpp)
+    target_link_libraries(FrameStateHashTest PRIVATE SokuLib)
+    target_compile_definitions(FrameStateHashTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+    add_test(NAME FrameStateHash COMMAND FrameStateHashTest)
     add_executable(ControlledStepTest tests/ControlledStepTest.cpp)
     add_test(NAME ControlledStep COMMAND ControlledStepTest)
     add_executable(NetworkInputScheduleTest tests/NetworkInputScheduleTest.cpp)
