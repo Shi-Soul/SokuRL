@@ -29,7 +29,8 @@ class SnapshotMemory:
         index = bisect_right(self.addresses, address)
         # Captured fields can lie inside a larger fighter block. Look behind
         # nested short ranges, but never fabricate bytes outside the snapshot.
-        for start in reversed(self.addresses[:index]):
+        for position in range(index - 1, -1, -1):
+            start = self.addresses[position]
             block = self.blocks[start]
             offset = address - start
             if offset + size <= len(block):
