@@ -127,4 +127,17 @@ OpenSpiel 负责策略种群、响应选择和投影复制动态；PPO 负责训
 
 ## 当前验证边界
 
+共享 PPO 的单变量调参候选 `rl=ppo_long_credit` 仅将 `gae_lambda` 从 0.95 改为
+0.995，其他参数继承 `rl=ppo`。在当前 `gamma=1` 下，GAE 残差权重的几何和从
+20 增至 200；这不是实际游戏记忆长度，也不保证更好的策略。用同一个固定神 AI、
+随机座位、相同种子与采样预算分别从头训练，再以相同验证种子比较胜负和超时。
+该候选可用于 BR 及其他复用 RL 层的 MARL 算法，不能因配置可加载就宣称通用性或强度达标。
+
+```bash
+bash scripts/linux.sh tools/train.py algorithm=br rl=ppo_long_credit \
+  rules=god wrappers=superhuman_learning track=superhuman \
+  +br_opponents=god_target algorithm.target.character=0 num_envs=8 \
+  output=logs/training/br-superhuman-god-reimu-long-credit
+```
+
 前馈与循环 IPPO 的更新、保存、加载、继续训练已由接口测试覆盖；NFSP 检查样本池和平均模型的恢复；PSRO 检查继续扩展种群时旧收益与成员文件的保留。完整神 AI 的真实游戏行为验证单独记录在[行为核对文档](community-ai.md)。这些检查不代表新版策略已经完成正式训练或强度验收。
