@@ -144,6 +144,8 @@ def test_benchmark_counts_seats_and_censoring_without_confusing_timeouts(tmp_pat
     assert report["summary"]["missing_games"] == 0
     assert len(report["games"]) == 8
     assert len(report["by_opponent_and_seat"]) == 4
+    assert report["combat_summary"]["episodes"] == 8
+    assert report["combat_summary"]["measured_episodes"] == 0
     for row in report["by_opponent_and_seat"]:
         assert row["games"] == 2
         if outcome in ("double_ko", "time_limit"):
@@ -157,3 +159,27 @@ def test_benchmark_counts_seats_and_censoring_without_confusing_timeouts(tmp_pat
     for slot, trial in enumerate(saved):
         assert game.resets[0][slot].player_0.character == trial["match"]["player_0"]["character"]
         assert (tmp_path / f'{trial["trial_id"]}.npz').is_file()
+
+
+def test_combat_summary_follows_learner_when_swapping_seats(tmp_path):
+    class CombatGame(EvaluationGame):
+        def step(self, actions):
+            result = super().step(actions)
+            for pair in result[-1].values():
+                for seat in (0, 1):
+                    pair[f"player_{seat}"]["combat_metrics"] = {
+                        "available": True, "own_hp_loss": 100 + seat * 600,
+                        "opponent_hp_loss": 700 - seat * 600, "own_hp_loss_frames": 1,
+                        "opponent_hp_loss_frames": 2, "own_final_hp": 9900 - seat * 600,
+                        "opponent_final_hp": 9300 + seat * 600,
+                        "own_spell_action_entries": seat, "opponent_spell_action_entries": 1 - seat}
+            return result
+
+    strategies, learner, setups, config = benchmark_inputs()
+    report = benchmark_br(CombatGame("p1_win"), strategies, "learned", learner,
+                          setups, config, "game", tmp_path)
+    assert report["combat_summary"]["means"]["own_hp_loss"] == 400
+    for row in report["by_opponent_and_seat"]:
+        seat = row["learner_seat"]
+        assert row["combat_summary"]["means"]["own_hp_loss"] == 100 + seat * 600
+        assert row["combat_summary"]["action_means"]["own_spell_action_entries"] == seat

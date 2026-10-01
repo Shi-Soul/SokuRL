@@ -5,6 +5,7 @@ import hashlib
 import json
 
 from soku_rl.env.match import MatchConfig, PlayerSetup
+from soku_rl.env.combat_metrics import summarize_combat
 from soku_rl.evaluation.benchmark import run_plan
 from soku_rl.evaluation.tournament import Trial, make_plan
 from soku_rl.pomg import Outcome
@@ -59,9 +60,13 @@ def benchmark_br(env, strategies, candidate, learner, setups, config, game_ident
     plan = matchup_plan(strategies, candidate, learner, setups, config, game_identity)
     report = run_plan(env, strategies, plan, config, directory, reset_matchup_trials)
     groups = {}
+    combat_groups = {}
     for game in report["games"]:
         key = (game["opponent"], game["learner_seat"])
         counts = groups.setdefault(key, Counter(win=0, loss=0, double_ko=0, time_limit=0))
+        combat = (game["combat_metrics_by_seat"][game["learner_seat"]]
+                  if "combat_metrics_by_seat" in game else {"available": False})
+        combat_groups.setdefault(key, []).append(combat)
         outcome = game["outcome"]
         if outcome in (Outcome.DRAW.value, Outcome.TRUNCATED.value):
             counts[outcome] += 1
@@ -71,6 +76,8 @@ def benchmark_br(env, strategies, candidate, learner, setups, config, game_ident
             counts["loss"] += 1
     report["by_opponent_and_seat"] = [{"opponent": name, "learner_seat": seat,
         "opponent_character": setups[name]["character"], "counts": dict(counts),
-        "games": sum(counts.values()), "win_rate": counts["win"] / sum(counts.values())}
+        "games": sum(counts.values()), "win_rate": counts["win"] / sum(counts.values()),
+        "combat_summary": summarize_combat(combat_groups[name, seat])}
         for (name, seat), counts in sorted(groups.items())]
+    report["combat_summary"] = summarize_combat([record for records in combat_groups.values() for record in records])
     return report
