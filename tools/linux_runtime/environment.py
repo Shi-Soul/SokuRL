@@ -25,7 +25,8 @@ def contained(root, value):
 
 
 def windows(path):
-    return "Z:" + str(Path(path).resolve()).replace("/", "\\")
+    # CMake stores paths in generated source; backslashes become escape sequences.
+    return "Z:" + Path(path).resolve().as_posix()
 
 
 def native_environment(config):
