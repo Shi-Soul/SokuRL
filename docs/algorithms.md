@@ -163,6 +163,17 @@ bash scripts/linux.sh tools/train.py algorithm=br rl=ppo_long_credit \
 前馈与循环 IPPO 的更新、保存、加载、继续训练已由接口测试覆盖；NFSP 检查样本池和平均模型的恢复；PSRO 检查继续扩展种群时旧收益与成员文件的保留。完整神 AI 的真实游戏行为验证单独记录在[行为核对文档](community-ai.md)。这些检查不代表新版策略已经完成正式训练或强度验收。
 # 战斗指标与后续效率实验
 
+新增战斗指标的真实评测记录（均为 2 个验证 world seed × 双座位、4 局筛选，非最终测试）：
+
+| 配置与已更新步数 | 胜/负 | 对手平均 HP 减少 | 学习者符卡动作进入总数 | 结果目录 |
+| --- | --- | --- | --- | --- |
+| 长 GAE，81920 | 0/4 | 501.75 | 缺测（schema 1） | `logs/benchmark/br-reimu-long-credit-81920-screening-v2` |
+| 默认，147456 | 0/4 | 1809 | 2（schema 2） | `logs/benchmark/br-reimu-default-147456-screening` |
+
+训练步数不同，且模型身份参与策略随机种子生成，这不是同一策略随机数流的配对
+消融。掉血和动作进入已有逐局证据，但不能由这 4 局认定某配置更强。两种座位
+的指标已核对 own/opponent 对应；符卡进入次数仍需动作/回放事件进一步验证。
+
 课程预训练使用显式冻结弱对手，仍走同一个 `algorithm=br`：
 
 ```bash
