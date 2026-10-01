@@ -127,6 +127,14 @@ OpenSpiel 负责策略种群、响应选择和投影复制动态；PPO 负责训
 
 ## 当前验证边界
 
+传输候选 `rl=ppo_sparse_transfer` 使用共享 PPO 工厂加载
+`SparseTransferRolloutBuffer`：非零的原始 32 位字及其位置传到设备后恢复完整 float32
+观测，减少填充零值的主机到设备传输。旧 zlib 记录仍按原格式解压；动作、回报、优势和
+小批次随机顺序不变。默认缓冲区暂不切换。11 项相关 CPU 测试通过；8×600000 元素的
+小型 CUDA 检查包含负零、NaN 载荷、稀疏及稠密记录，逐位一致，记录在
+`.dev/sparse-transfer-bit-check-20261001.json`。这尚不证明完整 PPO 更新或真实训练更快，
+完整批次的性能验证等待显存资源。此候选的配置独立保存，不应静默替换已有训练配置。
+
 观测编码候选 `track=superhuman_numeric` 保持超人赛道的完整观测、即时控制和动作空间，
 仅将共享特征提取器改为 `NumericPrivilegedFeatures`。原始两段无损数值编码全部保留，
 每个字段另外附加 `sign(x) * log(1 + abs(x)) / 16`，使方向、速度等小数值更容易进入网络。

@@ -50,7 +50,9 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
     if "features_extractor_class" in architecture:
         architecture["features_extractor_class"] = get_class(architecture["features_extractor_class"])
     parameters["policy_kwargs"] = architecture
-    if algorithm is PPO and interface.episode.observation_mode == "privileged_state":
+    if "rollout_buffer_class" in parameters:
+        parameters["rollout_buffer_class"] = get_class(parameters["rollout_buffer_class"])
+    elif algorithm is PPO and interface.episode.observation_mode == "privileged_state":
         from soku_rl.rl.buffers import PackedRolloutBuffer
         parameters["rollout_buffer_class"] = PackedRolloutBuffer
     if source == {"kind": "fresh"}:
@@ -77,5 +79,4 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         source_steps = model.num_timesteps
     return model, source | {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                             "source_steps": source_steps}
-
 

@@ -27,9 +27,10 @@ def test_packed_buffer_matches_upstream_returns_and_samples():
     from gymnasium import spaces
     from stable_baselines3.common.buffers import RolloutBuffer
     from soku_rl.rl.buffers import PackedRolloutBuffer
+    from soku_rl.rl.sparse_transfer import SparseTransferRolloutBuffer
     arguments = (4, spaces.Box(-100, 100, (6,), np.float32), spaces.Discrete(3))
     buffers = [kind(*arguments, device="cpu", gamma=1., gae_lambda=.95, n_envs=2)
-               for kind in (RolloutBuffer, PackedRolloutBuffer)]
+               for kind in (RolloutBuffer, PackedRolloutBuffer, SparseTransferRolloutBuffer)]
     for step in range(4):
         obs = np.arange(12, dtype=np.float32).reshape(2, 6) + step
         for buffer in buffers:
@@ -40,8 +41,27 @@ def test_packed_buffer_matches_upstream_returns_and_samples():
         buffer.compute_returns_and_advantage(torch.tensor([.2, -.3]), np.array([False, True]))
         np.random.seed(32)
         outputs.append(list(buffer.get(3)))
-    for first, second in zip(*outputs, strict=True):
-        assert all(torch.equal(a, b) for a, b in zip(first, second, strict=True))
+    for candidate in outputs[1:]:
+        for first, second in zip(outputs[0], candidate, strict=True):
+            assert all(torch.equal(a, b) for a, b in zip(first, second, strict=True))
+
+
+def test_device_restore_preserves_sparse_dense_and_legacy_words():
+    torch = pytest.importorskip("torch")
+    from soku_rl.rl.sparse_transfer import restore_batch
+    sparse = np.zeros(200, np.float32)
+    sparse.view(np.uint32)[[1, 123, 199]] = [0x80000000, 0x7FC01234, 0xFFFFFFFF]
+    dense = np.arange(200, dtype=np.float32) + 1
+    samples = [PackedObservation.pack(sparse), PackedObservation.pack(dense),
+               PackedObservation(sparse.shape, sparse.dtype.str, zlib.compress(sparse.tobytes())),
+               PackedObservation.pack(np.zeros_like(sparse))]
+    result = restore_batch(samples, torch.device("cpu"))
+    assert result.numpy().tobytes() == np.stack([s.unpack() for s in samples]).tobytes()
+    with pytest.raises(ValueError, match="nonempty"):
+        restore_batch([], torch.device("cpu"))
+    malformed = PackedObservation(sparse.shape, sparse.dtype.str, SPARSE_WORDS + b"\xff" * 4)
+    with pytest.raises(ValueError, match="header"):
+        restore_batch([malformed], torch.device("cpu"))
 
 
 @pytest.mark.parametrize("dtype", ["<f4", ">f4", "<u4"])
