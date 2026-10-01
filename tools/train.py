@@ -3,6 +3,7 @@ import hashlib
 from contextlib import closing
 from importlib.metadata import version
 import json
+import os
 from pathlib import Path
 import random
 import time
@@ -80,7 +81,9 @@ def main(cfg: DictConfig):
     identity = {"source_hashes": {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                                    for p in sources},
                 "packages": {p: version(p) for p in ["torch", "gymnasium", "pettingzoo", *dependencies]},
-                "device": str(device), "hydra_output": HydraConfig.get().runtime.output_dir}
+                "device": str(device), "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
+                "device_name": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu",
+                "hydra_output": HydraConfig.get().runtime.output_dir}
     (destination / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
     started = time.perf_counter()
     report = {"success": False, "algorithm": algorithm}

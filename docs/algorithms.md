@@ -163,6 +163,26 @@ bash scripts/linux.sh tools/train.py algorithm=br rl=ppo_long_credit \
 前馈与循环 IPPO 的更新、保存、加载、继续训练已由接口测试覆盖；NFSP 检查样本池和平均模型的恢复；PSRO 检查继续扩展种群时旧收益与成员文件的保留。完整神 AI 的真实游戏行为验证单独记录在[行为核对文档](community-ai.md)。这些检查不代表新版策略已经完成正式训练或强度验收。
 # 战斗指标与后续效率实验
 
+课程预训练使用显式冻结弱对手，仍走同一个 `algorithm=br`：
+
+```bash
+bash scripts/linux.sh tools/train.py linux.cuda_devices=1 algorithm=br \
+  rl=ppo_sparse_transfer rules=default wrappers=superhuman_learning track=superhuman \
+  +br_opponents=tree_target algorithm.target.character=0 algorithm.target.style=idle \
+  num_envs=4 algorithm.timesteps=65536 output=logs/training/br-idle-warmup
+```
+
+预训练不算目标神 AI 的成功。先确认独立对局能对静止对手造成有效伤害，再以
+`algorithm.initial_policy={kind:weights,path:...,training_config:...}` 初始化目标
+神 AI BR，保留相同网络、逐帧时序和随机座位。权重初始化重置优化器，源步数与
+预训练预算必须单独计入；比较直接训练和课程时同时报告总环境步数。需要不同
+弱策略时显式选择 `rush`、`zoning` 或 `counter`，不能在训练中静默改动原神 AI。
+
+完整 batch=256 合成传输诊断见 `logs/diagnostics/ppo-transfer-{dense,sparse}-b256-20261001`。
+各三次单 epoch 更新，预热后 dense 为 12.07/9.78 秒、sparse 为 0.051/0.040 秒，
+峰值均为 1,998,306,816 字节；并发负载和合成稀疏数据限制了外推，真实训练仍待测。
+选择稀疏传输进入课程小实验，不宣称它已提高策略强度或达到同样的真实加速比。
+
 2026-10-01 的进行中快照见 `logs/diagnostics/training-curves-20261001-b/`。
 `bash scripts/linux.sh tools/analyze_training.py` 复制原始配置、标量 CSV、进度和
 耗时 JSON 并记录 SHA256，再生成 PNG/PDF。SB3 的 train 指标在下一轮采样后才
