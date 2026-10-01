@@ -1,6 +1,7 @@
 """Run rule policies from the same observation tensors given to learners."""
 from collections import deque
 from dataclasses import asdict, dataclass
+from functools import cached_property
 import hashlib
 import json
 import math
@@ -42,7 +43,7 @@ class RulePolicy(RulePolicyBase):
 
     def __post_init__(self):
         if self.name == "god":
-            self.god_policy()
+            self.god_policy
             return
         if self.episode.observation_mode not in {"state", "diagnostic_state", "privileged_state"}:
             raise ValueError("rule policies require a numeric observation")
@@ -53,13 +54,13 @@ class RulePolicy(RulePolicyBase):
     @property
     def fingerprint(self):
         if self.name == "god":
-            return self.god_policy().fingerprint
+            return self.god_policy.fingerprint
         data = [self.name, self.rules, asdict(self.episode), self.implementation]
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
     def spawn(self, seed):
         if self.name == "god":
-            return self.god_policy().spawn(seed)
+            return self.god_policy.spawn(seed)
         if type(seed) is not int or not 0 <= seed < 2**32:
             raise ValueError("policy seed must be a uint32")
         strategy = strategy_from_config(self.name, self.rules, self.implementation)
@@ -70,6 +71,7 @@ class RulePolicy(RulePolicyBase):
             actor = ScreenRules(strategy, self.rules["screen"], self.episode.decision_frames)
         return RuleEpisode(actor, self.episode)
 
+    @cached_property
     def god_policy(self):
         from soku_rl.policy.god.runtime import GodPolicy
         from soku_rl.policy.god.package import ScriptPackage
@@ -79,7 +81,7 @@ class RulePolicy(RulePolicyBase):
 
     def spawn_play(self, seed):
         if self.name == "god":
-            return self.god_policy().spawn_play(seed)
+            return self.god_policy.spawn_play(seed)
         return super().spawn_play(seed)
 
 

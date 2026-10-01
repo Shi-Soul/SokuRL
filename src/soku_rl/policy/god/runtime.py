@@ -1,6 +1,8 @@
 """Resume unchanged Lua strategies at each original _yield frame boundary."""
 import hashlib
 
+from lupa.lua51 import LuaRuntime
+
 from soku_rl.env.encoding import encode_action
 from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
 from soku_rl.env.observation.privileged import decode_privileged
@@ -69,7 +71,6 @@ class GodPolicy(RulePolicy):
 
 class GodActor:
     def __init__(self, policy, seed):
-        from lupa.lua51 import LuaRuntime
         self.policy = policy
         self.lua = LuaRuntime(encoding=None, unpack_returned_tuples=True)
         self.api = ScriptAPI(self.lua, seed)

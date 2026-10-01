@@ -83,6 +83,25 @@ def test_canonical_selection_and_the_only_declared_source_repair():
 
 
 @pytest.mark.skipif(not NAMES, reason="external original community package is not installed")
+def test_play_reuses_the_loaded_package_without_sharing_actor_memory(monkeypatch):
+    from soku_rl.policy.rules.observed_rules import RulePolicy
+    episode = EpisodeConfig(7200, 1, 1, 0, "privileged_state", VISIBILITY, LEGACY_MATCH)
+    rules = {"god": {"package": str(SCRIPTS), "api_source": str(ROOT / "third_party/th123_ai/source/th123_ai/api.ai"),
+                     "script": "character"}}
+    policy = RulePolicy("god", rules, episode, "original")
+
+    def reread(*args):
+        raise AssertionError("play reread the original script package after loading")
+
+    monkeypatch.setattr(ScriptPackage, "__init__", reread)
+    assert policy.fingerprint
+    first, second = policy.spawn_play(37), policy.spawn_play(38)
+    assert first.actor.lua is not second.actor.lua
+    assert first.actor.api is not second.actor.api
+    assert first.actor.policy.package is second.actor.policy.package
+
+
+@pytest.mark.skipif(not NAMES, reason="external original community package is not installed")
 def test_repaired_distance_tables_match_the_standard_script_conditions():
     from lupa.lua51 import LuaRuntime
     package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
