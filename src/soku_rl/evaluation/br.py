@@ -1,0 +1,64 @@
+"""Evaluate one BR on paired seats with the correct character in each seat."""
+from collections import Counter
+from dataclasses import asdict, dataclass
+import hashlib
+import json
+
+from soku_rl.env.match import MatchConfig, PlayerSetup
+from soku_rl.evaluation.benchmark import run_plan
+from soku_rl.evaluation.tournament import Trial, make_plan
+from soku_rl.pomg import Outcome
+
+
+@dataclass(frozen=True, slots=True)
+class MatchupTrial(Trial):
+    match: dict
+    learner_seat: int
+    opponent: str
+
+
+def reset_matchup_trials(env, trials):
+    return env.reset_matchups({s: t.world_seed for s, t in trials.items()},
+                             {s: MatchConfig(**t.match) for s, t in trials.items()})
+
+
+def matchup_plan(strategies, candidate, learner, setups, config, game_identity):
+    if candidate not in strategies or set(setups) != set(strategies) - {candidate}:
+        raise ValueError("each evaluated opponent requires a character setup")
+    learner = PlayerSetup(**learner)
+    plan = []
+    for name, setup in setups.items():
+        opponent = PlayerSetup(**setup)
+        pair = {candidate: strategies[candidate], name: strategies[name]}
+        identity = hashlib.sha256(json.dumps([game_identity, asdict(learner), asdict(opponent)],
+                                             sort_keys=True).encode()).hexdigest()
+        for trial in make_plan(pair, config["world_seeds"], config["policy_seed"], identity):
+            if trial.players[0] == trial.players[1]:
+                continue
+            seat = trial.players.index(candidate)
+            match = MatchConfig(learner, opponent) if seat == 0 else MatchConfig(opponent, learner)
+            plan.append(MatchupTrial(**asdict(trial), match=asdict(match), learner_seat=seat, opponent=name))
+    # Keep identical matchups together to reuse native resets; paired seed
+    # identities remain unchanged even when the two seats run in separate batches.
+    return sorted(plan, key=lambda t: (t.opponent, t.learner_seat, t.world_seed))
+
+
+def benchmark_br(env, strategies, candidate, learner, setups, config, game_identity, directory):
+    plan = matchup_plan(strategies, candidate, learner, setups, config, game_identity)
+    report = run_plan(env, strategies, plan, config, directory, reset_matchup_trials)
+    groups = {}
+    for game in report["games"]:
+        key = (game["opponent"], game["learner_seat"])
+        counts = groups.setdefault(key, Counter(win=0, loss=0, double_ko=0, time_limit=0))
+        outcome = game["outcome"]
+        if outcome in (Outcome.DRAW.value, Outcome.TRUNCATED.value):
+            counts[outcome] += 1
+        elif outcome == (Outcome.P1_WIN.value if game["learner_seat"] == 0 else Outcome.P2_WIN.value):
+            counts["win"] += 1
+        else:
+            counts["loss"] += 1
+    report["by_opponent_and_seat"] = [{"opponent": name, "learner_seat": seat,
+        "opponent_character": setups[name]["character"], "counts": dict(counts),
+        "games": sum(counts.values()), "win_rate": counts["win"] / sum(counts.values())}
+        for (name, seat), counts in sorted(groups.items())]
+    return report

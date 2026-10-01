@@ -1,6 +1,5 @@
 """Train an approximate best response to an explicit frozen strategy mixture."""
-from dataclasses import dataclass, replace
-from pathlib import PurePosixPath
+from dataclasses import dataclass
 import numpy as np
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
 from stable_baselines3.common.logger import configure
@@ -10,8 +9,7 @@ from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
 from soku_rl.rl.matchup_env import MatchupMixtureVecEnv
 from soku_rl.rl.ppo import create_ppo, parameter_hash
 from soku_rl.rl.training import EpisodeRecords
-from soku_rl.env.match import MatchConfig, PlayerSetup
-from soku_rl.env.wrappers.learning import LearningInterface
+from soku_rl.policy.matchups import opponent_interface
 
 
 @dataclass(frozen=True)
@@ -83,14 +81,6 @@ def train_br(env, config, device, seed, directory):
     for entry in population:
         interface = env.interface
         if config["matchups"]["mode"] == "sampled":
-            match = MatchConfig(PlayerSetup(**config["matchups"]["learner"]), PlayerSetup(**entry["setup"]))
-            spec = entry["policy"]
-            if spec["kind"] == "rule" and spec["name"] == "god":
-                script = spec["rules"]["god"]["script"]
-                if script != "character":
-                    stem = PurePosixPath(script).name
-                    if not stem[:2].isdigit() or int(stem[:2]) != match.player_1.character:
-                        raise ValueError("BR god script and opponent character do not match")
-            interface = LearningInterface(replace(interface.episode, match=match), interface.config)
+            interface = opponent_interface(interface, config["matchups"]["learner"], entry)
         opponents.append(OpponentEntry(entry["name"], load_policy(entry["name"], entry["policy"], interface, device)))
     return train_response(env, config, opponents, probabilities, device, seed, directory)

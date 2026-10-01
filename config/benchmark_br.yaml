@@ -1,0 +1,18 @@
+defaults:
+  - train
+  - evaluation: validation
+  - override algorithm: br
+  - override rules: god
+  - override wrappers: superhuman_learning
+  - override track: superhuman
+  - _self_
+
+training_directory: ???
+checkpoint: final.zip
+require_complete: true
+opponent_source: training
+benchmark:
+  world_seeds: ${evaluation.world_seeds}
+  policy_seed: ${evaluation.policy_seed}
+  alpha: 0.05
+output: logs/benchmark/br-${evaluation.name}-${now:%Y%m%d-%H%M%S}

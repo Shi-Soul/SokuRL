@@ -34,6 +34,18 @@ BR 输出根目录的 `final.zip`、`progress.json`、`scalars/progress.csv` 和
 
 加上 `+br_opponents=god_all` 可训练覆盖 20 个角色的原始 27 个神 AI 脚本的均匀混合；不改写其战术或跳过脚本帧。它也可作为逐个脚本 BR 实验的对手配置来源。每局日志保留脚本名、指纹、双方角色、实际座位、种子和基础收益。
 
+单模型 BR 使用专门的角色配对评测入口；旧 `benchmark_training.py` 的固定角色双模型入口不能替代它：
+
+```bash
+bash scripts/linux.sh tools/benchmark_br.py \
+  training_directory=logs/training/br-superhuman-god-all-20261001-v1 \
+  evaluation=validation output=logs/benchmark/br-god-all-validation
+```
+
+默认要求训练成功并读取 `final.zip`，继承原训练的观测/动作/时限和对手列表。每个对手用同一组世界种子完成两种座位，逻辑策略的随机种子在换边后保持不变。`result.json` 的 `by_opponent_and_seat` 分别统计每个脚本、对手角色和学习方座位；胜率分母包含超时，双重击倒与超时分别列出。`plan.json`、动作回放、原生回放、模型哈希和完整源训练配置用于复查。
+
+需要独立于训练分布的全脚本检查时，加上 `opponent_source=config +br_opponents=god_all`。中途模型只可显式使用 `require_complete=false checkpoint=checkpoints/ppo_<步数>_steps.zip`，不能称为最终模型验收。调参使用 validation；配置和模型固定后再用 `evaluation=test`。评测实现通过模拟后端的配对、角色选择、胜负及超时计数测试，真实策略强度仍须等待完整测评。
+
 仍须用独立种子分别统计神 AI 脚本、角色和双方座位的胜负与超时，并比较超参数实验，才能判断配置是否通用。用户当前要求优先推进此项训练，因此先前验收清单中的调参顺序不再限制本项工作，原人机游玩待办继续保留。
 
 ## PPO 更新与时间上限
