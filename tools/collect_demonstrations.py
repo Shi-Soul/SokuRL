@@ -3,6 +3,7 @@ from contextlib import closing
 import hashlib
 import json
 from importlib.metadata import version
+import os
 from pathlib import Path
 import time
 
@@ -32,17 +33,36 @@ def main(cfg):
     learner = config["algorithm"]["matchups"]["learner"]
     population = config["algorithm"]["opponents"]
     excluded = {seed for block in config["excluded"].values() for seed in block["world_seeds"]}
+    prior_plans, prior_worlds = [], set()
+    for name in config["excluded_datasets"]:
+        path = Path(name).resolve(strict=True) / "episodes/plan.json"
+        data = path.read_bytes()
+        prior_worlds.update(row["world_seed"] for row in json.loads(data))
+        prior_plans.append({"path": str(path), "sha256": hashlib.sha256(data).hexdigest()})
+    config["excluded"]["prior_collections"] = {"world_seeds": sorted(prior_worlds)}
+    excluded.update(prior_worlds)
     plan = demonstration_plan(config["collection"], population, config["seed"], excluded)
     teacher = load_policy("teacher", config["teacher"], interface, config["device"])
+    if config["behavior"] == {"kind": "teacher"}:
+        behavior = teacher
+    elif config["behavior"]["kind"] in {"sb3", "sb3_recurrent"}:
+        import torch
+        if str(config["device"]).startswith("cuda") and not torch.cuda.is_available():
+            raise RuntimeError("CUDA requested for learner-controlled collection but unavailable")
+        behavior = load_policy("behavior", config["behavior"], interface, config["device"])
+    else:
+        raise ValueError("collection behavior must be the teacher or an explicit learned checkpoint")
     opponents = [load_policy(entry["name"], entry["policy"],
         opponent_interface(interface, learner, entry), config["device"]) for entry in population]
     destination = Path(config["output"]).resolve()
     destination.mkdir(parents=True, exist_ok=False)
-    (destination / "config.yaml").write_text(OmegaConf.to_yaml(cfg, resolve=True), encoding="utf-8")
+    (destination / "config.yaml").write_text(OmegaConf.to_yaml(OmegaConf.create(config)), encoding="utf-8")
     root = Path(__file__).resolve().parents[1]
     identity = {"source_hashes": {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
         for folder in (root / "src/soku_rl", root / "tools") for p in sorted(folder.rglob("*.py"))},
-        "sampling": "rules only; no neural training or CUDA allocation",
+        "sampling": "teacher controls" if behavior is teacher else "learner controls; teacher only labels",
+        "behavior_fingerprint": behavior.fingerprint, "excluded_plans": prior_plans,
+        "device": config["device"], "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "packages": {name: version(name) for name in ("torch", "numpy", "gymnasium", "lupa")}}
     (destination / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
     report = {"success": False, "method": "rule_demonstrations"}
@@ -54,7 +74,7 @@ def main(cfg):
             (destination / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
             env = LearningVectorEnv(TwoPlayerVectorEnv(backend, config["num_envs"], interface.episode), interface.config)
             report["result"] = collect_demonstrations(env, plan, learner, population, teacher,
-                opponents, destination / "episodes")
+                opponents, behavior, destination / "episodes")
         report["success"] = True
     except BaseException as error:
         report["error"] = repr(error)

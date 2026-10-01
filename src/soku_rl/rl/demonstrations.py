@@ -35,11 +35,12 @@ def demonstration_plan(config, population, seed, excluded_worlds):
             plan.append({"id": len(plan), "split": "validation" if episode < held_out else "train",
                 "learner_seat": seat, "opponent_index": index, "opponent": names[index],
                 "world_seed": world, "teacher_seed": int(rng.integers(0, 0xFFFFFFFF)),
-                "opponent_seed": int(rng.integers(0, 0xFFFFFFFF))})
+                "opponent_seed": int(rng.integers(0, 0xFFFFFFFF)),
+                "behavior_seed": int(rng.integers(0, 0xFFFFFFFF))})
     return [plan[int(index)] for index in rng.permutation(len(plan))]
 
 
-def collect_demonstrations(env, plan, learner, population, teacher, opponents, directory):
+def collect_demonstrations(env, plan, learner, population, teacher, opponents, behavior, directory):
     if env.single_observation_space.shape is None or len(env.single_observation_space.shape) != 1:
         raise ValueError("demonstrations currently require flat numeric observations")
     if (not plan or len(opponents) != len(population)
@@ -50,7 +51,9 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, d
         raise ValueError("invalid or overlapping demonstration plan")
     directory.mkdir(parents=True, exist_ok=False)
     (directory / "plan.json").write_text(json.dumps(plan, indent=2), encoding="utf-8")
-    metadata = {"schema": 1, "complete": False, "teacher_fingerprint": teacher.fingerprint,
+    metadata = {"schema": 2, "complete": False, "teacher_fingerprint": teacher.fingerprint,
+        "control": "teacher" if behavior is teacher else "learner",
+        "behavior_fingerprint": behavior.fingerprint,
         "opponent_fingerprints": {entry["name"]: p.fingerprint
             for entry, p in zip(population, opponents, strict=True)},
         "observation_shape": list(env.single_observation_space.shape),
@@ -67,10 +70,13 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, d
                 other = PlayerSetup(**population[job["opponent_index"]]["setup"])
                 pair = (own, other) if job["learner_seat"] == 0 else (other, own)
                 matches[slot] = MatchConfig(*pair)
-                actors[slot] = (teacher.spawn(job["teacher_seed"]),
-                    opponents[job["opponent_index"]].spawn(job["opponent_seed"]))
+                label_actor = teacher.spawn(job["teacher_seed"])
+                actors[slot] = (label_actor,
+                    opponents[job["opponent_index"]].spawn(job["opponent_seed"]),
+                    label_actor if behavior is teacher else behavior.spawn(job["behavior_seed"]))
             observations, _ = env.reset_matchups({s: j["world_seed"] for s, j in jobs.items()}, matches)
-            pending = {s: {"job": j, "observations": [], "actions": [], "rewards": []} for s, j in jobs.items()}
+            pending = {s: {"job": j, "observations": [], "actions": [], "executed_actions": [],
+                "rewards": []} for s, j in jobs.items()}
             while pending:
                 actions = {}
                 for slot, record in pending.items():
@@ -79,9 +85,13 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, d
                     action = int(actors[slot][0].act(observations[slot][own]))
                     if not env.single_action_space.contains(action):
                         raise ValueError("teacher action is outside the learning vocabulary")
+                    executed = action if behavior is teacher else int(actors[slot][2].act(observations[slot][own]))
+                    if not env.single_action_space.contains(executed):
+                        raise ValueError("behavior action is outside the learning vocabulary")
                     record["observations"].append(PackedObservation.pack(observations[slot][own]))
                     record["actions"].append(action)
-                    actions[slot] = {own: action,
+                    record["executed_actions"].append(executed)
+                    actions[slot] = {own: executed,
                         other: actors[slot][1].act(observations[slot][other])}
                 observations, rewards, terms, truncs, infos = env.step(actions)
                 metadata["successful_env_steps"] += len(actions)
@@ -97,14 +107,17 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, d
                     reward_array = np.asarray(record["rewards"], dtype=np.float32)
                     # Undiscounted finite-horizon targets match the current shared PPO payoff.
                     returns = np.cumsum(reward_array[::-1], dtype=np.float64)[::-1].copy().astype(np.float32)
-                    torch.save({"schema": 1, "observations": record["observations"],
+                    torch.save({"schema": 2, "observations": record["observations"],
                         "actions": np.asarray(record["actions"], dtype=np.int64),
+                        "executed_actions": np.asarray(record["executed_actions"], dtype=np.int64),
                         "rewards": reward_array, "returns": returns}, directory / name)
                     with (directory / name).open("rb") as stream:
                         digest = hashlib.file_digest(stream, "sha256").hexdigest()
                     row = job | {"path": name, "sha256": digest, "steps": len(reward_array),
                         "match": asdict(matches[slot]), "outcome": info["outcome"], "frame": info["frame"],
-                        "return": float(reward_array.sum(dtype=np.float64))}
+                        "return": float(reward_array.sum(dtype=np.float64)),
+                        "teacher_behavior_disagreements": int(np.count_nonzero(
+                            np.asarray(record["actions"]) != np.asarray(record["executed_actions"])))}
                     if "combat_metrics" in info:
                         row["combat_metrics"] = info["combat_metrics"]
                     metadata["episodes"].append(row)

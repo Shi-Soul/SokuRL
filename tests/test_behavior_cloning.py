@@ -21,8 +21,9 @@ def dataset(tmp_path, monkeypatch):
     config = fixture_config("mlp") | {"name": "br"}
     config["ppo"]["learning_rate"] = .02
     plan = demonstration_plan({"episodes_per_seat": 2, "validation_per_seat": 1}, population(), 42, {8, 9})
+    teacher = ConstantPolicy(3)
     manifest = collect_demonstrations(env, plan, {"character": 1, "palette": 0, "deck": 0},
-        population(), ConstantPolicy(3), [ConstantPolicy(8)], tmp_path / "episodes")
+        population(), teacher, [ConstantPolicy(8)], teacher, tmp_path / "episodes")
     path = save_contract(tmp_path, env, config)
     contract = OmegaConf.load(path)
     contract.excluded = {"validation": {"world_seeds": [8]}, "test": {"world_seeds": [9]}}
@@ -73,6 +74,7 @@ def test_change_accuracy_exposes_a_policy_that_only_copies_previous_commands(dat
         path = directory / "episodes" / row["path"]
         data = torch.load(path, weights_only=False)
         data["actions"][:] = [3, 3, 8]
+        data["executed_actions"][:] = data["actions"]
         torch.save(data, path)
         row["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     rewrite_manifest(directory, manifest)
@@ -90,7 +92,7 @@ def test_change_accuracy_exposes_a_policy_that_only_copies_previous_commands(dat
     assert scored["changed_nll"] > scored["nll"]
 
 
-@pytest.mark.parametrize("damage", ["partial", "hash", "return", "reserved", "split", "accounting"])
+@pytest.mark.parametrize("damage", ["partial", "hash", "return", "reserved", "split", "accounting", "execution"])
 def test_loader_rejects_corruption_and_data_leakage(dataset, damage):
     directory, interface, _ = dataset
     manifest = json.loads((directory / "episodes/manifest.json").read_text())
@@ -99,10 +101,13 @@ def test_loader_rejects_corruption_and_data_leakage(dataset, damage):
         manifest["complete"] = False
     elif damage == "hash":
         row["sha256"] = "incorrect"
-    elif damage == "return":
+    elif damage in {"return", "execution"}:
         path = directory / "episodes" / row["path"]
         data = torch.load(path, weights_only=False)
-        data["returns"][0] += 1
+        if damage == "return":
+            data["returns"][0] += 1
+        else:
+            data["executed_actions"][0] += 1
         torch.save(data, path)
         row["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     elif damage == "reserved":
@@ -114,6 +119,24 @@ def test_loader_rejects_corruption_and_data_leakage(dataset, damage):
     rewrite_manifest(directory, manifest)
     with pytest.raises(ValueError):
         load_demonstrations(directory, interface)
+
+
+def test_original_teacher_only_dataset_remains_loadable(dataset):
+    directory, interface, _ = dataset
+    manifest = json.loads((directory / "episodes/manifest.json").read_text())
+    manifest["schema"] = 1
+    del manifest["control"], manifest["behavior_fingerprint"]
+    for row in manifest["episodes"]:
+        path = directory / "episodes" / row["path"]
+        data = torch.load(path, weights_only=False)
+        data["schema"] = 1
+        del data["executed_actions"], row["teacher_behavior_disagreements"]
+        torch.save(data, path)
+        row["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    rewrite_manifest(directory, manifest)
+    samples, loaded, _, _ = load_demonstrations(directory, interface)
+    assert loaded["schema"] == 1
+    assert len(samples["train"]) == len(samples["validation"]) == 6
 
 
 @pytest.mark.parametrize("key,value", [("epochs", 0), ("batch_size", True), ("value_coef", float("nan"))])

@@ -36,9 +36,14 @@ def load_demonstrations(source, interface):
     manifest_bytes = path.read_bytes()
     manifest = json.loads(manifest_bytes)
     if (report["success"] is not True or report["method"] != "rule_demonstrations"
-            or manifest["complete"] is not True or manifest["schema"] != 1
+            or manifest["complete"] is not True or manifest["schema"] not in (1, 2)
             or manifest != report["result"] or manifest["incomplete_episodes"]):
         raise ValueError("demonstrations require a successful complete collection and matching manifest")
+    if manifest["schema"] == 2 and (manifest["control"] not in {"teacher", "learner"}
+            or not isinstance(manifest["behavior_fingerprint"], str) or not manifest["behavior_fingerprint"]
+            or (manifest["control"] == "teacher"
+                and manifest["behavior_fingerprint"] != manifest["teacher_fingerprint"])):
+        raise ValueError("invalid demonstration behavior identity")
     if (manifest["observation_shape"] != list(interface.observation_space.shape)
             or manifest["observation_dtype"] != interface.observation_space.dtype.str
             or manifest["num_actions"] != interface.action_space.n):
@@ -68,12 +73,19 @@ def load_demonstrations(source, interface):
         # These are trusted local shards, verified before decoding custom packed arrays.
         data = torch.load(episode_path, map_location="cpu", weights_only=False)
         count = row["steps"]
-        if (data["schema"] != 1 or count < 1 or len(data["observations"]) != count
+        if (data["schema"] != manifest["schema"] or count < 1 or len(data["observations"]) != count
                 or any(data[key].shape != (count,) for key in ("actions", "rewards", "returns"))
                 or data["actions"].dtype != np.int64 or (data["actions"] < 0).any()
                 or (data["actions"] >= interface.action_space.n).any()
                 or not np.isfinite(data["rewards"]).all() or not np.isfinite(data["returns"]).all()):
             raise ValueError("invalid demonstration sample arrays")
+        if data["schema"] == 2:
+            executed = data["executed_actions"]
+            if (executed.shape != (count,) or executed.dtype != np.int64 or (executed < 0).any()
+                    or (executed >= interface.action_space.n).any()
+                    or np.count_nonzero(executed != data["actions"]) != row["teacher_behavior_disagreements"]
+                    or (manifest["control"] == "teacher" and not np.array_equal(executed, data["actions"]))):
+                raise ValueError("invalid demonstration executed actions or teacher agreement")
         expected = np.cumsum(data["rewards"][::-1], dtype=np.float64)[::-1].astype(np.float32)
         if not np.array_equal(expected, data["returns"]):
             raise ValueError("demonstration return targets do not match episode rewards")

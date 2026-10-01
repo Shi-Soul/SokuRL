@@ -26,6 +26,9 @@ def main(cfg):
     interface = LearningInterface(EpisodeConfig.from_dict(config["episode"]), LearningConfig(**config["wrappers"]))
     source = Path(config["pretraining"]["dataset"]).resolve(strict=True)
     samples, manifest, training, digest = load_demonstrations(source, interface)
+    if (manifest["schema"] == 2 and manifest["control"] == "learner"
+            and config["pretraining"]["value_coef"] != 0):
+        raise ValueError("learner-controlled teacher labels require value_coef=0; returns belong to the behavior policy")
     # Keep the dataset's character and opponent identities for paired BR evaluation.
     for key in ("matchups", "opponents"):
         config["algorithm"][key] = training["algorithm"][key]

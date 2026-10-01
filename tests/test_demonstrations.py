@@ -52,7 +52,8 @@ def test_invalid_split_is_rejected(total, validation):
         demonstration_plan({"episodes_per_seat": total, "validation_per_seat": validation}, population(), 42, set())
 
 
-def test_collection_preserves_own_history_rewards_and_complete_game_boundaries(tmp_path, monkeypatch):
+@pytest.mark.parametrize("learner_controls", [False, True])
+def test_collection_preserves_own_history_rewards_and_complete_game_boundaries(tmp_path, monkeypatch, learner_controls):
     env = fixture_env()
     env = LearningVectorEnv(env.env, LearningConfig("combat", False, 2, 0.))
     backend = env.env.backend
@@ -67,18 +68,24 @@ def test_collection_preserves_own_history_rewards_and_complete_game_boundaries(t
 
     monkeypatch.setattr(env, "step", rewarded)
     plan = demonstration_plan({"episodes_per_seat": 2, "validation_per_seat": 1}, population(), 42, set())
+    teacher = ConstantPolicy(3)
+    behavior = ConstantPolicy(5) if learner_controls else teacher
     try:
         metadata = collect_demonstrations(env, plan, {"character": 1, "palette": 0, "deck": 0},
-            population(), ConstantPolicy(3), [ConstantPolicy(8)], tmp_path / "episodes")
+            population(), teacher, [ConstantPolicy(8)], behavior, tmp_path / "episodes")
         assert metadata["complete"] is True
         assert metadata["successful_env_steps"] == 12
         assert metadata["incomplete_episodes"] == []
         assert len(metadata["episodes"]) == 4
+        assert metadata["control"] == ("learner" if learner_controls else "teacher")
+        assert metadata["behavior_fingerprint"] == behavior.fingerprint
         for row in metadata["episodes"]:
             path = tmp_path / "episodes" / row["path"]
             assert hashlib.sha256(path.read_bytes()).hexdigest() == row["sha256"]
             data = torch.load(path, weights_only=False)
             assert data["actions"].tolist() == [3, 3, 3]
+            assert data["executed_actions"].tolist() == [behavior.value] * 3
+            assert row["teacher_behavior_disagreements"] == (3 if learner_controls else 0)
             sign = 1 if row["learner_seat"] == 0 else -1
             assert data["rewards"].tolist() == [sign] * 3
             assert data["returns"].tolist() == [3 * sign, 2 * sign, sign]
@@ -88,7 +95,7 @@ def test_collection_preserves_own_history_rewards_and_complete_game_boundaries(t
             assert row["return"] == 3 * sign
             # Each saved observation precedes its label; never use the reset state.
             assert np.array_equal(data["observations"][1].unpack()[-8:],
-                np.asarray(decode_action(env.interface.command(3)).inputs, dtype=np.float32))
+                np.asarray(decode_action(env.interface.command(behavior.value)).inputs, dtype=np.float32))
     finally:
         env.close()
 
@@ -108,10 +115,11 @@ def test_failed_collection_does_not_mark_partial_episodes_complete(tmp_path, mon
 
     monkeypatch.setattr(env, "step", failed)
     plan = demonstration_plan({"episodes_per_seat": 2, "validation_per_seat": 1}, population(), 42, set())
+    teacher = ConstantPolicy(3)
     try:
         with pytest.raises(RuntimeError, match="interruption"):
             collect_demonstrations(env, plan, {"character": 1, "palette": 0, "deck": 0},
-                population(), ConstantPolicy(3), [ConstantPolicy(8)], tmp_path / "episodes")
+                population(), teacher, [ConstantPolicy(8)], teacher, tmp_path / "episodes")
         manifest = json.loads((tmp_path / "episodes/manifest.json").read_text())
         assert manifest["complete"] is False
         assert manifest["episodes"] == []

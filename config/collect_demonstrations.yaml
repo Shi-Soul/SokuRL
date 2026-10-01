@@ -18,4 +18,6 @@ teacher:
   kind: rule
   name: god
   rules: ${rules}
+behavior: {kind: teacher}
+excluded_datasets: []
 output: logs/demonstrations/god-${now:%Y%m%d-%H%M%S}
