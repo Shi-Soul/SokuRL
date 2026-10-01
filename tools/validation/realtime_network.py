@@ -39,7 +39,7 @@ def validate(cfg, report):
             os.environ["SOKURL_VS_PAUSE_AT_START"] = "0"
             game = stack.enter_context(closing(NetworkGame({"role": role, "address": "127.0.0.1",
                 "port": cfg.validation.port, "automate_menu": False}, visibility,
-                cfg.runtime.launch_timeout, cfg.validation.render)))
+                cfg.runtime.launch_timeout, cfg.validation.render, True)))
             games.append(game)
             histories.append(stack.enter_context(closing(RealtimeHistory(game.process.pid))))
             channels.append(stack.enter_context(closing(RealtimeInput(game.process.pid, seat))))

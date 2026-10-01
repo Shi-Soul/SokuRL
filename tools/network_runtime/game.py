@@ -23,7 +23,7 @@ from soku_rl.env.observation.visible_state import observe_visible_states
 
 
 class NetworkGame:
-    def __init__(self, settings, visibility, timeout, render):
+    def __init__(self, settings, visibility, timeout, render, realtime):
         if set(settings) != {"role", "address", "port", "automate_menu"}:
             raise ValueError("network settings must specify role, address, port and automate_menu")
         if settings["role"] not in ("host", "join") or type(settings["automate_menu"]) is not bool:
@@ -31,9 +31,9 @@ class NetworkGame:
         ipaddress.IPv4Address(settings["address"])
         if type(settings["port"]) is not int or not 1 <= settings["port"] <= 65535 or timeout <= 0:
             raise ValueError("a valid port and positive launch timeout are required")
-        if type(render) is not bool:
-            raise ValueError("render must be a boolean")
-        self.render = render
+        if type(render) is not bool or type(realtime) is not bool:
+            raise ValueError("render and realtime must be booleans")
+        self.render, self.realtime = render, realtime
         self.settings, self.timeout = settings, timeout
         self.visibility = VisibilityConfig(**visibility)
         self.lifecycle = MatchLifecycle(2)
@@ -58,7 +58,11 @@ class NetworkGame:
     def _launch(self):
         with title_configuration(sokurl.SKIPINTRO_INI, self.timeout):
             env = os.environ.copy()
+            env.pop("SOKURL_REALTIME_SEAT", None)
+            if self.realtime:
+                env["SOKURL_REALTIME_SEAT"] = str(("host", "join").index(self.settings["role"]))
             env.update(SOKURL_VS_BOOTSTRAP="0", SOKURL_UNLIMITED_PACING="0",
+                SOKURL_VS_PAUSE_AT_START="0",
                 SOKURL_HEADLESS_RENDER="0" if self.render else "1", SOKURL_CAPTURE_IMAGES="0",
                 SOKURL_NETWORK_ROLE=self.settings["role"],
                 SOKURL_NETWORK_PORT=str(self.settings["port"]),

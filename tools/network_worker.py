@@ -26,7 +26,7 @@ def main():
                 break
             try:
                 if operation == "start" and game is None:
-                    game = NetworkGame(payload["network"], payload["visibility"], initialization["launch_timeout"], True)
+                    game = NetworkGame(payload["network"], payload["visibility"], initialization["launch_timeout"], True, False)
                     value = {"pid": game.process.pid}
                 elif operation == "poll" and game is not None:
                     value = game.poll()

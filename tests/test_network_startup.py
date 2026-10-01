@@ -42,7 +42,7 @@ def test_mapping_failure_restores_launch_configuration_and_closes_game(tmp_path,
     monkeypatch.setattr(game, "NetworkHistoryClient", Mock(side_effect=OSError("mapping unavailable")))
     with pytest.raises(OSError, match="mapping unavailable"):
         game.NetworkGame({"role": "host", "address": "127.0.0.1", "port": 10800,
-                          "automate_menu": False}, asdict(config().visibility), 2., render)
+                          "automate_menu": False}, asdict(config().visibility), 2., render, False)
     assert path.read_bytes() == original
     kernel.ReleaseMutex.assert_called_once_with(17)
     kernel.CloseHandle.assert_called_once_with(17)
