@@ -410,3 +410,9 @@ GPU 3、131072 步预算。它使用原 10 epochs，已正常完成：32 局训�
 rollout 跨过边界，文件名仍写实际已更新步数，不伪造精确边界。6 项 BR 测试
 通过，其中覆盖首次/续训的保存时机，以及载入检查点后的步数和更新次数。
 旧运行的既有检查点名称与记录不修改。
+
+长期运行已启动于 `logs/training/br-superhuman-reimu-combat-context-long-20261001`。
+首个新检查点为 139264 步，PPO `_n_updates` 从 160 增至 170，Adam 参数状态
+的 step 从 5120 增至 5440；与源 `final.zip` 逐项读取核对，记录和两个检查点
+SHA256 见 `logs/diagnostics/br-combat-continuation-20261001/result.json`。
+此检查确认优化器计数接续，不表示游戏现场或随机数流逐位恢复，也不证明强度。
