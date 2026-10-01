@@ -4,6 +4,10 @@
 `ppo`（原两座位固定对手调度器）、`ippo`、`nfsp`、`psro`。MARL 只组织对手和采样，
 Q 更新全部在 `rl/dqn.py`；没有在各调度器中复制训练算法。
 
+本次实现、三组 GPU 训练调参与独立评测已完成，全量回归 880 项通过。
+选定的更多回放模型在独立 test 中为 **0 胜、64 负**；本预算没有学得能稳定
+击败规则灵梦的策略。以下区分实现验证、训练产物完整性和实际策略强度。
+
 实现基于固定依赖 Stable-Baselines3 2.9.0 的 DQN，保留其向量环境采样、Adam、
 目标网络同步和模型容器。局部更新采用 Double DQN 目标、Huber 损失与梯度裁剪，
 遇到非有限损失或梯度立即失败。在线网络选择下一动作，目标网络评价该动作。
@@ -181,9 +185,24 @@ test”的时序；收益/胜率/更新数排序规则、模型、预算和全�
 `logs/diagnostics/dqn-final-selection-20261001/selection.json` 保存锁定时间、
 模型及训练配置哈希、锁定时原始计划/进度与逐局回放哈希、严格收益下界和 test
 配置。test 的 32 个世界种子与 validation 不重叠。全部 validation 完成后，
-`completed-validation-comparison.json` 再次确认冻结的排序及模型哈希；独立 test
-仍在 `logs/benchmark/br-dqn-selected-final-test-20261001/` 运行，尚未完成验收。
-`test-plan-audit.json` 核对实际 64 局计划与冻结记录，test 不参与后续调参。
+`completed-validation-comparison.json` 再次确认冻结的排序及模型哈希。
+`test-plan-audit.json` 核对实际 64 局计划与冻结记录，test 未参与本轮调参。
+
+独立 test 已在 `logs/benchmark/br-dqn-selected-final-test-20261001/` 成功完成，
+耗时约 2983.4 秒：**0 胜、64 负、0 超时、0 双 KO，收益 -1**，两个座位各
+32 负。全部试验与配对种子、64 份回放、checkpoint 哈希、原版游戏身份、GPU
+执行和私有进程清理均通过核验。审计为
+`logs/diagnostics/dqn-selected-final-test-audit-20261001/result.json`，冻结记录与
+独立性复核为 `logs/diagnostics/dqn-final-selection-20261001/completed-test-verification.json`。
+validation 的两局超时优势没有在此 test 中表现出来，不能宣称策略已经收敛、
+形成稳定胜率或求得全局最优 BR。
+
+交付的训练模型为 `logs/training/br-dqn-reimu-more-replay-20261001/final.zip`，
+训练合同为同目录 `config.yaml`，继续训练所需的经验及哈希清单为
+`final.replay.pkl` / `final.replay.json`。模型 SHA256 为
+`e11199ffa31d0a75b8c8fa215c838602b9b2febcde0937969c706388bcf850f7`。
+其配置是 `rl=dqn_more_replay`；这是本轮固定预算内按既定规则选出的实验产物，
+泛化强度仍有限。
 
 最终评估输出依次为 `logs/benchmark/br-dqn-baseline-final-validation-20261001/`、
 `logs/benchmark/br-dqn-five-step-final-validation-direct-20261001/` 和
