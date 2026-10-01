@@ -1,5 +1,6 @@
 """Exercise shared PPO collection, supervised reservoirs and portable continuation."""
 from dataclasses import asdict
+from pathlib import Path
 import json
 
 import numpy as np
@@ -72,7 +73,7 @@ def test_joint_collection_save_load_and_continue(tmp_path, policy_type):
     env.close()
 
 
-def test_nfsp_averages_share_loader_and_resume_reservoirs(tmp_path):
+def test_nfsp_averages_share_loader_and_resume_reservoirs(tmp_path, monkeypatch):
     torch.set_num_threads(1)
     env = fixture_env()
     config = fixture_config("mlp") | {"name": "nfsp", "iterations": 1,
@@ -86,7 +87,20 @@ def test_nfsp_averages_share_loader_and_resume_reservoirs(tmp_path):
     assert [reservoir["seen"] for reservoir in state["reservoirs"]] == [8, 8]
     config["resume"] = {"kind": "checkpoint", "path": result["resume_checkpoint"],
                         "training_config": contract}
+    from soku_rl.marl import nfsp
+    initialize = nfsp.create_ppo
+    sources = []
+
+    def record_initialization(view, interface, settings, source, device, seed):
+        sources.append(source)
+        return initialize(view, interface, settings, source, device, seed)
+
+    monkeypatch.setattr(nfsp, "create_ppo", record_initialization)
     resumed = train_nfsp(env, config, "cpu", 12, second)
+    assert len(sources) == 4
+    assert all(source["kind"] == "checkpoint" for source in sources)
+    assert {Path(source["path"]).name for source in sources} == {
+        "response-p0.zip", "average-p0.zip", "response-p1.zip", "average-p1.zip"}
     state = torch.load(resumed["resume_checkpoint"], weights_only=False)
     assert state["iteration"] == 2
     assert all(reservoir["seen"] == 16 and len(reservoir["samples"]) == 12 for reservoir in state["reservoirs"])

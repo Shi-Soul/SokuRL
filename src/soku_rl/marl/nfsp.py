@@ -37,14 +37,17 @@ def train_nfsp(env, config, device, seed, directory):
             view = OpponentMixtureVecEnv(env, player,
                 [UniformPolicy("initial", env.single_action_space.n)], [1.], seed + player)
             views.append(view)
-            model, _ = create_ppo(view, env.interface, config, {"kind": "fresh"}, device, seed + player)
-            average_model, _ = create_ppo(view, env.interface, config,
-                {"kind": "fresh"}, device, seed + 2 + player)
+            initialized = []
+            for name, model_seed in (("response", seed + player), ("average", seed + 2 + player)):
+                source = {"kind": "fresh"} if saved is None else {
+                    "kind": "checkpoint",
+                    "path": str(Path(resume["path"]).parent / saved[f"{name}_models"][player]),
+                    "training_config": resume["training_config"],
+                }
+                model, _ = create_ppo(view, env.interface, config, source, device, model_seed)
+                initialized.append(model)
+            model, average_model = initialized
             if saved is not None:
-                root = Path(resume["path"]).parent
-                algorithm = algorithm_type(config["policy_type"])
-                model = algorithm.load(root / saved["response_models"][player], env=view, device=device)
-                average_model = algorithm.load(root / saved["average_models"][player], env=view, device=device)
                 view.rng.bit_generator.state = saved["opponent_rngs"][player]
             model.set_logger(configure(str(directory / f"player_{player}" / "scalars"), ["csv"]))
             models.append(model)
