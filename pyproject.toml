@@ -8,17 +8,17 @@ version = "0.1.0"
 description = "Research project for reinforcement-learning agents in Touhou Hisoutensoku"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = ["psutil==7.2.2"]
+dependencies = ["psutil==7.2.2", "hydra-core>=1.3,<1.4"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 god = ["lupa==2.6"]
 god-validation = ["lupa==2.6", "unicorn==2.1.4"]
-rl = ["gymnasium>=1.0,<2", "numpy>=1.24", "pettingzoo==1.27.0", "PyYAML>=6", "hydra-core>=1.3,<1.4"]
-nfsp = ["stable-baselines3==2.9.0", "torch==2.9.1"]
-ppo = ["stable-baselines3==2.9.0", "sb3-contrib==2.9.0", "torch==2.9.1"]
-psro = ["open-spiel==2.0.2", "stable-baselines3==2.9.0", "cvxpy>=1.4", "matplotlib>=3.7"]
-marl = ["stable-baselines3==2.9.0", "sb3-contrib==2.9.0", "torch==2.9.1", "open-spiel==2.0.2", "cvxpy>=1.4", "matplotlib>=3.7"]
+rl = ["gymnasium>=1.0,<2", "numpy>=1.24", "pettingzoo==1.27.0", "PyYAML>=6"]
+nfsp = ["hisouten-rl[ppo]"]
+ppo = ["hisouten-rl[rl]", "stable-baselines3==2.9.0", "sb3-contrib==2.9.0", "torch==2.9.1"]
+psro = ["hisouten-rl[ppo]", "open-spiel==2.0.2", "cvxpy>=1.4", "matplotlib>=3.7"]
+marl = ["hisouten-rl[psro]"]
 torchrl = ["torchrl==0.10.1", "tensordict==0.10.0"]
 play = ["onnxruntime==1.23.2"]
 export = ["onnx==1.19.1", "onnxruntime==1.23.2"]

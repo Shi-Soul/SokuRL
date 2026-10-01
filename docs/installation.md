@@ -22,15 +22,17 @@
 .\.venv\Scripts\python.exe scripts\00_check_game.py
 ```
 
-基础安装提供启动器所需的 `psutil`，不包含训练库。按任务安装选装依赖：
+基础安装提供启动器所需的 `psutil` 和 Hydra，不包含训练库。按任务安装选装依赖：
 
 | 分组 | 安装内容 |
 | --- | --- |
 | `.[dev,rl]` | 测试、NumPy、Gymnasium、PettingZoo、Hydra |
 | `.[rl,ppo]` | PPO 和循环 PPO |
-| `.[rl,nfsp]` | OpenSpiel NFSP |
+| `.[rl,nfsp]` | 使用共享 PPO 响应的 NFSP；依赖引用 `ppo` 分组 |
 | `.[rl,psro]` | OpenSpiel PSRO 与 PPO 响应训练 |
-| `.[rl,marl]` | TorchRL、BenchMARL 及 OpenSpiel |
+| `.[rl,marl]` | PPO、循环 PPO、IPPO、NFSP、PSRO；依赖引用 `psro` 分组 |
+
+PPO 核心库及版本只在 `ppo` 分组声明。`nfsp` 和 `psro` 引用这组依赖；PPO 分组还包含环境依赖。旧的 `.[rl,ppo]` 等组合继续可用。TorchRL 只在显式选择 `torchrl` 分组时安装，新训练不依赖 BenchMARL。
 
 例如只需检查环境与协议时，安装 `".[dev,rl]"`，然后运行：
 
