@@ -104,7 +104,7 @@ class RealtimeSession:
                 "engine_inputs": tuple(tuple(getattr(player.input, key) for key, _ in player.input._fields_)
                                        for player in (capture.raw.p1, capture.raw.p2))})
             self.seen_battle = True
-        latest = states["ai"]
+        latest = self.games["ai"].clients["state"].read(.2)
         if not latest.in_battle:
             state = latest.match_state
             if state.phase == "disconnected":

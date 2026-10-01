@@ -1,0 +1,35 @@
+defaults:
+  - train
+  - override rules: play
+  - override track: superhuman
+  - _self_
+
+operation: play
+opponent: god:reimu
+checkpoints: {}
+device: cpu
+play:
+  connection: local
+  ai:
+    character: 0
+    render: false
+    mute_audio: true
+  human:
+    seat: 2
+    character: 0
+    automate_menu: false
+    render: true
+    mute_audio: false
+  network:
+    address: 127.0.0.1
+    port: 10811
+session:
+  # Zero keeps playing until the player closes the game or disconnects.
+  matches: 0
+  timeout: 0.0
+runtime:
+  command: [.venv/Scripts/python.exe, -u, tools/play_worker.py]
+output: logs/play/${opponent}-${now:%Y%m%d-%H%M%S}
+hydra:
+  run:
+    dir: logs/hydra/play-${now:%Y%m%d-%H%M%S}
