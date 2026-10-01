@@ -1,0 +1,10 @@
+defaults:
+  - local_match
+  - _self_
+validation:
+  characters: [6, 19]
+  port: 10991
+  frames: 120
+  timeout: 180.0
+  stalled_seconds: 3.0
+output: logs/validation/realtime-network-${now:%Y%m%d-%H%M%S}
