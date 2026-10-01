@@ -6,12 +6,11 @@ import json
 from pathlib import Path
 
 import hydra
+from hydra.core.hydra_config import HydraConfig
 from omegaconf import OmegaConf
 
-from soku_rl.env import EpisodeConfig
 from soku_rl.env.worker_pipe import WorkerConnection
-from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
-from soku_rl.play.loader import load_play_policy
+from soku_rl.play.loader import load_play_policy, play_interface, warm_play_policy
 from soku_rl.play.opponents import opponent_catalog
 from soku_rl.play.realtime_session import run_session
 from soku_rl.play.settings import client_plan
@@ -29,15 +28,24 @@ def main(cfg):
             characters = ",".join(map(str, opponent.characters))
             print(f"{name} | {opponent.label} | {tracks} | AI 角色编号 {characters}")
         return
-    if config["operation"] != "play":
-        raise ValueError("operation must be list or play")
+    if config["operation"] not in {"play", "check"}:
+        raise ValueError("operation must be list, check or play")
     if config["opponent"] not in catalog:
         raise ValueError("unknown opponent; use operation=list to list supported opponents")
     plan = client_plan(config["play"])
     ai = next(client for client in plan if client["realtime"])
     candidate, rules = catalog[config["opponent"]].configuration(config["track"], ai["character"], config["rules"])
-    interface = LearningInterface(EpisodeConfig.from_dict(config["episode"]), LearningConfig(**config["wrappers"]))
+    interface = play_interface(candidate, config["episode"], config["wrappers"], config["track"],
+                               HydraConfig.get().overrides.task)
+    print("正在准备 AI；完成后才建立网络连接。", flush=True)
     policy = load_play_policy(candidate, interface, rules, config["device"], ai["seat"])
+    warmed = warm_play_policy(policy, interface, config["seed"])
+    print(f"AI 准备完成，已预热 {warmed} 个模型。", flush=True)
+    cfg.episode = OmegaConf.create(asdict(interface.episode))
+    cfg.wrappers = OmegaConf.create(asdict(interface.config))
+    if config["operation"] == "check":
+        print(f"配置和策略检查通过：{config['opponent']}；不会启动游戏。", flush=True)
+        return
     output = Path(config["output"]).resolve()
     output.mkdir(parents=True, exist_ok=False)
     OmegaConf.save(cfg, output / "config.yaml", resolve=True)
