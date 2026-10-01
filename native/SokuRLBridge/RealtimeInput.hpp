@@ -23,6 +23,7 @@ static_assert(sizeof(RealtimeInputBlock) == 168, "realtime input layout");
 bool initializeRealtimeInput();
 void closeRealtimeInput();
 bool realtimeInputEnabled();
+LogicalInput advanceRealtimeInput(std::uint32_t match, std::uint32_t round, std::uint64_t frame);
 void prepareRealtimeInput(ControlledInput &inputs, std::uint32_t match,
     std::uint32_t round, std::uint64_t frame);
 }

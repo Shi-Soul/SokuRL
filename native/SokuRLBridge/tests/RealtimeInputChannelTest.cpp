@@ -27,7 +27,16 @@ int main() {
         SetEnvironmentVariableW(L"SOKURL_UNLIMITED_PACING", L"1");
         require(!initializeRealtimeInput(), "realtime cannot accelerate original pacing");
         SetEnvironmentVariableW(L"SOKURL_UNLIMITED_PACING", L"0");
-        for (unsigned seat = 0; seat < 2; ++seat) {
+        SetEnvironmentVariableW(L"SOKURL_NETWORK_ROLE", L"host");
+        require(!initializeRealtimeInput(), "network cannot also bootstrap an offline game");
+        SetEnvironmentVariableW(L"SOKURL_VS_BOOTSTRAP", L"0");
+        SetEnvironmentVariableW(L"SOKURL_NETWORK_ROLE", L"join");
+        require(!initializeRealtimeInput(), "client cannot control the host seat");
+        SetEnvironmentVariableW(L"SOKURL_NETWORK_ROLE", L"invalid");
+        require(!initializeRealtimeInput(), "invalid network role rejected");
+        for (unsigned mode = 0; mode < 2; ++mode) for (unsigned seat = 0; seat < 2; ++seat) {
+            SetEnvironmentVariableW(L"SOKURL_VS_BOOTSTRAP", mode ? L"0" : L"1");
+            SetEnvironmentVariableW(L"SOKURL_NETWORK_ROLE", mode ? (seat ? L"join" : L"host") : nullptr);
             SetEnvironmentVariableW(L"SOKURL_REALTIME_SEAT", seat ? L"1" : L"0");
             require(initializeRealtimeInput(), "create channel");
             wchar_t name[64]{};
@@ -42,7 +51,8 @@ int main() {
             InterlockedIncrement(&block->requestGuard);
             block->command = {1, 7, 2, seat, 0, 0, 3, {0, 0, 1, 0, 0, 0, 0, 0}};
             InterlockedIncrement(&block->requestGuard);
-            prepareRealtimeInput(inputs, 7, 2, 0);
+            if (mode) require(advanceRealtimeInput(7, 2, 0).a == 1, "network intent begins");
+            else prepareRealtimeInput(inputs, 7, 2, 0);
             require(block->acknowledged == 1 && block->appliedSequence == 1 && block->appliedAt == 0,
                 "producer request consumed and applied");
             // Emulate a writer which dies during its next update. The consumer
@@ -50,9 +60,13 @@ int main() {
             InterlockedIncrement(&block->requestGuard);
             block->command.sequence = 2;
             for (unsigned frame = 1; frame < 100000; ++frame) {
-                prepareRealtimeInput(inputs, 7, 2, frame);
-                require(inputs.apply(1-seat, human, true, true, false).a == 42, "human untouched");
-                const auto ai = inputs.apply(seat, human, true, true, false);
+                LogicalInput ai{};
+                if (mode) ai = advanceRealtimeInput(7, 2, frame);
+                else {
+                    prepareRealtimeInput(inputs, 7, 2, frame);
+                    require(inputs.apply(1-seat, human, true, true, false).a == 42, "human untouched");
+                    ai = inputs.apply(seat, human, true, true, false);
+                }
                 require((ai.a != 0) == (frame < 3), "crashed producer expires held input");
                 require(block->acknowledged == 1 && block->frame == frame, "torn command not consumed");
             }

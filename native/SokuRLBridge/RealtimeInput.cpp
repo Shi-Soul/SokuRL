@@ -24,9 +24,16 @@ bool initializeRealtimeInput() {
     // Explicit opt-in; reject malformed configuration instead of choosing a seat.
     if (length != 1 || (value[0] != L'0' && value[0] != L'1') ||
         environmentValue(L"SOKURL_VS_PAUSE_AT_START", 0) ||
-        environmentValue(L"SOKURL_UNLIMITED_PACING", 0) ||
-        !environmentValue(L"SOKURL_VS_BOOTSTRAP", 0)) return false;
+        environmentValue(L"SOKURL_UNLIMITED_PACING", 0)) return false;
     g_seat = value[0] - L'0';
+    wchar_t role[16]{};
+    const auto roleLength = GetEnvironmentVariableW(L"SOKURL_NETWORK_ROLE", role, _countof(role));
+    const bool noRole = !roleLength && GetLastError() == ERROR_ENVVAR_NOT_FOUND;
+    const bool offline = environmentValue(L"SOKURL_VS_BOOTSTRAP", 0) != 0;
+    if (roleLength) {
+        if (offline || roleLength >= _countof(role) ||
+            wcscmp(role, g_seat == 0 ? L"host" : L"join")) return false;
+    } else if (!offline || !noRole) return false;
     wchar_t name[64]{};
     swprintf_s(name, L"Local\\SokuRLRealtimeInput_%lu", GetCurrentProcessId());
     g_handle = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
@@ -57,9 +64,8 @@ void closeRealtimeInput() {
     if (g_handle) { CloseHandle(g_handle); g_handle = nullptr; }
 }
 
-void prepareRealtimeInput(ControlledInput &inputs, std::uint32_t match,
-    std::uint32_t round, std::uint64_t frame) {
-    if (!g_block) return;
+LogicalInput advanceRealtimeInput(std::uint32_t match, std::uint32_t round, std::uint64_t frame) {
+    if (!g_block) return {};
     auto &schedule = *g_schedule;
     schedule.advance(match, round, frame);
     // Exactly one read attempt. A stalled/crashed writer can never stall the game.
@@ -75,8 +81,6 @@ void prepareRealtimeInput(ControlledInput &inputs, std::uint32_t match,
     }
     schedule.advance(match, round, frame);
     const auto held = schedule.input(g_seat, {});
-    inputs.request(g_seat == 0 ? held : LogicalInput{},
-        g_seat == 1 ? held : LogicalInput{}, 1U << g_seat, 1);
     InterlockedIncrement(&g_block->statusGuard);
     MemoryBarrier();
     g_block->acknowledged = g_acknowledged;
@@ -90,5 +94,14 @@ void prepareRealtimeInput(ControlledInput &inputs, std::uint32_t match,
     g_block->held = held;
     MemoryBarrier();
     InterlockedIncrement(&g_block->statusGuard);
+    return held;
+}
+
+void prepareRealtimeInput(ControlledInput &inputs, std::uint32_t match,
+    std::uint32_t round, std::uint64_t frame) {
+    if (!g_block) return;
+    const auto held = advanceRealtimeInput(match, round, frame);
+    inputs.request(g_seat == 0 ? held : LogicalInput{},
+        g_seat == 1 ? held : LogicalInput{}, 1U << g_seat, 1);
 }
 }

@@ -244,7 +244,8 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
                 publishResult(SokuRLBridge::chooseNetworkCharacter(self, g_control->commandArgument));
                 g_lastCommandSeq = sequence;
                 acknowledge(sequence);
-            } else if (!networkSelection && type == SokuRLBridge::CommandType::EstablishCheckpoint) {
+            } else if (!networkSelection && !SokuRLBridge::realtimeInputEnabled() &&
+                type == SokuRLBridge::CommandType::EstablishCheckpoint) {
                 const auto seed = g_control->commandArgument;
                 if (SokuLib::practiceSettings)
                     SokuLib::practiceSettings->state = SokuLib::DUMMY_STATE_2P_CONTROL;

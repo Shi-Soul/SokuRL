@@ -3,6 +3,7 @@
 #include "NetworkInputSchedule.hpp"
 #include "NetworkState.hpp"
 #include "NetworkSelection.hpp"
+#include "RealtimeInput.hpp"
 #include <Scenes.hpp>
 #include <Character.hpp>
 #include <InputManager.hpp>
@@ -110,7 +111,8 @@ void serviceNetworkInput() {
     const bool confirm = command == 3 && request.duration == 1 && keys.a == 1 &&
         keys.horizontalAxis == 0 && keys.verticalAxis == 0 && keys.b == 0 &&
         keys.c == 0 && keys.d == 0 && keys.changeCard == 0 && keys.spellcard == 0;
-    if ((command != 1 && !confirm) || !valid(request.input) || request.duration < 1 || request.duration > 120)
+    if ((realtimeInputEnabled() && command == 1) ||
+        (command != 1 && !confirm) || !valid(request.input) || request.duration < 1 || request.duration > 120)
         result = 3;
     else if (!(confirm ? finished : fighting) || request.match != state.match || request.round != state.raw.roundId)
         result = 4;
@@ -136,7 +138,7 @@ void serviceNetworkInput() {
 void applyNetworkInput(SokuLib::KeymapManager *keyboard) {
     serviceNetworkInput();
     const auto &state = currentNetworkState();
-    if (!g_owned || (state.scene != 13 && state.scene != 14)) return;
+    if (state.scene != 13 && state.scene != 14) return;
     // Loading changes +0x208 from the menu keyboard to the local profile input
     // (0x43F045/0x43F08A). The sender reads this object's +0x62 packed keys at
     // 0x454CA9/0x454CCB; the peer receive objects at +0xF8/+0x174 are separate.
@@ -151,6 +153,15 @@ void applyNetworkInput(SokuLib::KeymapManager *keyboard) {
         *reinterpret_cast<SokuLib::KeymapManager **>(network + 0x208);
     if (keyboard != target)
         return;
+    if (realtimeInputEnabled() && !finished) {
+        const auto held = advanceRealtimeInput(state.match, state.raw.roundId, state.updates);
+        // This is the original sender's local input, before network encoding.
+        // The peer receive objects never pass the target check above.
+        keyboard->input = {held.horizontalAxis, held.verticalAxis, held.a,
+            held.b, held.c, held.d, held.changeCard, held.spellcard};
+        return;
+    }
+    if (!g_owned) return;
     const auto &held = g_schedule.apply(state.updates);
     keyboard->input = {held.horizontalAxis, held.verticalAxis, held.a,
         held.b, held.c, held.d, held.changeCard, held.spellcard};

@@ -1,4 +1,5 @@
 #include "NetworkState.hpp"
+#include "RealtimeObservation.hpp"
 #include <Windows.h>
 #include <cwchar>
 
@@ -130,5 +131,6 @@ void publishNetworkState(const RawFrameState &raw, unsigned leftScore, unsigned 
     captureRenderState(g_state->render);
     endWrite();
     appendHistory();
+    publishRealtimeObservation(raw);
 }
 }
