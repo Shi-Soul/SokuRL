@@ -59,7 +59,7 @@ def run(config):
     return 0
 
 
-@hydra.main(version_base="1.3", config_path="../../config", config_name="game_control")
+@hydra.main(version_base="1.3", config_path=str(Path(__file__).resolve().parents[2] / "config"), config_name="game_control")
 def main(config):
     result = run(config)
     if result:
