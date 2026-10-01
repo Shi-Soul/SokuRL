@@ -4,7 +4,7 @@ import hashlib
 from soku_rl.env.encoding import encode_action
 from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
 from soku_rl.env.observation.privileged import decode_privileged
-from soku_rl.policy.base import RulePolicy
+from soku_rl.policy.base import PlayActor, RulePolicy
 from .api import ScriptAPI
 from .package import ScriptPackage
 
@@ -61,6 +61,10 @@ class GodPolicy(RulePolicy):
 
     def spawn(self, seed):
         return GodActor(self, seed)
+
+    def spawn_play(self, seed):
+        # The original host reloads on battle scene entry, not on each knockout.
+        return PlayActor(self.spawn(seed), False)
 
 
 class GodActor:

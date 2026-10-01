@@ -10,6 +10,7 @@ from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.encoding import AGENTS
 from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningParallelEnv
 from soku_rl.play.live_policy import LivePolicy
+from soku_rl.policy.base import RulePolicy
 from soku_rl.pomg import Outcome, TimeStep
 from soku_rl.env.observation.visible_state import StateObservation, STATE_FEATURES
 
@@ -40,7 +41,7 @@ class PublicBackend:
         pass
 
 
-class RecordingPolicy:
+class RecordingPolicy(RulePolicy):
     def __init__(self):
         self.episodes = []
 

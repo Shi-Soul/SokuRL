@@ -42,6 +42,7 @@ def test_original_strategy_matches_offline_with_absolute_live_frame_numbers(seat
                 history.reset(frame, pair)
                 features.reset_agent(live.agent, history.observations()[live.agent])
                 live.start_round(origin, absolute, seed)
+                assert live.reset_each_round is False
                 with pytest.raises(RuntimeError, match="cannot skip"):
                     live.skip_decision()
             else:

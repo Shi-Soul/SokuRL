@@ -35,7 +35,7 @@ class LivePolicy:
         self.origin = self.next_decision = frame
         self.history.reset(frame, self._round_observations(frame, observations))
         self.features.reset_agent(self.agent, self.history.observations()[self.agent])
-        self.actor = self.policy.spawn(seed)
+        self.actor = self.policy.spawn_play(seed)
         self.active = True
 
     def _round_observations(self, frame, observations):
@@ -48,6 +48,12 @@ class LivePolicy:
         # the engine's battle clock and every original script input unchanged.
         return tuple(replace(value, world=value.world | {"frame": frame - self.origin})
                      for value in observations)
+
+    @property
+    def reset_each_round(self):
+        if not self.active:
+            raise RuntimeError("start a policy before reading its memory boundary")
+        return self.actor.reset_each_round
 
     @property
     def decision_due(self):

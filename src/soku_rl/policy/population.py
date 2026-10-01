@@ -66,10 +66,18 @@ class MixturePolicy(Policy):
         self.probabilities = weights / weights.sum()
         self.probabilities.setflags(write=False)
 
-    def spawn(self, seed):
+    def _select(self, seed):
         rng = np.random.default_rng(seed)
         member = self.members[int(rng.choice(len(self.members), p=self.probabilities))]
-        return member.spawn(int(rng.integers(0, 0xFFFFFFFF)))
+        return member, int(rng.integers(0, 0xFFFFFFFF))
+
+    def spawn(self, seed):
+        member, actor_seed = self._select(seed)
+        return member.spawn(actor_seed)
+
+    def spawn_play(self, seed):
+        member, actor_seed = self._select(seed)
+        return member.spawn_play(actor_seed)
 
 
 @dataclass(frozen=True)

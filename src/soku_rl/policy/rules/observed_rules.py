@@ -14,7 +14,7 @@ from soku_rl.env.encoding import FRAME_FEATURES, FIGHTER_SCALES, encode_action
 from soku_rl.policy.rules.strategies import strategy_from_config
 from soku_rl.policy.rules.tactical_observation import screen_view
 from soku_rl.env.observation.visible_state import STATE_FEATURES
-from soku_rl.policy.base import RulePolicy as RulePolicyBase
+from soku_rl.policy.base import PlayActor, RulePolicy as RulePolicyBase
 
 
 def decode_diagnostic(values, horizon):
@@ -76,6 +76,11 @@ class RulePolicy(RulePolicyBase):
         config = self.rules["god"]
         return GodPolicy(self.name, ScriptPackage(config["package"], config["api_source"]),
                          config["script"], self.episode)
+
+    def spawn_play(self, seed):
+        if self.name == "god":
+            return self.god_policy().spawn_play(seed)
+        return super().spawn_play(seed)
 
 
 @dataclass
@@ -223,6 +228,10 @@ class LearningRulePolicy(RulePolicyBase):
 
     def spawn(self, seed):
         return LearningRuleEpisode(self.policy.spawn(seed), self.interface)
+
+    def spawn_play(self, seed):
+        instance = self.policy.spawn_play(seed)
+        return PlayActor(LearningRuleEpisode(instance.actor, self.interface), instance.reset_each_round)
 
 
 @dataclass
