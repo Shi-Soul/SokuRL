@@ -169,6 +169,17 @@ DLL、资源、观测/动作/对手/种子/依赖身份。恢复段包含日志�
 这两个配置均未显示出战胜规则灵梦的能力。更多回放组最终 validation、模型
 选型与独立 test 仍未完成。
 
+随后按不可能逆转的排序锁定 `rl=dqn_more_replay`：锁定时该组已完成 49 局，
+47 负、2 超时，即使剩余 15 局全部失利，最终 64 局平均收益仍至少为 -0.96875，
+严格高于两份已完成候选的 -1。因此 test 可以与剩余 validation 并行，不需要
+等待已经无法改变排序的对局。此处明确调整原先“全部 validation 结束再启动
+test”的时序；收益/胜率/更新数排序规则、模型、预算和全部 64 局审计要求不变。
+选择不可再由 test 结果改变，超时优势也不等于胜利。
+`logs/diagnostics/dqn-final-selection-20261001/selection.json` 保存锁定时间、
+模型及训练配置哈希、锁定时原始计划/进度与逐局回放哈希、严格收益下界和 test
+配置。test 的 32 个世界种子与 validation 不重叠；最终交付仍需两项完整评测
+结束并审计通过。
+
 最终评估输出依次为 `logs/benchmark/br-dqn-baseline-final-validation-20261001/`、
 `logs/benchmark/br-dqn-five-step-final-validation-direct-20261001/` 和
 `logs/benchmark/br-dqn-more-replay-final-validation-20261001/`。独立启动示例：
