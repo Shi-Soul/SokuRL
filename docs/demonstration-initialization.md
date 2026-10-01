@@ -78,3 +78,41 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=3 \
 熵系数 0.001、target_kl 0.015，其余沿用原共享 PPO。
 这些是降低遗忘风险的待验证设置，不是已证明最优的参数；从零自适应实验继续作为原配置对照。
 后续 BR 仍按长期胜率调整 uniform / 神 AI 比例，且会独立评估完整神 AI。
+
+## 真实采样记录
+
+`logs/demonstrations/god-marisa-reimu-20261001` 成功完成全部 16 局、100869 环境步，
+耗时 1283.49 秒；12 局训练集 72069 帧，4 局验证集 28800 帧。
+教师 6 胜、1 负、9 次超时，平均自身 HP 下降 6715.69、对手 8832.63，
+自身符卡动作进入 0.1875 次/局、对手 0。
+数据加载器已在真实 GPU 预训练启动前核对整局 split、保留种子、每片哈希和回报。
+采样私有 session `12c8dbdb3a654cff8f4c737d3692d48f` 的 worker/stop/wait 均退出 0，
+prefix/game 均一次清理成功。
+
+新增教师换指令帧指标的 11 项测试通过，日志 `.dev/pytest-behavior-cloning-changes-20261001.log`。
+`logs/pretraining/god-marisa-reimu-bc-20261001` 在 GPU 6 成功完成 20 轮、5640 次监督更新，
+拟合入口耗时 133.71 秒；PPO 环境步数仍为 0，示范采样成本另计 100869 步。
+最佳检查点为第 20 轮，验证 NLL 从 6.3562 降到 0.3446，准确率 92.23%、熵 0.3409。
+训练集最常见动作是 256（中立），直接输出该动作的验证准确率 37.57%；
+复制上一条教师指令的验证基线为 87.56%。3583 个教师换指令帧上，模型准确率为 41.11%。
+验证价值 MSE 为 0.3381，高于初始 0.1848；四局验证都是超时，不能据此声称价值初始化有效。
+模型参数哈希已改变，原始结果保留训练和验证的完整标签频次。
+
+已启动初始化模型的配对完整神 AI 评估，以及保守配置的 131072 步自适应 PPO：
+
+```bash
+bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=6 rl.cpu_threads=1 \
+  training_directory=logs/pretraining/god-marisa-reimu-bc-20261001 checkpoint=best.zip \
+  'benchmark.world_seeds=[918042743,1897077702]' num_envs=4 \
+  output=logs/benchmark/br-reimu-bc-zero-shot-20261001
+
+bash scripts/linux.sh tools/train.py linux.cuda_devices=6 algorithm=br \
+  rl=ppo_demonstration_transfer rl.cpu_threads=1 rules=god \
+  wrappers=superhuman_learning track=superhuman_combat \
+  +br_opponents=god_target algorithm.target.character=0 +curriculum=adaptive_noise \
+  num_envs=4 algorithm.timesteps=131072 \
+  '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-bc-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-bc-20261001/config.yaml}' \
+  output=logs/training/br-superhuman-reimu-bc-adaptive-20261001
+```
+
+从零训练对照仍在 GPU 3；两项新任务尚无完整对局效果结论。
