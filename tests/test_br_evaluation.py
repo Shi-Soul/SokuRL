@@ -59,6 +59,32 @@ def test_explicit_screening_panel_keeps_declared_names_and_order():
             select_opponents(population, names)
 
 
+def test_completed_game_survives_failure_of_another_slot(tmp_path):
+    class FailingGame(EvaluationGame):
+        def step(self, actions):
+            if 0 not in actions:
+                saved = json.loads((tmp_path / "progress.json").read_text())
+                assert len(saved["games"]) == 1
+                assert saved["summary"]["missing_games"] == 7
+                raise RuntimeError("remaining slot failed")
+            observations, rewards, terms, truncs, infos = super().step(actions)
+            for slot, pair in terms.items():
+                if slot != 0:
+                    for agent in pair:
+                        pair[agent] = False
+            return observations, rewards, terms, truncs, infos
+
+    strategies, learner, setups, config = benchmark_inputs()
+    with pytest.raises(RuntimeError, match="remaining slot failed"):
+        benchmark_br(FailingGame("p1_win"), strategies, "learned", learner,
+                     setups, config, "game", tmp_path)
+    record, = json.loads((tmp_path / "progress.json").read_text())["games"]
+    assert (tmp_path / record["replay"]).is_file()
+    failures = json.loads((tmp_path / "failure.json").read_text())["active_trials"]
+    assert len(failures) == 7
+    assert record["trial_id"] not in {trial["trial_id"] for trial in failures}
+
+
 @pytest.mark.parametrize("outcome", ["p1_win", "p2_win", "double_ko", "time_limit"])
 def test_benchmark_counts_seats_and_censoring_without_confusing_timeouts(tmp_path, outcome):
     strategies, learner, setups, config = benchmark_inputs()

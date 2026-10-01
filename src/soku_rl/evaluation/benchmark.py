@@ -73,7 +73,7 @@ def run_plan(env, strategies, plan, config, directory, reset_batch):
                 records.append(asdict(trial) | {"status": "complete", "outcome": info["outcome"],
                     "frames": info["frame"], "returns": returns[slot].tolist(), "replay": name})
                 del obs[slot]
-        progress = {"games": records, "seconds": time.perf_counter() - started,
-                    "summary": summarize(plan, records, config["alpha"])}
-        (directory / "progress.json").write_text(json.dumps(progress, indent=2), encoding="utf-8")
+                progress = {"games": records, "seconds": time.perf_counter() - started,
+                            "summary": summarize(plan, records, config["alpha"])}
+                (directory / "progress.json").write_text(json.dumps(progress, indent=2), encoding="utf-8")
     return progress
