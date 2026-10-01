@@ -79,6 +79,7 @@ def load_demonstrations(source, interface):
                 or (data["actions"] >= interface.action_space.n).any()
                 or not np.isfinite(data["rewards"]).all() or not np.isfinite(data["returns"]).all()):
             raise ValueError("invalid demonstration sample arrays")
+        executed = data["actions"]
         if data["schema"] == 2:
             executed = data["executed_actions"]
             if (executed.shape != (count,) or executed.dtype != np.int64 or (executed < 0).any()
@@ -94,7 +95,9 @@ def load_demonstrations(source, interface):
                     or observation.dtype != interface.observation_space.dtype.str):
                 raise ValueError("invalid packed demonstration observation")
         # -1 marks the first frame: never count a transition across episode boundaries.
-        changes = np.concatenate(([-1], np.not_equal(data["actions"][1:], data["actions"][:-1]).astype(int)))
+        # On learner trajectories the copy baseline uses the actual preceding input,
+        # not an unexecuted teacher label that would be unavailable to the learner.
+        changes = np.concatenate(([-1], np.not_equal(data["actions"][1:], executed[:-1]).astype(int)))
         samples[row["split"]].extend(zip(data["observations"], data["actions"], data["returns"], changes, strict=True))
         seats[row["split"]].add(row["learner_seat"])
     if any(value != {0, 1} for value in seats.values()):
@@ -148,7 +151,9 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
             or algorithm["ppo"]["gamma"] != 1. or any(not rows for rows in samples.values())):
         raise ValueError("pretraining requires nonempty numeric samples, feedforward PPO and gamma=1")
     view = ObservationContractEnv(interface)
-    model, _ = create_ppo(view, interface, algorithm, {"kind": "fresh"}, device, seed)
+    if config["initial_policy"]["kind"] not in {"fresh", "weights"}:
+        raise ValueError("supervised initialization requires fresh or weights with a fresh optimizer")
+    model, source = create_ppo(view, interface, algorithm, config["initial_policy"], device, seed)
     initial = parameter_hash(model.policy)
     rng = np.random.default_rng(seed)
     label_counts = {split: np.bincount([int(row[1]) for row in rows],
@@ -204,6 +209,7 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
     model.save(directory / "final.zip")
     return {"checkpoint": str(directory / "best.zip"), "final_checkpoint": str(directory / "final.zip"),
         "ppo_steps": model.num_timesteps, "supervised_updates": updates, "best_epoch": best_epoch,
+        "initialization": source,
         "initial_policy_hash": initial, "final_policy_hash": final,
         "constant_action_baseline": baseline,
         "copy_previous_action_baseline": repeat_baselines,

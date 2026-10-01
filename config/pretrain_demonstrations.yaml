@@ -4,6 +4,8 @@ defaults:
 
 pretraining:
   dataset: ???
+  additional_datasets: []
+  initial_policy: {kind: fresh}
   epochs: 20
   batch_size: 256
   value_coef: 0.5

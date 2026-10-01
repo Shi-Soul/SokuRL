@@ -151,3 +151,28 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=6 algorithm=br \
 
 这是学习者状态标注基础设施，尚未证明教师脚本的内部计划在该轨迹上仍提供有效建议，
 也尚未证明聚合后能提高胜率。应保留原示范并分别检查独立真实对局。
+
+`pretraining.additional_datasets` 将新轨迹与原示范聚合，保持每个数据集原先整局划分。
+加载时拒绝重复路径、跨集重复世界（包括训练/验证重叠）、不同教师/角色/对手分布及正式评估种子约定。
+各数据集的 manifest/config 哈希、控制者、帧数和 split 世界种子分别保存在身份文件中；
+示范环境步数累计计账，不重复记作 PPO 采样。
+`pretraining.initial_policy` 可为 fresh 或 weights，复用共享 PPO 初始化并重置监督优化器。
+学习者轨迹上的复制基线使用上一条实际输入，而非上一条未执行的教师标签；
+变化帧指标表示当前教师建议与上一条实际输入不同。
+
+27 项采样、聚合和初始化测试通过，日志 `.dev/pytest-demonstration-aggregation-20261001.log`；
+其中使用人工构造的跨集验证泄漏，确认即使每个数据集单独合法，合并也必须拒绝。
+真实学习者状态采样输出为 `logs/demonstrations/learner-marisa-reimu-20261001`，尚在进行。
+完成后可执行：
+
+```bash
+bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=6 rl.cpu_threads=1 \
+  pretraining.dataset=logs/demonstrations/god-marisa-reimu-20261001 \
+  'pretraining.additional_datasets=[logs/demonstrations/learner-marisa-reimu-20261001]' \
+  pretraining.value_coef=0 \
+  '++pretraining.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-bc-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-bc-20261001/config.yaml}' \
+  output=logs/pretraining/god-marisa-reimu-aggregate-20261001
+```
+
+原示范初始化的 PPO 已到 65536 步，课程内 8 局全负，完整神 AI 配对评估已另行启动。
+保守更新的稳定性仍没有转化成已验证的策略强度。

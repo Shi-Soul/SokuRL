@@ -52,7 +52,7 @@ def test_fit_uses_shared_ppo_and_weights_reload_with_fresh_optimizer(dataset):
     output = directory / "fit"
     output.mkdir()
     result = fit_demonstrations(interface, config, samples,
-        {"epochs": 20, "batch_size": 4, "value_coef": .5}, "cpu", 7, output)
+        {"epochs": 20, "batch_size": 4, "value_coef": .5, "initial_policy": {"kind": "fresh"}}, "cpu", 7, output)
     assert result["ppo_steps"] == 0 and result["supervised_updates"] == 40
     assert result["best_epoch"] > 0
     assert result["history"][-1]["validation"]["nll"] < result["history"][0]["validation"]["nll"] * .5
@@ -65,6 +65,14 @@ def test_fit_uses_shared_ppo_and_weights_reload_with_fresh_optimizer(dataset):
     assert parameter_hash(model.policy) == result["final_policy_hash"]
     assert not model.policy.optimizer.state
     assert model.num_timesteps == source["source_steps"] == 0
+    continued = directory / "continued"
+    continued.mkdir()
+    transfer = fit_demonstrations(interface, config, samples, {"epochs": 1, "batch_size": 4,
+        "value_coef": 0., "initial_policy": {"kind": "weights", "path": result["final_checkpoint"],
+        "training_config": str(directory / "config.yaml")}}, "cpu", 17, continued)
+    assert transfer["initial_policy_hash"] == result["final_policy_hash"]
+    assert transfer["initialization"]["kind"] == "weights"
+    assert transfer["ppo_steps"] == 0 and transfer["supervised_updates"] == 2
 
 
 def test_change_accuracy_exposes_a_policy_that_only_copies_previous_commands(dataset):
