@@ -1,0 +1,12 @@
+defaults:
+  - collect_demonstrations
+  - _self_
+
+pretraining:
+  dataset: ???
+  epochs: 20
+  batch_size: 256
+  value_coef: 0.5
+runtime:
+  command: []
+output: logs/pretraining/god-bc-${now:%Y%m%d-%H%M%S}

@@ -32,4 +32,27 @@ bash scripts/linux.sh tools/collect_demonstrations.py linux.cuda_devices=3 \
 
 13 项采样/选角测试通过，日志 `.dev/pytest-demonstrations-20261001-v2.log`，
 覆盖双座位动作历史归属、动作前观测、回报、整局分割、哈希和中断记账。
-这不代替真实采样或学习策略胜率验证。监督训练入口与真实学习效果仍待完成。
+这不代替真实采样或学习策略胜率验证。
+
+## 共享模型的监督初始化
+
+`tools/pretrain_demonstrations.py` 通过 RL 层原有 `create_ppo` 创建模型；
+整局训练集用于动作交叉熵和有限时域回报回归，整局验证集只用于选择动作负对数似然最好的检查点。
+每轮记录验证动作准确率、熵、负对数似然和价值均方误差。
+输入压缩观测沿用 PPO 的无损稀疏传输，在设备上恢复完整 float32 数组。
+不启动游戏进程，不把监督更新数记成 PPO 环境步数。
+
+```bash
+bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=3 \
+  rl.cpu_threads=1 pretraining.dataset=logs/demonstrations/god-marisa-reimu-20261001 \
+  output=logs/pretraining/god-marisa-reimu-bc-20261001
+```
+
+入口拒绝未完成或失败的数据集、哈希不符、与预定 split 不同、重复世界或与保留评估种子重叠的样本。
+逐局回报重新计算并核对。产物保留数据 manifest/config 哈希、源码和依赖身份；
+检查点为原有 PPO 格式，`best.zip` 用于独立真实对局评估。
+后续 BR 通过 `algorithm.initial_policy.kind=weights` 导入参数，重新初始化 PPO 优化器；
+课程仍从自适应配置开始，不延续监督优化器的状态。
+
+21 项采样、监督初始化和共享 PPO 测试通过，日志 `.dev/pytest-behavior-cloning-20261001.log`。
+监督拟合真实效果和后续 PPO 保持能力仍待独立对局验证；动作准确率不能替代游戏胜率。
