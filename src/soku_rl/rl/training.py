@@ -6,6 +6,7 @@ import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
 from soku_rl.policy.loader import load_policy
+from soku_rl.env.combat_metrics import summarize_combat
 
 
 from soku_rl.rl.ppo import initialize_ppo, parameter_hash
@@ -31,6 +32,8 @@ class EpisodeRecords(BaseCallback):
             if done:
                 self.records.append({key: info[key] for key in (
                     "episode", "frame", "outcome", "decision_frames", "latency_frames", "training_context")})
+                if "combat_metrics" in info:
+                    self.records[-1]["combat_metrics"] = info["combat_metrics"]
         return True
 
     def _on_rollout_end(self):
@@ -39,7 +42,9 @@ class EpisodeRecords(BaseCallback):
             "rollout_seconds": self.rollout_finished - self.rollout_started})
         self.pending_update = True
         (self.directory / "progress.json").write_text(json.dumps({
-            "steps": self.num_timesteps, "episodes": self.records}, indent=2), encoding="utf-8")
+            "steps": self.num_timesteps, "episodes": self.records,
+            "combat_summary": summarize_combat([record["combat_metrics"] for record in self.records
+                if "combat_metrics" in record])}, indent=2), encoding="utf-8")
         self._write_timings("updating")
 
     def _finish_update(self):

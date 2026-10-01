@@ -13,6 +13,7 @@ from soku_rl.env.observation_history import ObservationHistory
 from soku_rl.env.match import LEGACY_MATCH, MatchConfig
 from soku_rl.env.observation.privileged import encode_privileged
 from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
+from soku_rl.env.combat_metrics import CombatMetrics
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,7 @@ class Episode:
         self.ended = True
         self.frame = 0
         self.number = 0
+        self.combat_metrics = CombatMetrics()
         self.controls = DelayedControls(ControlConfig(config.decision_frames, config.latency_frames))
 
     def reset(self, time_step, seed):
@@ -94,6 +96,7 @@ class Episode:
         self.number += 1
         self.frame = 0
         self.controls.reset()
+        self.combat_metrics.reset(time_step.observations[0])
         self.ready, self.ended = True, False
         self.observation_history.reset(time_step.frame, time_step.observations)
         return self.observation_history.observations(), self._infos(time_step, "ongoing")
@@ -120,6 +123,7 @@ class Episode:
         if time_step.frame != self.frame + 1:
             raise RuntimeError("backend must advance exactly one frame")
         self.frame = time_step.frame
+        self.combat_metrics.step(time_step.observations[0])
         self.observation_history.append(time_step.frame, time_step.observations)
         terminated = time_step.terminated
         truncated = not terminated and (time_step.truncated or self.frame >= self.config.max_frames)
@@ -133,8 +137,9 @@ class Episode:
         return {agent: {"frame": time_step.frame, "episode": self.number,
                         "outcome": outcome,
                         "decision_frames": self.config.decision_frames,
-                        "latency_frames": self.config.latency_frames}
-                for agent in AGENTS}
+                        "latency_frames": self.config.latency_frames,
+                        "combat_metrics": self.combat_metrics.snapshot(seat)}
+                for seat, agent in enumerate(AGENTS)}
 
 
 class HisoutenParallelEnv(ParallelEnv):

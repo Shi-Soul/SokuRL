@@ -72,6 +72,9 @@ def run_plan(env, strategies, plan, config, directory, reset_batch):
                 info = infos[slot][AGENTS[0]]
                 records.append(asdict(trial) | {"status": "complete", "outcome": info["outcome"],
                     "frames": info["frame"], "returns": returns[slot].tolist(), "replay": name})
+                if "combat_metrics" in info:
+                    records[-1]["combat_metrics_by_seat"] = [
+                        infos[slot][agent]["combat_metrics"] for agent in AGENTS]
                 del obs[slot]
                 progress = {"games": records, "seconds": time.perf_counter() - started,
                             "summary": summarize(plan, records, config["alpha"])}
