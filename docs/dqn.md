@@ -63,3 +63,18 @@ RTX 3080 Ti，Torch 2.9.1+cu128 和 Wine 工作进程依赖可用。第一轮 DQ
 测试后，DQN 专项 21 passed（`logs/pytest-dqn-extra.txt`），相关合并回归
 47 passed（`logs/pytest-dqn-final-core.txt`）。跳过项沿用 Windows/CRT/外部回放
 限制。尚未完成真实 DQN 训练或策略强度验收。
+
+2026-10-01：实现提交 `20e362a` 已推送到远端 `feat/dqn-marl`。真实基线启动于
+`logs/training/br-dqn-reimu-baseline-20261001`：GPU 1、8 环境、2 个 Torch CPU
+线程、seed 1732、262144 转移预算。配置、完整源码哈希及运行 DLL 身份保存在该
+目录，stdout 为 `logs/train-dqn-baseline-20261001.txt`。启动时已确认独立 Wine
+工作进程及 8 个该会话的游戏进程；尚不能据此宣称已完成训练。
+
+另有终局 bandit 学习检查，固定种子下不仅权重变化，而且学得的三个 Q 值接近
+已知的 [-1, 1, -1]（误差不超过 0.12），选出正确动作。该检查及 NFSP 旧配置
+兼容调整后的恢复回归共 2 passed，日志 `logs/pytest-dqn-learning.txt`。
+
+预先选定的单因素调参候选是 `rl=dqn_five_step`：只将三步回报改为五步，保持
+网络、学习率、采样预算、种子、座位和神灵梦对手一致。先核对基线真实更新的显存
+及吞吐，再安排并行运行；不因候选存在就认为它更强。后续仍需完成两组训练、
+同种子双座位 validation 对照、选定模型的独立 test，以及真实检查点续训验证。

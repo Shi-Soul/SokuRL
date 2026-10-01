@@ -263,3 +263,35 @@ def test_image_and_command_history_dqn_updates(tmp_path):
     finally:
         view.close()
         env.close()
+
+
+def test_dqn_learns_terminal_rewards_instead_of_only_changing_weights():
+    import gymnasium as gym
+    from types import SimpleNamespace
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    class Bandit(gym.Env):
+        observation_space = spaces.Box(-1, 1, (4,), dtype=np.float32)
+        action_space = spaces.Discrete(3)
+
+        def reset(self, **kwargs):
+            super().reset(**kwargs)
+            return np.zeros(4, dtype=np.float32), {}
+
+        def step(self, action):
+            return np.zeros(4, dtype=np.float32), (1. if action == 1 else -1.), True, False, {}
+
+    torch.set_num_threads(1)
+    env = DummyVecEnv([Bandit] * 4)
+    interface = SimpleNamespace(config=SimpleNamespace(health_potential_scale=0.))
+    config = dqn_config()
+    config["dqn"].update(buffer_size=512, batch_size=32, train_freq=4, gradient_steps=8,
+                         exploration_decay_steps=512, target_update_interval=64)
+    try:
+        model, _ = create_learner(env, interface, config, {"kind": "fresh"}, "cpu", 71)
+        model.learn(1024)
+        values = model.q_net(torch.zeros(1, 4)).detach().numpy()[0]
+        assert values.argmax() == 1
+        np.testing.assert_allclose(values, [-1., 1., -1.], atol=.12)
+    finally:
+        env.close()
