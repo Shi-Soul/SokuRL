@@ -44,3 +44,19 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=0 algorithm=br \
 但小批量推断更慢，不能将局部大批量前向收益当作 PPO 整体加速。
 原型源代码、旧编码器、检查点与数据身份及时间结果保留于
 `logs/diagnostics/active-object-encoding-20261001`，不把未采用的原型计为训练优化成果。
+
+两组已从提交 `b238e3a` 在 GPU 0/7 启动，输出分别为
+`br-reimu-numeric-rehearsal-gae95-adaptive-20261001` 和
+`br-reimu-numeric-rehearsal-gae995-adaptive-20261001`。
+保存配置逐字段核对，除 GAE 与输出目录外相同；源码、依赖和初始化模型 SHA256 也相同。
+配置检查日志 `.dev/audit-recurrent-credit-config-20261001-v2.log`，
+运行产物检查 `.dev/audit-recurrent-credit-launch-20261001.log`。
+
+首轮各完成 1024 个决策、2 个 PPO epoch（KL 提前停止），以及一次 256 帧复习，
+每组重放 14788 帧前缀。两组采样分别耗时 9.01/8.64 秒，更新 7.35/6.92 秒，
+其中复习 1.33/1.31 秒；首轮包含初始化开销，不能代表稳态吞吐。
+已检查参数确实改变、优化器有状态、检查点/课程 sidecar 哈希一致、监督计数一致，
+且此时无完整对局，课程累计局数为 0、uniform=0.9，没有虚构胜率。
+证据在 `.dev/audit-recurrent-credit-first-update-20261001.log` 和
+`logs/diagnostics/recurrent-credit-first-update-20261001/summary.json`。
+这只确认新配置正常训练，尚不是完整神 AI 测评结果。
