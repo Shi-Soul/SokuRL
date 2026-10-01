@@ -12,6 +12,7 @@
 #include "HeldInput.hpp"
 #include "ControlledInput.hpp"
 #include "RealtimeInput.hpp"
+#include "RealtimeObservation.hpp"
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
 #include <Character.hpp>
@@ -46,6 +47,8 @@ using SokuRLBridge::beginStatusWrite;
 using SokuRLBridge::endStatusWrite;
 using SokuRLBridge::applySimpleState;
 using SokuRLBridge::isValidSimplePlayerState;
+using SokuRLBridge::toLogicalInput;
+using SokuRLBridge::toKeyInput;
 
 using SetInputsMethod = void (SokuLib::KeymapManager::*)();
 using BattleProcessMethod = int (SokuLib::Battle::*)();
@@ -92,18 +95,6 @@ SokuRLBridge::LocalStart g_localStart;
 
 SokuRLBridge::CheckpointIdentity g_checkpoint{};
 std::optional<SokuRLBridge::FrameRecords> g_records;
-
-SokuRLBridge::LogicalInput toLogicalInput(const SokuLib::KeyInput &input)
-{
-    return {input.horizontalAxis, input.verticalAxis, input.a, input.b, input.c, input.d,
-        input.changeCard, input.spellcard};
-}
-
-SokuLib::KeyInput toKeyInput(const SokuRLBridge::LogicalInput &input)
-{
-    return {input.horizontalAxis, input.verticalAxis, input.a, input.b, input.c, input.d,
-        input.changeCard, input.spellcard};
-}
 
 void publishResult(SokuRLBridge::ResultCode result)
 {
@@ -229,6 +220,8 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
     if (!g_control)
         return;
     const auto scene = *reinterpret_cast<const int *>(SokuLib::ADDR_SCENE_ID);
+    if (SokuRLBridge::realtimeInputEnabled() && scene != SokuLib::SCENE_BATTLE)
+        g_battleActive = false;
     SokuRLBridge::observeNetworkScene(scene);
     SokuRLBridge::applyNetworkInput(self);
     const bool networkSelection = scene == SokuLib::SCENE_SELECTSV ||
@@ -330,6 +323,7 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         return (manager->*g_originalBattleManagerProcess)();
     }
     if (!g_battleActive) {
+        if (SokuRLBridge::realtimeInputEnabled()) ++g_segmentId;
         g_battleActive = true;
         g_currentFrame = 0;
         g_stepsRemaining = 0;
@@ -339,6 +333,7 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         if (g_checkpointArmed && g_checkpointSeedRequested)
             SokuLib::gameParams.randomSeed = g_requestedCheckpointSeed;
         const auto initial = captureState(manager, 0, g_segmentId, g_inputs.effective);
+        SokuRLBridge::publishRealtimeObservation(initial);
         if (g_checkpointArmed) {
             g_checkpointArmed = false;
             g_checkpointSeedRequested = false;
@@ -374,8 +369,9 @@ int __fastcall battleManagerOnProcess(SokuLib::BattleManager *manager)
         g_records->trim(g_currentFrame);
         result = callSimulationUpdate(manager);
         ++g_currentFrame;
-        g_records->appendRecordedFrame(
-            captureState(manager, g_currentFrame, g_segmentId, g_inputs.effective), g_stepsRemaining);
+        const auto state = captureState(manager, g_currentFrame, g_segmentId, g_inputs.effective);
+        g_records->appendRecordedFrame(state, g_stepsRemaining);
+        SokuRLBridge::publishRealtimeObservation(state);
         SokuRLBridge::setRenderPending(true);
         if (g_stepsRemaining)
             --g_stepsRemaining;

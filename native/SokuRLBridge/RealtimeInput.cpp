@@ -1,6 +1,7 @@
 #include "RealtimeInput.hpp"
 #include "ControlledInput.hpp"
 #include "LocalStart.hpp"
+#include "RealtimeObservation.hpp"
 #include <Windows.h>
 #include <cwchar>
 #include <optional>
@@ -43,12 +44,14 @@ bool initializeRealtimeInput() {
     g_acknowledged = 0;
     g_result = RealtimeResult::Idle;
     g_schedule.emplace(g_seat);
+    if (!initializeRealtimeObservation()) { closeRealtimeInput(); return false; }
     return true;
 }
 
 bool realtimeInputEnabled() { return g_block != nullptr; }
 
 void closeRealtimeInput() {
+    closeRealtimeObservation();
     g_schedule.reset();
     if (g_block) { UnmapViewOfFile(g_block); g_block = nullptr; }
     if (g_handle) { CloseHandle(g_handle); g_handle = nullptr; }

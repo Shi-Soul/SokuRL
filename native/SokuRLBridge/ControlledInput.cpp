@@ -1,7 +1,16 @@
 #include "ControlledInput.hpp"
 #include "FrameRecords.hpp"
+#include <InputManager.hpp>
 
 namespace SokuRLBridge {
+LogicalInput toLogicalInput(const SokuLib::KeyInput &input) {
+    return {input.horizontalAxis, input.verticalAxis, input.a, input.b, input.c, input.d,
+        input.changeCard, input.spellcard};
+}
+SokuLib::KeyInput toKeyInput(const LogicalInput &input) {
+    return {input.horizontalAxis, input.verticalAxis, input.a, input.b, input.c, input.d,
+        input.changeCard, input.spellcard};
+}
 namespace {
 bool isBoolean(std::int32_t value) { return value == 0 || value == 1; }
 }

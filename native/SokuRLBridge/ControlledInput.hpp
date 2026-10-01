@@ -1,7 +1,10 @@
 #pragma once
 #include "ControlBlock.hpp"
+namespace SokuLib { struct KeyInput; }
 
 namespace SokuRLBridge {
+LogicalInput toLogicalInput(const SokuLib::KeyInput &input);
+SokuLib::KeyInput toKeyInput(const LogicalInput &input);
 using InputDecoder = LogicalInput (*)(const LogicalInput &, const LogicalInput &);
 bool isValidInput(const LogicalInput &input, std::uint32_t duration);
 

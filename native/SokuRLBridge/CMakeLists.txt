@@ -19,6 +19,8 @@ add_subdirectory("${SOKUMODS_ROOT}/SokuLib" "${CMAKE_BINARY_DIR}/SokuLib" EXCLUD
 add_library(SokuRLBridge MODULE
     PrivilegedSnapshot.hpp
     PrivilegedSnapshot.cpp
+    RealtimeObservation.hpp
+    RealtimeObservation.cpp
     RealtimeInput.hpp
     RealtimeInput.cpp
     RealtimeInputSchedule.hpp
@@ -77,7 +79,8 @@ set_property(SOURCE NetworkState.cpp NetworkInput.cpp SokuRLBridge.cpp APPEND PR
 include(CTest)
 if(BUILD_TESTING)
     add_executable(RealtimeInputChannelTest tests/RealtimeInputChannelTest.cpp RealtimeInput.cpp
-        ControlledInput.cpp FrameRecords.cpp FrameState.cpp LocalStart.cpp)
+        ControlledInput.cpp FrameRecords.cpp FrameState.cpp LocalStart.cpp RealtimeObservation.cpp
+        RenderState.cpp PrivilegedSnapshot.cpp)
     target_link_libraries(RealtimeInputChannelTest PRIVATE SokuLib)
     target_compile_definitions(RealtimeInputChannelTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
     add_test(NAME RealtimeInputChannel COMMAND RealtimeInputChannelTest)
