@@ -126,6 +126,7 @@ bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=3 rl.cpu_threads=
 
 此基准用于判断原魔理沙神 AI 是否能提供有用示范，结果不计为 PPO 成绩；
 只有在原策略表现确有价值后，才考虑将示范用于共享 PPO 的初始权重。
+相关原始论文、可借鉴部分及不适用的前提见[研究笔记](ppo-research-notes.md)。
 
 固定两阶段课程保留为历史证据，不再作为后续课程方案：
 `br-superhuman-noise90-to-reimu-20261001` 完成额外 65536 步（连同 warmup 总计 131072），
