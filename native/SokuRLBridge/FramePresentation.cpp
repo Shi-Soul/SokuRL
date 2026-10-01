@@ -24,7 +24,17 @@ void __declspec(naked) renderBranchDispatch()
         // Preserve the original JNE first. The injected JMP does not alter EFLAGS.
         jne originalSkip
         cmp dword ptr ds:[008A0044h], 5
-        jne originalRender
+        je localBattle
+        // Network AI engines can omit drawing without changing their update
+        // clock, input transport, menus or the peer's visible game.
+        cmp byte ptr [g_headlessRender], 0
+        je originalRender
+        cmp dword ptr ds:[008A0044h], 13
+        je originalSkip
+        cmp dword ptr ds:[008A0044h], 14
+        je originalSkip
+        jmp originalRender
+    localBattle:
         cmp byte ptr [g_headlessRender], 0
         jne originalSkip
         cmp byte ptr [g_captureImages], 0

@@ -38,7 +38,8 @@ def validate(cfg, report):
             os.environ["SOKURL_REALTIME_SEAT"] = str(seat)
             os.environ["SOKURL_VS_PAUSE_AT_START"] = "0"
             game = stack.enter_context(closing(NetworkGame({"role": role, "address": "127.0.0.1",
-                "port": cfg.validation.port, "automate_menu": False}, visibility, cfg.runtime.launch_timeout)))
+                "port": cfg.validation.port, "automate_menu": False}, visibility,
+                cfg.runtime.launch_timeout, cfg.validation.render)))
             games.append(game)
             histories.append(stack.enter_context(closing(RealtimeHistory(game.process.pid))))
             channels.append(stack.enter_context(closing(RealtimeInput(game.process.pid, seat))))
@@ -95,6 +96,8 @@ def validate(cfg, report):
                                                   for a, b in zip(before, after)])
         if any(b["frame"] <= a["frame"] or any(b["held"]) for a, b in zip(before, after)):
             raise AssertionError("game stopped while Python stalled or input failed to expire")
+        if not cfg.validation.render and any(not 55 <= fps <= 65 for fps in report["stalled_fps"]):
+            raise AssertionError("headless network game failed real-time pacing")
         for history, cursor in zip(histories, cursors):
             try:
                 history.read_after(cursor)
@@ -109,7 +112,7 @@ def main(cfg):
     output.mkdir(parents=True, exist_ok=False)
     OmegaConf.save(cfg, output / "config.yaml")
     configure_game(cfg.runtime.game_directory)
-    report = {"success": False, "characters": list(cfg.validation.characters)}
+    report = {"success": False, "characters": list(cfg.validation.characters), "render": cfg.validation.render}
     try:
         validate(cfg, report)
         report["success"] = True

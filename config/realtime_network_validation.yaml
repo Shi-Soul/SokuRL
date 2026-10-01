@@ -2,6 +2,7 @@ defaults:
   - local_match
   - _self_
 validation:
+  render: true
   characters: [6, 19]
   port: 10991
   frames: 120

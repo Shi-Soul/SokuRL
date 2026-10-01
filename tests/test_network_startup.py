@@ -14,7 +14,8 @@ from test_replay_rollout import config
 
 
 @pytest.mark.parametrize("mutex_status", (0, 0x80))
-def test_mapping_failure_restores_launch_configuration_and_closes_game(tmp_path, monkeypatch, mutex_status):
+@pytest.mark.parametrize("render", (False, True))
+def test_mapping_failure_restores_launch_configuration_and_closes_game(tmp_path, monkeypatch, mutex_status, render):
     path = tmp_path / "SkipIntro.ini"
     original = b"[SkipIntro]\r\nscene_id = 3\r\n"
     path.write_bytes(original)
@@ -28,6 +29,8 @@ def test_mapping_failure_restores_launch_configuration_and_closes_game(tmp_path,
 
     def launch(*args, **kwargs):
         assert path.read_bytes() == original.replace(b"3", b"2")
+        assert kwargs["env"]["SOKURL_HEADLESS_RENDER"] == ("0" if render else "1")
+        assert kwargs["env"]["SOKURL_UNLIMITED_PACING"] == "0"
         return process
 
     monkeypatch.setattr(game.psutil, "Popen", launch)
@@ -39,7 +42,7 @@ def test_mapping_failure_restores_launch_configuration_and_closes_game(tmp_path,
     monkeypatch.setattr(game, "NetworkHistoryClient", Mock(side_effect=OSError("mapping unavailable")))
     with pytest.raises(OSError, match="mapping unavailable"):
         game.NetworkGame({"role": "host", "address": "127.0.0.1", "port": 10800,
-                          "automate_menu": False}, asdict(config().visibility), 2.)
+                          "automate_menu": False}, asdict(config().visibility), 2., render)
     assert path.read_bytes() == original
     kernel.ReleaseMutex.assert_called_once_with(17)
     kernel.CloseHandle.assert_called_once_with(17)
