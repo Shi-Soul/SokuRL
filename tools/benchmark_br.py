@@ -12,14 +12,17 @@ from omegaconf import OmegaConf
 
 def candidate_specification(config, source, algorithm):
     candidate = config["candidate"]
-    if candidate == {"kind": "checkpoint"}:
+    greedy = candidate == {"kind": "checkpoint", "inference": "greedy"}
+    if candidate == {"kind": "checkpoint"} or greedy:
         model = (source / config["checkpoint"]).resolve(strict=True)
         if not model.is_relative_to(source):
             raise ValueError("checkpoint must belong to training_directory")
         kind = {"mlp": "sb3", "lstm": "sb3_recurrent"}[algorithm["policy_type"]]
-        return "learned-br", {"kind": kind, "path": str(model),
-            "training_config": str(source / "config.yaml")}, {
-                "checkpoint_sha256": hashlib.sha256(model.read_bytes()).hexdigest()}
+        spec = {"kind": kind, "path": str(model), "training_config": str(source / "config.yaml")}
+        metadata = {"checkpoint_sha256": hashlib.sha256(model.read_bytes()).hexdigest()}
+        if greedy:
+            return "learned-br:greedy", {"kind": "greedy", "policy": spec}, metadata
+        return "learned-br", spec, metadata
     if set(candidate) == {"kind", "name", "rules"} and candidate["kind"] == "rule":
         if not isinstance(candidate["name"], str) or not candidate["name"]:
             raise ValueError("rule reference requires a rule name")

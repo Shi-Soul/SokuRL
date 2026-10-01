@@ -41,7 +41,27 @@ def test_checkpoint_outside_training_directory_is_rejected(tmp_path):
         specification({"candidate": {"kind": "checkpoint"}, "checkpoint": "../outside.zip"}, source, {})
 
 
+@pytest.mark.parametrize("policy_type,kind", [("mlp", "sb3"), ("lstm", "sb3_recurrent")])
+def test_greedy_candidate_preserves_checkpoint_identity_and_labels_inference(tmp_path, policy_type, kind):
+    with initialize_config_dir(config_dir=str(Path(__file__).parents[1] / "config"), version_base="1.3"):
+        cfg = compose(config_name="benchmark_br", overrides=["+br_candidate=greedy"])
+        candidate = OmegaConf.to_container(cfg.candidate, resolve=True)
+    model = tmp_path / "best.zip"
+    model.write_bytes(b"greedy-source-selection")
+    name, spec, metadata = specification({"candidate": candidate, "checkpoint": "best.zip"},
+        tmp_path, {"policy_type": policy_type})
+    assert name == "learned-br:greedy"
+    assert spec == {"kind": "greedy", "policy": {"kind": kind, "path": str(model),
+        "training_config": str(tmp_path / "config.yaml")}}
+    assert metadata["checkpoint_sha256"] == hashlib.sha256(model.read_bytes()).hexdigest()
+    with pytest.raises(ValueError, match="belong"):
+        nested = tmp_path / "run"
+        nested.mkdir()
+        specification({"candidate": candidate, "checkpoint": "../best.zip"}, nested, {"policy_type": policy_type})
+
+
 @pytest.mark.parametrize("candidate", [{"kind": "uniform"}, {"kind": "checkpoint", "extra": 1},
+    {"kind": "checkpoint", "inference": "unknown"},
     {"kind": "rule", "name": "" , "rules": {}}, {"kind": "rule", "name": "god"}])
 def test_invalid_candidate_is_rejected(candidate, tmp_path):
     with pytest.raises(ValueError):

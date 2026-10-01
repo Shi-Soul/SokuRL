@@ -89,3 +89,41 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
 首个 updated 检查点相对 BC best 有 38 个参数张量改变，包含 LSTM actor，
 课程 sidecar 的模型 SHA256 验证通过，记录在 `.dev/audit-recurrent-first-update-20261001.log`。
 此时无完整对局，课程为初始 0.90 uniform，不能报告虚构的训练胜率；长训练仍在继续。
+
+## 动作切换错误和确定性推断对照
+
+`logs/diagnostics/cloning-change-errors-20261001/summary.json` 将相同四局教师验证集的
+最高概率动作错误进一步拆分，记录模型、数据 manifest 和各局 shard 的 SHA256。
+排除各局首帧后，共 3583 个应改变命令的帧、25213 个应重复命令的帧：
+
+| 模型 | 正确换动作 | 漏换动作，仍重复旧输入 | 换成错误动作 | 应重复时误换动作 |
+| --- | --- | --- | --- | --- |
+| 前馈 BC | 1473 / 41.11% | 1911 / 53.34% | 199 / 5.55% | 123 / 0.488% |
+| 循环 BC | 1669 / 46.58% | 1567 / 43.73% | 347 / 9.68% | 434 / 1.721% |
+
+前三列分母为应改变帧数，最后一列分母为应重复帧数。循环模型减少漏换，但误换更多。
+这是教师轨迹上的最高概率动作诊断；已有真实对局使用逐帧随机采样，不能直接用此表推断胜率。
+
+新增 `benchmark_br.py +br_candidate=greedy` 显式评估每帧最高概率动作，候选名称为
+`learned-br:greedy`，策略指纹由原检查点指纹及 greedy 版本共同确定。
+它是同一模型导出的另一种策略；默认随机采样评测及训练保持原行为。
+配置保存完整包装规格和原检查点哈希，支持共享前馈 PPO 和 RecurrentPPO，
+每局独立初始化循环记忆。它不增加跳帧、动作屏蔽或强制保持命令。
+对照使用相同验证世界种子、角色和双方策略种子，评测完整神 AI。
+目的仅为检验随机动作采样是否妨碍连续操作，未预设它能改善表现。
+
+21 项策略加载、候选来源和实际 SB3 逐帧预测回归测试通过，
+日志 `.dev/pytest-greedy-policy-20261001-v2.log`。
+初次测试因新测试 fixture 缺少算法名称失败，修正 fixture 后通过；初次日志保留。
+
+```bash
+bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=6 rl.cpu_threads=1 \
+  training_directory=logs/pretraining/god-marisa-reimu-recurrent-20261001 \
+  checkpoint=best.zip +br_candidate=greedy num_envs=4 \
+  'benchmark.world_seeds=[918042743,1897077702]' \
+  output=logs/benchmark/br-reimu-recurrent-greedy-20261001
+```
+
+另已启动 32 局原神 AI 教师示范收集 `logs/demonstrations/god-marisa-reimu-expanded-20261001`，
+两座位各 16 局，训练/验证种子排除原有三个数据集及正式评估种子。
+尚未完成的数据不能进入拟合；本项扩充与确定性推断对照分别记录。
