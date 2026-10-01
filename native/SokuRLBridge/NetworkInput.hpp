@@ -15,6 +15,7 @@ struct NetworkInputBlock {
 };
 #pragma pack(pop)
 static_assert(sizeof(NetworkInputBlock) == 104, "network input layout");
+ResultCode chooseNetworkCharacter(SokuLib::KeymapManager *keyboard, std::uint64_t character);
 bool initializeNetworkInput();
 void closeNetworkInput();
 void serviceNetworkInput();

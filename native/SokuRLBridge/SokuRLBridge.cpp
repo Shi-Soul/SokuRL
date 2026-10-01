@@ -8,7 +8,6 @@
 #include "NetworkStart.hpp"
 #include "NetworkState.hpp"
 #include "NetworkInput.hpp"
-#include "NetworkSelection.hpp"
 #include "LocalStart.hpp"
 #include "HeldInput.hpp"
 #include "ControlledInput.hpp"
@@ -247,28 +246,7 @@ void __fastcall keymapManagerSetInputs(SokuLib::KeymapManager *self)
                 publishResult(SokuRLBridge::ResultCode::Complete);
                 acknowledge(sequence);
             } else if (networkSelection && type == SokuRLBridge::CommandType::MenuChooseCharacter) {
-                const auto seat = SokuRLBridge::currentNetworkState().localSeat;
-                const auto character = g_control->commandArgument;
-                if (seat > 1 || character > 19 || !SokuLib::currentScene) {
-                    publishResult(SokuRLBridge::ResultCode::InvalidCommand);
-                } else {
-                    const auto &select = SokuLib::currentScene->to<SokuLib::Select>();
-                    const auto selected = seat ? SokuLib::gameParams.rightPlayerInfo.character :
-                        SokuLib::gameParams.leftPlayerInfo.character;
-                    const auto stage = seat ? select.rightSelectionStage : select.leftSelectionStage;
-                    // Use the local menu's original packed inputs so the peer sees
-                    // the same selection. Never overwrite either player's character.
-                    if (selected == character)
-                        self->input.a = 1;
-                    else if (stage != 0)
-                        self->input.b = 1;
-                    else {
-                        const auto cursor = seat ? select.rightCursor.cursorPos : select.leftCursor.cursorPos;
-                        self->input.horizontalAxis = SokuRLBridge::selectionDirection(
-                            cursor, SokuRLBridge::characterCursor(static_cast<unsigned>(character)));
-                    }
-                    publishResult(SokuRLBridge::ResultCode::Complete);
-                }
+                publishResult(SokuRLBridge::chooseNetworkCharacter(self, g_control->commandArgument));
                 g_lastCommandSeq = sequence;
                 acknowledge(sequence);
             } else if (!networkSelection && type == SokuRLBridge::CommandType::EstablishCheckpoint) {

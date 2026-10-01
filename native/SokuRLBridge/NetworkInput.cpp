@@ -2,6 +2,9 @@
 #include "NetworkInputEvents.hpp"
 #include "NetworkInputSchedule.hpp"
 #include "NetworkState.hpp"
+#include "NetworkSelection.hpp"
+#include <Scenes.hpp>
+#include <Character.hpp>
 #include <InputManager.hpp>
 #include <Windows.h>
 #include <cwchar>
@@ -151,5 +154,32 @@ void applyNetworkInput(SokuLib::KeymapManager *keyboard) {
     const auto &held = g_schedule.apply(state.updates);
     keyboard->input = {held.horizontalAxis, held.verticalAxis, held.a,
         held.b, held.c, held.d, held.changeCard, held.spellcard};
+}
+}
+
+namespace SokuRLBridge {
+ResultCode chooseNetworkCharacter(SokuLib::KeymapManager *self, std::uint64_t character)
+{
+    const auto seat = SokuRLBridge::currentNetworkState().localSeat;
+    if (seat > 1 || character > 19 || !SokuLib::currentScene) {
+        return ResultCode::InvalidCommand;
+    } else {
+        const auto &select = SokuLib::currentScene->to<SokuLib::Select>();
+        const auto selected = seat ? SokuLib::gameParams.rightPlayerInfo.character :
+            SokuLib::gameParams.leftPlayerInfo.character;
+        const auto stage = seat ? select.rightSelectionStage : select.leftSelectionStage;
+        // Use the local menu's original packed inputs so the peer sees
+        // the same selection. Never overwrite either player's character.
+        if (selected == character)
+            self->input.a = 1;
+        else if (stage != 0)
+            self->input.b = 1;
+        else {
+            const auto cursor = seat ? select.rightCursor.cursorPos : select.leftCursor.cursorPos;
+            self->input.horizontalAxis = SokuRLBridge::selectionDirection(
+                cursor, SokuRLBridge::characterCursor(static_cast<unsigned>(character)));
+        }
+        return ResultCode::Complete;
+    }
 }
 }
