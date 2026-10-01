@@ -62,7 +62,7 @@ RTX 3080 Ti，Torch 2.9.1+cu128 和 Wine 工作进程依赖可用。第一轮 DQ
 2 subtests passed（`logs/pytest-dqn-full-resources.txt`）。后续新增配置和图像更新
 测试后，DQN 专项 21 passed（`logs/pytest-dqn-extra.txt`），相关合并回归
 47 passed（`logs/pytest-dqn-final-core.txt`）。跳过项沿用 Windows/CRT/外部回放
-限制。尚未完成真实 DQN 训练或策略强度验收。
+限制。上述早期检查验证实现；最新真实训练和评测结果见下方记录。
 
 2026-10-01：实现提交 `20e362a` 已推送到远端 `feat/dqn-marl`。真实基线启动于
 `logs/training/br-dqn-reimu-baseline-20261001`：GPU 1、8 环境、2 个 Torch CPU
@@ -286,3 +286,9 @@ CUDA。实机复测确认独立入口 CUDA 可用、嵌套入口不可用，日�
 服务与工作进程均正常退出，临时游戏和前缀已移除。完整审计为
 `logs/diagnostics/dqn-five-step-final-audit-20261001/result.json`。最终验证从上述
 独立入口启动，已建立 64 局计划；尚不能由训练成功推断策略强度。
+
+撤回嵌套队列、合入清理修复后，代码提交 `7813eb5` 的全量回归为 880 passed、
+12 skipped、1 deselected、2 subtests passed，耗时 63.36 秒。日志为
+`logs/pytest-dqn-release-20261001.txt`；3 条警告来自 TorchRL 对 PettingZoo 版本的
+提示，相应接口测试通过。跳过项保留既有 Windows/CRT/外部回放限制。当前仍需
+另外两组训练完成、三组最终 validation 和选定模型的独立 test。
