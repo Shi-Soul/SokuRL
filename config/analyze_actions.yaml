@@ -1,0 +1,11 @@
+runs:
+  direct: logs/benchmark/br-reimu-sparse-fresh-final-20261001
+  curriculum: logs/benchmark/br-idle-to-reimu-final-20261001
+  warmup: logs/benchmark/br-idle-warmup-reimu-zero-shot-20261001
+output: logs/diagnostics/action-behavior-${now:%Y%m%d-%H%M%S}
+hydra:
+  run:
+    dir: ${output}/hydra
+  output_subdir: null
+  job:
+    chdir: false

@@ -8,6 +8,7 @@ from stable_baselines3 import PPO
 
 from soku_rl.policy.contract import read_training_contract
 from soku_rl.rl import validate_payoff
+from soku_rl.rl.action_initialization import initialize_action_bias, logical_action_prior
 
 
 def algorithm_type(policy_type):
@@ -46,6 +47,8 @@ def parameter_hash(policy):
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
     validate_payoff(interface, config)
     parameters = dict(config["ppo"])
+    if "initial_action_prior" in parameters:
+        prior_logits = logical_action_prior(interface, parameters.pop("initial_action_prior"))
     architecture = dict(parameters["policy_kwargs"])
     if "features_extractor_class" in architecture:
         architecture["features_extractor_class"] = get_class(architecture["features_extractor_class"])
@@ -56,7 +59,10 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         from soku_rl.rl.buffers import PackedRolloutBuffer
         parameters["rollout_buffer_class"] = PackedRolloutBuffer
     if source == {"kind": "fresh"}:
-        return algorithm(policy_type, env, seed=seed, device=device, **parameters), source
+        model = algorithm(policy_type, env, seed=seed, device=device, **parameters)
+        if "initial_action_prior" in config["ppo"]:
+            initialize_action_bias(model, prior_logits)
+        return model, source
     if set(source) != {"kind", "path", "training_config"} or source["kind"] not in {"checkpoint", "weights"}:
         raise ValueError("initial policy must be fresh, a training checkpoint, or policy weights")
     training = read_training_contract(source["training_config"], interface)
@@ -79,4 +85,3 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         source_steps = model.num_timesteps
     return model, source | {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                             "source_steps": source_steps}
-
