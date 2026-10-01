@@ -17,6 +17,9 @@ endif()
 add_subdirectory("${SOKUMODS_ROOT}/SokuLib" "${CMAKE_BINARY_DIR}/SokuLib" EXCLUDE_FROM_ALL)
 
 add_library(SokuRLBridge MODULE
+    RealtimeInput.hpp
+    RealtimeInput.cpp
+    RealtimeInputSchedule.hpp
     ControlledInput.hpp
     ControlledInput.cpp
     HeldInput.hpp

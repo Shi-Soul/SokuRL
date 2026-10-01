@@ -11,7 +11,7 @@
 #include "LocalStart.hpp"
 #include "HeldInput.hpp"
 #include "ControlledInput.hpp"
-
+#include "RealtimeInput.hpp"
 #include <BattleManager.hpp>
 #include <BattleMode.hpp>
 #include <Character.hpp>
@@ -137,7 +137,9 @@ void consumeCommand(bool gameplay)
     const auto stepInputMask = SokuRLBridge::controlledStepMask(type, argument);
     g_lastCommandSeq = sequence;
 
-    if (type == SokuRLBridge::CommandType::Release) {
+    if (SokuRLBridge::realtimeInputEnabled()) {
+        publishResult(SokuRLBridge::ResultCode::InvalidCommand);
+    } else if (type == SokuRLBridge::CommandType::Release) {
         clearControlledInput(SokuRLBridge::ResultCode::Released, gameplay);
     } else if (!gameplay) {
         publishResult(SokuRLBridge::ResultCode::NotInGameplay);
@@ -284,6 +286,8 @@ int callSimulationUpdate(SokuLib::BattleManager *manager)
     if (isPracticeGameplay() && SokuLib::practiceSettings)
         SokuLib::practiceSettings->state = SokuLib::DUMMY_STATE_2P_CONTROL;
     g_inputs.clearEffective();
+    SokuRLBridge::prepareRealtimeInput(g_inputs, g_segmentId,
+        static_cast<unsigned char>(manager->currentRound), g_currentFrame);
     g_inSimulationUpdate = true;
     const auto result = (manager->*g_originalBattleManagerProcess)();
     g_inSimulationUpdate = false;
@@ -484,6 +488,7 @@ bool createMapping()
 
 void closeMapping()
 {
+    SokuRLBridge::closeRealtimeInput();
     SokuRLBridge::closeNetworkState();
     SokuRLBridge::closeNetworkInput();
     SokuRLBridge::closeImageCapture();
@@ -544,7 +549,8 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE, HMODULE)
     static_assert(sizeof(void *) == 4, "SokuRLBridge must be built for Win32/x86");
     if (!createMapping())
         return false;
-    if (!SokuRLBridge::initializeNetworkState() || !SokuRLBridge::initializeNetworkInput()) {
+    if (!SokuRLBridge::initializeNetworkState() || !SokuRLBridge::initializeNetworkInput() ||
+        !SokuRLBridge::initializeRealtimeInput()) {
         closeMapping();
         return false;
     }
