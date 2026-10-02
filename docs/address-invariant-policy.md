@@ -124,3 +124,18 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=7 \
 符卡按钮提交比例 0.0597%。唯一胜局也有一次实际符卡动作进入，但不能据此推断因果。
 提交按钮与实际施放分开记录；无声称每次按钮都触发游戏动作。
 后续 [自适应 PPO 对照](address-invariant-ppo.md)继续检验这个初始化，不能把它当作已解决的强策略。
+# 当前模型的确定性推断复查
+
+早期前馈/循环 BC 的 greedy 对照没有改善原神 AI 表现，但它们不是当前地址不变模型。
+固定当前 `god-marisa-reimu-address-invariant-20261002/best.zip`，额外比较每帧取最高概率
+动作与原随机采样，检验连续操作是否受到采样影响；不重训、改动作空间或跳帧。
+仍使用两个公共世界种子、双座位、common_roles、policy_seed=728341，原灵梦神 AI。
+这是独立派生策略，不替换默认 PPO 的采样规则；实战结果尚待完成。
+
+```bash
+bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=2 rl.cpu_threads=1 \
+  training_directory=logs/pretraining/god-marisa-reimu-address-invariant-20261002 \
+  checkpoint=best.zip +br_candidate=greedy require_complete=true num_envs=4 \
+  'benchmark.world_seeds=[918042743,1897077702]' benchmark.policy_seed=728341 \
+  output=logs/benchmark/br-reimu-address-invariant-greedy-20261002
+```
