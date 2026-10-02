@@ -10,6 +10,7 @@ from soku_rl.evaluation.population import PopulationEvaluator
 from soku_rl.policy.population import UniformPolicy, PPOPolicy
 from soku_rl.marl.response import PPOResponseOracle
 from soku_rl.policy.recurrent import RecurrentPPOPolicy
+from soku_rl.policy.dqn import DQNPolicy
 from soku_rl.env.encoding import AGENTS
 from soku_rl.policy.contract import read_training_contract
 from soku_rl.policy.loader import load_policy
@@ -26,7 +27,8 @@ def policy_artifact(policy, directory):
     if isinstance(policy, UniformPolicy):
         return metadata | {"kind": "uniform", "num_actions": int(policy.num_actions)}
     if isinstance(policy, PPOPolicy):
-        kind = "sb3_recurrent" if isinstance(policy, RecurrentPPOPolicy) else "sb3"
+        kind = ("sb3_dqn" if isinstance(policy, DQNPolicy) else
+                "sb3_recurrent" if isinstance(policy, RecurrentPPOPolicy) else "sb3")
         return metadata | {"kind": kind, "path": str(policy.path.relative_to(directory))}
     raise TypeError("unsupported PSRO population member")
 
@@ -40,7 +42,7 @@ def initial_policies(config, interface, device, directory):
         spec = config[seat]
         if spec == {"kind": "uniform"}:
             policy = UniformPolicy(f"uniform-p{index}", interface.action_space.n)
-        elif spec["kind"] in {"sb3", "sb3_recurrent"}:
+        elif spec["kind"] in {"sb3", "sb3_recurrent", "sb3_dqn"}:
             policy = load_policy(f"initial-p{index}", spec, interface, device)
         else:
             raise ValueError("initial policies must be uniform, sb3, or sb3_recurrent")

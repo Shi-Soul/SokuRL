@@ -7,3 +7,5 @@ checkpoint_every: 8
 initial_policies:
   player_0: {kind: fresh}
   player_1: {kind: fresh}
+learner: ${rl.learner}
+dqn: ${rl.dqn}

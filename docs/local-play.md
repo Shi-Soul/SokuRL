@@ -43,7 +43,39 @@ Windows 入口是 `scripts/play.cmd`。双击后依次选择连接方式、拟�
 
 学习模型的观测、动作、历史长度、决策间隔和延迟从训练文件读取。入口拒绝通过命令行覆盖这些字段，
 防止输入含义与训练不一致。拟人模型不能作为超人模型加载，反向也会报错。
-实时传输当前支持公开状态和完整状态，图像模型会在启动游戏前明确报错。
+实时传输当前支持公开状态、完整状态和精简诊断状态。后两种归入超人模式；
+精简状态也从同一帧的不可变快照读取，不访问已向前运行的游戏内存。
+图像模型会在启动游戏前明确报错。
+
+## DQN 对手
+
+`sb3_dqn` 检查点与 PPO 一样支持本机双引擎、建房和加入，共用角色选择、预热、
+回合重置、时序检查和退出流程。DQN 推理固定取在线 Q 网络的最大值，不开启训练探索。
+`play_dqn` 配置可直接登记一个训练目录；`ai_character` 必须明确指定该模型使用的角色。
+
+```bash
+# Linux 无游戏检查；公开状态模型另加 track=human，精简/完整状态使用默认超人模式。
+bash scripts/linux.sh tools/play.py --config-name play_dqn operation=check \
+  training_directory=logs/training/br-dqn-slow-rush-diagnostic-reproduced-20261002 ai_character=1
+
+# 导出公开状态或精简状态 DQN，复制训练合同并核验 Q 值和贪心动作。
+bash scripts/linux.sh tools/export_policy.py --config-name export_dqn \
+  training_directory=logs/training/br-dqn-slow-rush-diagnostic-reproduced-20261002 \
+  output=logs/deployment/my-dqn
+bash scripts/linux.sh tools/play.py --config-name play_dqn_onnx operation=check \
+  deployment_directory=logs/deployment/my-dqn ai_character=1
+```
+
+真正游玩时使用已配置本机 `tools/play_worker.py` 的运行命令，去掉 `operation=check`，
+并通过 `play.human.seat=1` 或 `2` 选择玩家座位。`play.connection=host` / `join`
+及网络地址、端口参数与 PPO 相同。Windows 可将上述 Python 参数交给
+`scripts/play.ps1`；本次开发没有在 Windows 启动游戏或验证真人操作体验。
+
+CPU 部署目录包含 `policy.json`、`actor.onnx` 和 `training.yaml`，登记类型是
+`onnx_dqn`。也可将 `play_dqn.yaml` 中的 `checkpoints` 条目放入本机
+`config/local/play.yaml`，让 DQN 出现在统一菜单中。原生完整状态 DQN 可直接加载；
+ONNX 导出当前覆盖公开状态和精简状态，不宣称完整状态对象编码器已通过部署验证。
+更多训练与部署支持范围见 [DQN 流程](dqn.md)。
 
 ## 本机配置
 

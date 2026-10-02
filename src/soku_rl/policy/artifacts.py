@@ -20,8 +20,9 @@ def completed_policies(directory):
         spec = {"training_config": str(config_path)}
         shared = report["result"].get("format") == "sokurl-shared-ppo-v1"
         if algorithm["name"] == "ppo" or shared:
-            kinds = {"mlp": "sb3", "lstm": "sb3_recurrent"}
-            spec.update(kind=kinds[algorithm["policy_type"]], path=str(directory / seat / "final.zip"))
+            from soku_rl.rl.learner import artifact_kind
+            kind = "sb3" if algorithm["name"] == "nfsp" else artifact_kind(algorithm)
+            spec.update(kind=kind, path=str(directory / seat / "final.zip"))
         elif algorithm["name"] == "nfsp":
             spec.update(kind="nfsp_average", player=seat, path=str(directory / "final" / f"{seat}.pt"))
         elif algorithm["name"] == "psro":

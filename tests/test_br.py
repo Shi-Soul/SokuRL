@@ -25,6 +25,9 @@ def test_br_mixture_and_continuation(tmp_path, policy_type):
         report = train_br(env, config, "cpu", 13, first)
         assert report["additional_steps"] == 8
         assert report["initial_policy_hash"] != report["final_policy_hash"]
+        initial = algorithm_type(policy_type).load(first / "initial.zip", device="cpu")
+        assert parameter_hash(initial.policy) == report["initial_policy_hash"]
+        assert initial.num_timesteps == 0
         timing = json.loads((first / "timing.json").read_text())
         assert timing["phase"] == "finished"
         assert timing["rollouts"][0]["ppo_n_updates"] >= 1

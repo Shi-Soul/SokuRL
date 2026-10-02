@@ -10,3 +10,5 @@ timesteps_per_player: 262144
 checkpoint_every: 65536
 timeout_payoff: ${rl.timeout_payoff}
 ppo: ${rl.ppo}
+learner: ${rl.learner}
+dqn: ${rl.dqn}

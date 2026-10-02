@@ -8,9 +8,8 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from soku_rl.policy.loader import load_policy
 from soku_rl.env.combat_metrics import summarize_combat
 from soku_rl.rl.episode_metrics import grouped_episode_metrics, summarize_episodes
-
-
 from soku_rl.rl.ppo import initialize_ppo, parameter_hash
+from soku_rl.rl.learner import save_checkpoint
 
 
 class ResponseCheckpointCallback(CheckpointCallback):
@@ -62,6 +61,11 @@ class EpisodeRecords(BaseCallback):
         self.pending_update = True
         metrics = grouped_episode_metrics(self.records)
         rollout_metrics = summarize_episodes(self.records[self.rollout_record_start:])
+        # Off-policy learners may collect several rollouts between logger dumps.
+        # Missing means in this rollout must not inherit a previous rollout's data.
+        for key in tuple(self.logger.name_to_value):
+            if key.startswith("combat/"):
+                self.logger.record(key, None)
         self.logger.record("combat/episodes", rollout_metrics["episodes"])
         self.logger.record("combat/measured_episodes", rollout_metrics["combat"]["measured_episodes"])
         self.logger.record("combat/action_measured_episodes", rollout_metrics["combat"]["action_measured_episodes"])
@@ -81,19 +85,22 @@ class EpisodeRecords(BaseCallback):
         self._write_timings("updating")
 
     def _finish_update(self):
-        self.timings[-1].update(update_seconds=time.perf_counter() - self.rollout_finished,
-                               ppo_n_updates=self.model._n_updates)
+        from soku_rl.rl.dqn import DoubleDQN
+        kind = "dqn" if isinstance(self.model, DoubleDQN) else "ppo"
+        self.timings[-1].update(update_seconds=time.perf_counter() - self.rollout_finished)
+        self.timings[-1][kind + "_n_updates"] = self.model._n_updates
+        self.timings[-1]["learner_n_updates"] = self.model._n_updates
         if hasattr(self.model, "rehearsal_state"):
             self.timings[-1]["rehearsal"] = dict(self.model.rehearsal_state["last_update"])
         if hasattr(self.model, "anchor_state"):
             self.timings[-1]["online_anchor"] = dict(self.model.anchor_state["last_update"])
         steps = self.model.num_timesteps
-        if (not self.last_saved_steps
+        if self.model._n_updates and (not self.last_saved_steps
                 or steps // self.checkpoint_every > self.last_saved_steps // self.checkpoint_every):
             checkpoints = self.directory / "checkpoints"
             checkpoints.mkdir(exist_ok=True)
             path = checkpoints / f"updated_{steps}_steps.zip"
-            self.model.save(path)
+            save_checkpoint(self.model, path)
             self.curriculum.save(path, steps)
             self.last_saved_steps = steps
             self.timings[-1]["updated_checkpoint"] = str(path)

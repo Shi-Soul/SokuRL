@@ -1,5 +1,4 @@
 """Use the same paused-frame observations for live environments and replays."""
-from soku_rl.env.observation.diagnostic import observe
 from soku_rl.env.observation.visible_state import observe_visible_states
 from soku_rl.pomg import Outcome, TimeStep
 
@@ -37,6 +36,11 @@ class ObservationReader:
             from game_runtime.privileged import PrivilegedReader, ProcessMemory
             self.privileged = PrivilegedReader(ProcessMemory(pid))
             self.resources.append(self.privileged)
+        if mode == "diagnostic_state":
+            from game_runtime.diagnostic import DiagnosticReader
+            from game_runtime.privileged import ProcessMemory
+            self.diagnostic = DiagnosticReader(ProcessMemory(pid))
+            self.resources.append(self.diagnostic)
         if mode in {"image", "state"}:
             from game_runtime.images import ImageClient
             self.image = ImageClient(pid)
@@ -52,7 +56,7 @@ class ObservationReader:
             render = self.image.read_state(int(raw.frameId), 10.0)
             observations = observe_visible_states(raw, render, self.visibility)
         else:
-            observations = tuple(observe(raw, seat) for seat in (0, 1))
+            observations = self.diagnostic.observe(raw, bridge)
         return time_step(raw, bridge.snapshot().dropped_frames, observations, self.pid)
 
     def close(self):

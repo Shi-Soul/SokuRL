@@ -1,4 +1,4 @@
-"""Initialize the shared PPO from complete, independently split rule demonstrations."""
+"""Initialize the shared learner from complete, independently split rule demonstrations."""
 import hashlib
 import json
 from importlib.metadata import version

@@ -1,4 +1,4 @@
-"""Measure shared PPO update overhead on synthetic observations, not strength."""
+"""Measure shared learner update overhead on synthetic observations, not strength."""
 import gc
 import hashlib
 import json
@@ -20,7 +20,7 @@ def main(cfg):
     from soku_rl.env import EpisodeConfig
     from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
     from soku_rl.rl import ppo_settings
-    from soku_rl.rl.ppo import create_ppo
+    from soku_rl.rl.learner import create_learner, learner_kind
     from soku_rl.rl.storage import PackedObservation
     from soku_rl.env.observation.memory_schema import (
         FIGHTER_NAMES, FIGHTER_WIDTH, MAX_OBJECTS, OBJECT_WIDTH, PLAYER_WIDTH, WORLD_NAMES)
@@ -36,6 +36,10 @@ def main(cfg):
     if type(updates) is not int or updates < 2:
         raise ValueError("at least two updates are required")
     settings = ppo_settings(config)
+    kind = learner_kind(settings)
+    frequency = settings[kind]["train_freq" if kind == "dqn" else "n_steps"]
+    cycle_steps = config["num_envs"] * frequency
+    warmup_cycles = settings["dqn"]["learning_starts"] // cycle_steps if kind == "dqn" else 0
     interface = LearningInterface(EpisodeConfig.from_dict(config["episode"]), LearningConfig(**config["wrappers"]))
     active = config["profile"]["active_objects"]
     if (interface.episode.observation_mode != "privileged_state" or interface.episode.history_frames != 1
@@ -110,11 +114,12 @@ def main(cfg):
             torch.set_num_threads(count)
             env = DummyVecEnv([SyntheticEnv for _ in range(config["num_envs"])])
             try:
-                model, _ = create_ppo(env, interface, settings, {"kind": "fresh"}, device, config["seed"])
+                model, _ = create_learner(env, interface, settings, {"kind": "fresh"}, device, config["seed"])
                 timer = Timings()
                 torch.cuda.reset_peak_memory_stats(device)
-                model.learn(total_timesteps=updates * config["num_envs"] * settings["ppo"]["n_steps"], callback=timer)
+                model.learn(total_timesteps=(updates + warmup_cycles) * cycle_steps, callback=timer)
                 report["results"].append({"cpu_threads": count, "samples": timer.samples,
+                    "learner": kind, "learner_updates": model._n_updates, "warmup_cycles": warmup_cycles,
                     "peak_cuda_bytes": torch.cuda.max_memory_allocated(device)})
                 (output / "progress.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
                 del model

@@ -40,7 +40,7 @@ def test_all_twenty_characters_and_seven_variants_are_selectable(catalog):
 
 def test_checkpoint_catalog_preserves_shared_loader_specs(catalog):
     _, rules, package = catalog
-    kinds = ("sb3", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo", "onnx_recurrent")
+    kinds = ("sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo", "onnx_recurrent", "onnx_dqn")
     entries = {kind: {"label": kind, "characters": [1], "tracks": ["human"],
                       "policy": {"kind": kind, "path": "artifact"}} for kind in kinds}
     opponents = opponent_catalog(rules, package, entries)

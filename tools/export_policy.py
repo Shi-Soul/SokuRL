@@ -1,4 +1,4 @@
-"""Export and verify a recurrent PPO actor for standalone CPU play."""
+"""Export and verify recurrent PPO or greedy DQN for standalone CPU play."""
 import hashlib
 import json
 from pathlib import Path
@@ -37,6 +37,10 @@ def main(cfg):
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     spec = config["candidate"]["policy"]
+    if spec["kind"] == "sb3_dqn":
+        from soku_rl.policy.export_dqn import export_dqn
+        print(json.dumps(export_dqn(config), indent=2), flush=True)
+        return
     if spec["kind"] != "sb3_recurrent" or config["episode"]["observation_mode"] != "state":
         raise ValueError("CPU deployment export requires a public-state recurrent PPO policy")
     if type(config["verification_steps"]) is not int or config["verification_steps"] < 512:

@@ -1,0 +1,12 @@
+defaults:
+  - export_policy
+  - _self_
+
+training_directory: ???
+checkpoint: final.zip
+candidate:
+  name: learned-dqn
+  policy:
+    kind: sb3_dqn
+    path: ${training_directory}/${checkpoint}
+    training_config: ${training_directory}/config.yaml

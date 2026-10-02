@@ -1,0 +1,36 @@
+# Reproducible learning check against an active, low-frequency rule opponent.
+defaults:
+  - train
+  - override algorithm: br
+  - override rl: dqn
+  - override rules: default
+  - override wrappers: superhuman_learning
+  - override track: superhuman_combat
+  - _self_
+
+num_envs: 8
+episode:
+  decision_frames: 4
+wrappers:
+  action_set: combat
+rules:
+  roster: [rush]
+  overrides:
+    rush:
+      attack_interval: 120
+algorithm:
+  timesteps: 131072
+  checkpoint_every: 16384
+  opponents:
+    - name: slow-rush-reimu
+      probability: 1.0
+      setup: ${episode.match.player_1}
+      policy:
+        kind: rule
+        name: rush
+        rules: ${rules}
+rl:
+  cpu_threads: 2
+  dqn:
+    exploration_decay_steps: 65536
+output: logs/training/br-dqn-slow-rush-${now:%Y%m%d-%H%M%S}

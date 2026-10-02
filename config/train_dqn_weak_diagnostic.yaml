@@ -1,0 +1,11 @@
+defaults:
+  - train_dqn_weak
+  - override track: superhuman_diagnostic
+  - _self_
+
+# Legacy diagnostic rules require frame-by-frame decisions.
+episode:
+  decision_frames: 1
+algorithm:
+  timesteps: 16384
+output: logs/training/br-dqn-slow-rush-diagnostic-${now:%Y%m%d-%H%M%S}

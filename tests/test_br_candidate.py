@@ -66,3 +66,14 @@ def test_greedy_candidate_preserves_checkpoint_identity_and_labels_inference(tmp
 def test_invalid_candidate_is_rejected(candidate, tmp_path):
     with pytest.raises(ValueError):
         specification({"candidate": candidate}, tmp_path, {})
+
+
+@pytest.mark.parametrize("candidate", [{"kind": "checkpoint"}, {"kind": "checkpoint", "inference": "greedy"}])
+def test_dqn_candidate_uses_native_greedy_policy(candidate, tmp_path):
+    model = tmp_path / "final.zip"
+    model.write_bytes(b"dqn-source-selection")
+    name, spec, metadata = specification({"candidate": candidate, "checkpoint": "final.zip"},
+        tmp_path, {"learner": "dqn", "policy_type": "mlp"})
+    assert name == "learned-br"
+    assert spec == {"kind": "sb3_dqn", "path": str(model), "training_config": str(tmp_path / "config.yaml")}
+    assert metadata["checkpoint_sha256"] == hashlib.sha256(model.read_bytes()).hexdigest()

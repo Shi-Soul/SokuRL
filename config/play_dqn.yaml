@@ -1,0 +1,17 @@
+defaults:
+  - play
+  - _self_
+
+training_directory: ???
+checkpoint: final.zip
+ai_character: ???
+opponent: learned-dqn
+checkpoints:
+  learned-dqn:
+    label: DQN
+    characters: ["${ai_character}"]
+    tracks: [human, superhuman]
+    policy:
+      kind: sb3_dqn
+      path: ${training_directory}/${checkpoint}
+      training_config: ${training_directory}/config.yaml

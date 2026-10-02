@@ -19,13 +19,14 @@ def main(cfg):
     from soku_rl.policy.loader import load_policy
     from soku_rl.policy.matchups import opponent_interface
     from soku_rl.rl import configure_runtime, ppo_settings, validate_payoff
+    from soku_rl.rl.learner import learner_kind
     from soku_rl.rl.demonstrations import collect_demonstrations, demonstration_plan
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     ppo_settings(config)
     configure_runtime(config["rl"])
     if (config["algorithm"]["name"] != "br" or config["algorithm"]["matchups"]["mode"] != "sampled"
-            or config["algorithm"]["ppo"]["gamma"] != 1. or config["teacher"]["kind"] != "rule"
+            or config["algorithm"][learner_kind(config["algorithm"])]["gamma"] != 1. or config["teacher"]["kind"] != "rule"
             or "curriculum" in config["algorithm"]):
         raise ValueError("rule demonstrations require sampled BR, gamma=1 and explicit fixed opponents")
     interface = LearningInterface(EpisodeConfig.from_dict(config["episode"]), LearningConfig(**config["wrappers"]))
@@ -45,7 +46,7 @@ def main(cfg):
     teacher = load_policy("teacher", config["teacher"], interface, config["device"])
     if config["behavior"] == {"kind": "teacher"}:
         behavior = teacher
-    elif config["behavior"]["kind"] in {"sb3", "sb3_recurrent"}:
+    elif config["behavior"]["kind"] in {"sb3", "sb3_recurrent", "sb3_dqn"}:
         import torch
         if str(config["device"]).startswith("cuda") and not torch.cuda.is_available():
             raise RuntimeError("CUDA requested for learner-controlled collection but unavailable")

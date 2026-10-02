@@ -10,7 +10,8 @@ from soku_rl.marl.average import AveragePolicy, BestResponseSamples
 from soku_rl.policy.population import UniformPolicy
 from soku_rl.policy.contract import read_training_contract
 from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
-from soku_rl.rl.ppo import algorithm_type, create_ppo, snapshot
+from soku_rl.rl.ppo import create_ppo
+from soku_rl.rl.learner import create_learner, snapshot, save_checkpoint, learner_kind
 
 
 def train_nfsp(env, config, device, seed, directory):
@@ -25,8 +26,10 @@ def train_nfsp(env, config, device, seed, directory):
         if set(resume) != {"kind", "path", "training_config"} or resume["kind"] != "checkpoint":
             raise ValueError("NFSP resume requires a complete training checkpoint")
         previous = read_training_contract(resume["training_config"], env.interface)["algorithm"]
-        for key in ("policy_type", "ppo", "average", "anticipatory_param"):
-            if previous[key] != config[key]:
+        previous = {"learner": "ppo", "dqn": {}} | previous
+        current = {"learner": "ppo", "dqn": {}} | config
+        for key in ("policy_type", "ppo", "average", "anticipatory_param", "learner", "dqn"):
+            if previous[key] != current[key]:
                 raise ValueError(f"NFSP continuation changed {key}")
         saved = torch.load(resume["path"], map_location="cpu", weights_only=False)
         if saved["format"] != "sokurl-ppo-nfsp-v1":
@@ -44,7 +47,8 @@ def train_nfsp(env, config, device, seed, directory):
                     "path": str(Path(resume["path"]).parent / saved[f"{name}_models"][player]),
                     "training_config": resume["training_config"],
                 }
-                model, _ = create_ppo(view, env.interface, config, source, device, model_seed)
+                factory = create_learner if name == "response" and learner_kind(config) == "dqn" else create_ppo
+                model, _ = factory(view, env.interface, config, source, device, model_seed)
                 initialized.append(model)
             model, average_model = initialized
             if saved is not None:
@@ -66,7 +70,7 @@ def train_nfsp(env, config, device, seed, directory):
                 for name, model in (("response", models[player]), ("average", averages[player].model)):
                     path = frozen / f"{name}-p{player}.zip"
                     model.save(path)
-                    copy = algorithm_type(config["policy_type"]).load(path, device=device)
+                    copy = type(model).load(path, device=device)
                     pair.append(snapshot(f"{name}-p{player}", copy, path))
                 opponents.append(pair)
             learning = []
@@ -74,6 +78,8 @@ def train_nfsp(env, config, device, seed, directory):
                 views[player].opponents = opponents[1 - player]
                 views[player].probabilities = np.array([config["anticipatory_param"], 1 - config["anticipatory_param"]])
                 # Another learner used the shared game. Reset before collecting.
+                if hasattr(model, "replay_buffer") and hasattr(model.replay_buffer, "cut_trajectories"):
+                    model.replay_buffer.cut_trajectories()
                 model._last_obs = None
                 model.learn(config["timesteps_per_iteration"],
                     callback=BestResponseSamples(averages[player]), reset_num_timesteps=False)
@@ -86,7 +92,7 @@ def train_nfsp(env, config, device, seed, directory):
                 for player, model in enumerate(models):
                     response_paths.append(f"response-p{player}.zip")
                     average_paths.append(f"average-p{player}.zip")
-                    model.save(checkpoint / response_paths[-1])
+                    save_checkpoint(model, checkpoint / response_paths[-1])
                     averages[player].model.save(checkpoint / average_paths[-1])
                 torch.save({"format": "sokurl-ppo-nfsp-v1", "iteration": iteration,
                     "response_models": response_paths, "average_models": average_paths,
