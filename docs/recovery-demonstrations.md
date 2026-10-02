@@ -41,6 +41,7 @@ PPO 训练循环和 BR 对手课程不复制、不改为接管课程；uniform �
 最佳模型仍按隔离验证集 NLL 选择，逐数据集报告拟合，避免总体均值掩盖恢复数据表现。
 随后完整执行同一 16 局纯神 AI 验证，不按前四局截断；全部结果与原 BC 并列。
 只有实战改善才据此选择后续共享 PPO 对照，不能因后缀拟合改善自动延长训练。
+即使这组固定对局改善，通用 BR 仍需更多独立种子及其他对手策略/角色的验证。
 
 ```bash
 bash scripts/linux.sh tools/collect_demonstrations.py --config-name collect_address_recovery_demonstrations \
@@ -67,3 +68,13 @@ CPU/CUDA 独立逐帧计算核对后缀指标与完整记忆，修改被忽略�
 计划世界与所有声明的历史/评估排除种子不重叠。短预检使用 CPU，不运行游戏或训练。
 配置和计划证据 `logs/diagnostics/address-recovery-collection-preflight-20261002/summary.json`，
 日志 `.dev/check-address-recovery-collection-20261002.log`。
+
+## 实际采集启动
+
+提交 `e1b9ca7` 由空闲 GPU 2 启动上述 16 局采集；当时可用内存约 247 GiB、NAS 可用
+20 TiB，未停止其他任务。实际配置、源码逐文件哈希、16 局 plan、全部排除数据集
+计划哈希和 CUDA 可见设备均与预检匹配。采集组合指纹仍为
+`064474e5473e6bbba72d49c21ba0b5eaa89be82977f924439e8a56f9499b1f1d`。
+实际启动记录在预检目录的 `actual-start.json`，日志
+`.dev/audit-address-recovery-start-20261002.log` 和 `.dev/collect-address-recovery-20261002.log`。
+这是启动核对；完整数据、监督后缀及 worker 清理仍待采集结束后检查，尚未开始拟合。
