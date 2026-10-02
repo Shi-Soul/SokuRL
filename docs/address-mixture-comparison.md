@@ -215,3 +215,16 @@ worker 正常退出并清理。证据为上述 audit 目录内的 `mid_games.jso
 所以这不是 16 次独立分支抽样，也不能假定实际恰好各半。这是离线组合结果，未额外
 运行组合策略，更不属于纯神 AI 胜局。逐局分支抽样、结果哈希与分座位指标见
 `logs/diagnostics/frozen-address-mixtures-audit-20261002/summary.json`，观察流程已正常结束。
+
+## 按局组训练结束
+
+按局组已正常完成 262144 步、128 个采样周期、382 个 PPO epoch、1505 次 Adam。
+完整源码/配置、初始化、更新计数、课程 sidecar、全部 EMA/分支事件及私有 worker
+清理核对通过，证据 `logs/diagnostics/address-episode-mix50-audit-20261002/final.json`。
+总用时 3331.01 秒，其中采样 3021.56 秒、更新 138.01 秒；其余包含初始化和收尾。
+
+48 个完整训练局中 uniform 为 18 胜、8 负、3 超时，original 为 19 负（1P 5 负、
+2P 14 负）。最终 EMA=.395179、uniform=1，统计仍按长期平均更新，未发生固定 stage
+切换。最终模型 SHA256 为
+`8815ea8d082735150a930768815b2276ec4f2893e9a0be60825f15337bd2b3dd`。
+预定完整神 AI 16 局已启动，不能用这些训练分支结果代替最终强度评估。
