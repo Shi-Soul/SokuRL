@@ -318,10 +318,11 @@ ZIP 当作续训检查点。学习者采样、教师标注的数据必须设置 
 因为该轨迹回报不属于教师。离线 softmax 指标只衡量标签拟合，实际 DQN 推理始终贪心。
 
 PPO 特有的 LSTM、动作分解头、rehearsal 和 online_anchor 不变成 DQN 的学习目标；
-共享 DQN 当前使用前馈网络和帧历史。公开状态及精简状态支持 ONNX 导出；完整状态
-模型可使用原生检查点进行 play。图像实时传输仍是 PPO/DQN 共同的未完成事项。
+共享 DQN 当前使用前馈网络和帧历史。公开、精简及完整状态均支持 ONNX 导出；
+play 入口会在开局前导出并校验原生检查点，实时进程统一使用 CPU ONNX。
+图像实时传输仍是 PPO/DQN 共同的未完成事项。
 
-原生 play 使用 `play_dqn` 配置，指定 `training_directory`、`checkpoint` 和
+检查点入口使用 `play_dqn` 配置，指定 `training_directory`、`checkpoint` 和
 `ai_character`；CPU 部署使用 `play_dqn_onnx`，指定 `deployment_directory` 和
 `ai_character`。观测、动作词表、历史、决策频率及延迟均从保存合同读取，不能
 临时覆盖。公开状态选 `track=human`，精简/完整状态选 `track=superhuman`。

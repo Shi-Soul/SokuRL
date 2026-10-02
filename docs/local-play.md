@@ -98,6 +98,7 @@ checkpoints:
 也可登记 `kind: checkpoint`，并提供 `path`、`training_config`，由开局前准备自动导出。
 原有 SB3、NFSP 平均策略、PSRO 混合策略和历史网络登记也经过同一准备流程；规则与神 AI
 仍执行原策略。ONNX 目录的模型与训练配置哈希均检查，模型格式来自实际 checkpoint。
+地址不变 BC 的实际模型、双座位对局及实时性证据见 [BC ONNX 验收](bc-onnx-play.md)。
 
 ## DQN 对手
 
@@ -110,7 +111,7 @@ checkpoints:
 bash scripts/linux.sh tools/play.py --config-name play_dqn operation=check \
   training_directory=logs/training/br-dqn-slow-rush-diagnostic-reproduced-20261002 ai_character=1
 
-# 导出公开状态或精简状态 DQN，复制训练合同并核验 Q 值和贪心动作。
+# 导出数值状态 DQN，复制训练合同并核验 Q 值和贪心动作。
 bash scripts/linux.sh tools/export_policy.py --config-name export_dqn \
   training_directory=logs/training/br-dqn-slow-rush-diagnostic-reproduced-20261002 \
   output=logs/deployment/my-dqn
