@@ -75,6 +75,56 @@ def test_history_cursor_wraps_without_losing_order(history):
     assert cursor == 0 and frames[0].match.frame == 200
 
 
+def test_live_history_recovers_overrun_at_latest_complete_frame(history):
+    publish(history, 21, 20, 4)
+    cursor, frames, dropped = history.read_latest(0)
+    assert (cursor, dropped) == (21, 20)
+    assert [frame.match.frame for frame in frames] == [20]
+    publish(history, 22, 21, 5)
+    assert history.read_latest(cursor) == (cursor, (), 0)
+    publish(history, 22, 21, 6)
+    cursor, frames, dropped = history.read_latest(cursor)
+    assert (cursor, dropped, frames[0].match.frame) == (22, 0, 21)
+
+
+def test_live_history_retries_copy_races_without_advancing_cursor(history, monkeypatch):
+    publish(history, 1, 0, 2)
+
+    def overwritten(cursor):
+        raise BufferError("AI observation was overwritten during copying")
+
+    monkeypatch.setattr(history, "read_after", overwritten)
+    assert history.read_latest(0) == (0, (), 0)
+
+
+def test_late_live_commands_are_scheduled_after_the_current_game_frame():
+    buffer = C.create_string_buffer(channels.INPUT_SIZE)
+    client = object.__new__(channels.RealtimeInput)
+    client.view, client.seat, client.sequence = C.addressof(buffer), 1, 0
+    client.writer = threading.get_ident()
+    channels.STATUS.pack_into(buffer, 92, 2, 0, 0, 7, 2, 80, 0, 0, 0, *([0] * 8))
+    state = MatchState(7, 2, 30, (0, 0), (10000, 10000), "battle")
+    keys = (-1, 0, 1, 0, 0, 0, 0, 0)
+    reply = client.submit_current(state, keys, 5, 3)
+    assert reply == {"submitted": True, "request": 1, "target": 81, "expires": 84}
+    assert channels.COMMAND.unpack_from(buffer, 20) == (1, 7, 2, 1, 30, 81, 84, *keys)
+    changed_round = MatchState(7, 3, 81, (1, 0), (10000, 10000), "battle")
+    assert not client.submit_current(changed_round, keys, 5, 3)["submitted"]
+
+
+def test_temporary_snapshot_timeout_keeps_the_play_session_open():
+    from play_runtime.session import RealtimeSession
+    session = object.__new__(RealtimeSession)
+
+    def busy():
+        raise TimeoutError("snapshot writer is busy")
+
+    session._poll = busy
+    batch = session.poll()
+    assert not batch["closed"] and not batch["records"]
+    assert batch["events"][0]["kind"] == "observation_wait"
+
+
 def test_input_has_native_offsets_and_never_waits_for_acknowledgement():
     assert channels.COMMAND.size == 72 and channels.STATUS.size == 76
     buffer = C.create_string_buffer(channels.INPUT_SIZE)

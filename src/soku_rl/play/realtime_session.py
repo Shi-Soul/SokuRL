@@ -1,4 +1,4 @@
-"""Run shared policies on consecutive network frames without advancing the game."""
+"""Run live policies with explicit gap recovery, without advancing the game."""
 from dataclasses import asdict
 import time
 
@@ -55,6 +55,19 @@ class RealtimePolicy:
         self.live.stop()
         self.live.prepared.clear()
 
+    def catch_up(self, frame):
+        """Reset private policy memory after a gap without resetting the match."""
+        state = frame.match
+        if state.phase != "battle":
+            return 0
+        expected = self.frame + 1 if state.match == self.match else 1
+        skipped = state.frame - expected
+        if skipped <= 0:
+            return 0
+        self.stop()
+        self.match, self.frame = state.match, state.frame - 1
+        return skipped
+
 
 def run_session(connection, controller, matches, timeout, record):
     if type(matches) is not int or matches < 0 or timeout < 0:
@@ -62,10 +75,12 @@ def run_session(connection, controller, matches, timeout, record):
     started = time.monotonic()
     completed, decisions, frames, scores = 0, 0, 0, (0, 0)
     submitted, busy = 0, 0
+    recoveries, skipped_frames, policy_timeouts = 0, 0, 0
 
     def result(termination):
         return dict(termination=termination, matches=completed, decisions=decisions, frames=frames,
-                    submitted=submitted, busy=busy, scores=scores, seconds=time.monotonic()-started)
+                    submitted=submitted, busy=busy, scores=scores, seconds=time.monotonic()-started,
+                    recoveries=recoveries, skipped_frames=skipped_frames, policy_timeouts=policy_timeouts)
 
     try:
         while not timeout or time.monotonic()-started < timeout:
@@ -76,8 +91,21 @@ def run_session(connection, controller, matches, timeout, record):
                 record(event)
             for item in batch["records"]:
                 frame = item["frame"]
+                skipped = controller.catch_up(frame)
+                if skipped:
+                    recoveries += 1
+                    skipped_frames += skipped
+                    record({"kind": "policy_resync", "match": frame.match.match,
+                            "frame": frame.match.frame, "skipped": skipped})
                 before = time.perf_counter_ns()
-                step = controller.advance(frame)
+                try:
+                    step = controller.advance(frame)
+                except TimeoutError as error:
+                    controller.stop()
+                    policy_timeouts += 1
+                    record({"kind": "policy_timeout", "match": frame.match.match,
+                            "frame": frame.match.frame, "reason": str(error)})
+                    continue
                 inference_ms = (time.perf_counter_ns()-before)/1e6
                 state = frame.match
                 scores = state.scores
