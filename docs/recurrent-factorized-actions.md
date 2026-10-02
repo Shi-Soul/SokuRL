@@ -105,4 +105,17 @@ CSV 全部数值与快照逐项相同，PDF 同源导出但未独立渲染。
 学习效率。双方模型哈希、数据 manifest、完整验证局和按座位加权统计核对通过，见
 `logs/diagnostics/recurrent-factorized-address-fit-audit-20261002/summary.json`。
 原始评分为 `logs/diagnostics/recurrent-factorized-address-fit-20261002`，脚本/日志
-`.dev/audit-recurrent-factorized-address-fit-20261002.*`。预定 16 局实战仍在运行。
+`.dev/audit-recurrent-factorized-address-fit-20261002.*`。
+
+## 16 局完整神 AI 验证
+
+预定验证已完成：**0 胜 16 负**，1P/2P 各 8 负，耗时 670.23 秒。
+平均自身/对手 HP 下降 10003.44 / 1235.56，双方符卡动作进入为 0 / 0.0625 次每局。
+原平面 BC 在相同种子/座位协议为 1 胜 15 负、对手平均掉血 3777.00。
+新头未改善示范初始化的完整对局表现；不据此宣称更有效或延长这条 BC 训练。
+
+模型指纹、逐局种子/角色/对手、全部指标和独立 worker 正常清理已核对，见
+`logs/diagnostics/recurrent-factorized-address-audit-20261002/games.json`，脚本/日志
+`.dev/audit-recurrent-factorized-address-games-20261002.*`。
+动作共享是否改善在线 PPO 尚未由这项 BC 评估检验；后续有限预算的
+[共享 PPO 对照](recurrent-factorized-br.md)将相对于各自初始化比较在线学习变化。
