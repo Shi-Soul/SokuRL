@@ -1,0 +1,7 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+algorithm:
+  timesteps: 4096
+output: logs/diagnostics/br-recurrent-state-audit-${now:%Y%m%d-%H%M%S}
