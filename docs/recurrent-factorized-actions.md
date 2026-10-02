@@ -59,4 +59,35 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=6 \
 PPO 步数与更新计数为零，Adam 为空。
 预检在 `logs/diagnostics/recurrent-factorized-address-preflight-20261002/summary.json`，
 脚本/日志 `.dev/check-recurrent-factorized-address-20261002*`。
-这是启动前检查；实际保存的初始模型、完整 20 轮结果及 16 局评估仍待核对。
+实际保存的 initial.zip 与预检参数逐位匹配，源码身份、零 PPO 计数和空 Adam 也核对通过，
+见同目录 `actual-start.json`。
+
+## 20 轮结果
+
+预训练成功完成，耗时 533.21 秒，共 20273 次监督更新，PPO 步数为零。
+与原实验相同的 227277 训练帧、78544 验证帧及全部数据身份核对通过。
+同样按验证 NLL 选中第 18 轮，best SHA256 为
+`a5eb6637bed1ef9ee70228da1bae1e1cfcf969b829fbb661c5017cf60ef7c0ce`，参数哈希
+`09bb9e6b3a6fa2f6abc6ce0fada2ee1c905601b3138e29d92b5be60250eb5a32`。
+
+| 示范验证指标（各自 best） | 原平面循环头 | 方向/按键循环头 |
+| --- | ---: | ---: |
+| NLL | 0.214957 | 0.270333 |
+| 精确动作准确率 | 94.556% | 94.249% |
+| 动作变化帧准确率 | 65.558% | 64.681% |
+| 攻击标签精确准确率 | 78.939% | 76.105% |
+| 符卡标签精确准确率 | 64.035% | 63.596% |
+| 策略熵 / nat | 0.165934 | 0.194992 |
+
+这次较小动作头没有改善离线拟合；不能据此断言它的 PPO 样本效率，也不能用较高熵
+声称探索更有效。完整训练核对在 `logs/diagnostics/recurrent-factorized-address-audit-20261002`，
+脚本/日志 `.dev/audit-recurrent-factorized-address-training-20261002.*`。
+两组学习曲线及 40 行原始指标 CSV、源文件快照/哈希在
+`logs/diagnostics/recurrent-factorized-address-curves-20261002`；PNG 已目视检查，
+CSV 全部数值与快照逐项相同，PDF 同源导出但未独立渲染。
+
+提交 `23d8d78` 在 GPU 6 启动预定 16 局验证，输出
+`logs/benchmark/br-recurrent-factorized-address-20261002`。
+另在 GPU 2 对两组冻结模型同时执行完整 float32 的固定状态评分，涵盖原始/扩展教师
+验证集及原地址不变 BC 自身采样的验证状态；这用于检查离开教师轨迹后的标签拟合，
+不等同于新模型自身的状态分布。两项结果尚待完成。
