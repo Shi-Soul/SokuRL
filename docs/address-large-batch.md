@@ -13,6 +13,8 @@
 
 512 个有效样本不意味着每次只有 512 个物理输入：循环序列会填充，可能增加显存。
 minibatch 切分也决定反向传播序列的边界；不能把它解释为只改变独立样本数量。
+本机 sb3-contrib 2.9.0 的 `RecurrentPPO.train` 还在每个 minibatch 的有效帧上
+标准化优势；512 会使用整轮两个环境的有效帧，而不是分别标准化较短片段。
 每轮理论最大 Adam 更新次数从 12 降至 3，实际次数还受 KL 提前停止影响。
 因此需报告实际优化器 step、采样/更新耗时及战斗指标，不宣称具有相同梯度更新预算。
 
@@ -32,4 +34,22 @@ bash scripts/linux.sh tools/train.py --config-name train_address_large_batch \
   linux.cuda_devices=3 output=logs/training/br-address-large-batch-20261002
 ```
 
-此处为预定方案，尚无该候选的实战结果。
+## 初始化及首轮核对
+
+由提交 `a992039` 在 GPU 3 启动。完整配置与原 65536 步控制组逐字段核对，
+确认仅 batch_size 和输出不同；共享 learner 工厂核对原 BC 参数、空 Adam、零计数通过。
+原参数哈希为 `2cd1875312d06aee209beda08847c70ca613bf6a59cbcf1c17ff7648e4f03550`。
+没有改动生产 Python，本次用实际配置和模型初始化核对配置行为。
+
+实际 512 步检查点的源码身份、配置、初始参数、课程 sidecar 与原对手指纹通过核对。
+首轮完成 3 个 PPO epoch、3 次 Adam 更新，参数已改变；GPU 显存一次观测为约 6.8 GB，
+该值不是峰值测量。首轮 checkpoint SHA256 为
+`9756301e995a3509a0707fffee2cbf172878256343b8f60308c0dd33b3c507e5`。
+审计快照截止 5120 步尚无完整局结束，课程 uniform=0，不从中虚构胜率或伤害均值。
+
+证据 `logs/diagnostics/address-large-batch-preflight-20261002/{summary,actual-start}.json`，
+脚本/日志 `.dev/check-address-large-batch-20261002.*`、
+`.dev/audit-address-large-batch-start-20261002.*`。
+训练仍在运行，GPU 7 同时补齐原控制组最终模型的 12 局验证，
+输出 `logs/benchmark/br-address-warmup-control-expanded-20261002`。
+尚无该候选的实战结果。
