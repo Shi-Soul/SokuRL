@@ -64,13 +64,17 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
                 or "rollout_buffer_class" in parameters):
             raise ValueError("recurrent_storage requires recurrent PPO, sparse mode and no other buffer override")
     if "action_factorization" in parameters:
+        from sb3_contrib import RecurrentPPO
         from soku_rl.rl.factorized_policy import FactorizedActorCriticPolicy
         factorization = parameters.pop("action_factorization")
-        if (algorithm is not PPO or interface.commands != tuple(range(576))
+        if (algorithm not in (PPO, RecurrentPPO) or interface.commands != tuple(range(576))
                 or set(factorization) != {"button_probability"}
                 or "action_persistence" in parameters or "initial_action_prior" in parameters):
-            raise ValueError("factorized actions require feedforward full-command PPO without another action-head option")
+            raise ValueError("factorized actions require full-command PPO without another action-head option")
         policy_type = FactorizedActorCriticPolicy
+        if algorithm is RecurrentPPO:
+            from soku_rl.rl.recurrent_factorized_policy import FactorizedRecurrentActorCriticPolicy
+            policy_type = FactorizedRecurrentActorCriticPolicy
     if "action_persistence" in parameters:
         from soku_rl.rl.persistent_policy import PersistentActorCriticPolicy
         persistence = parameters.pop("action_persistence")

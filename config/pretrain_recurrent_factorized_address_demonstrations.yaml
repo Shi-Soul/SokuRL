@@ -1,0 +1,9 @@
+defaults:
+  - pretrain_recurrent_address_invariant_demonstrations
+  - _self_
+
+rl:
+  ppo:
+    action_factorization:
+      button_probability: 0.5
+output: logs/pretraining/god-recurrent-factorized-address-bc-${now:%Y%m%d-%H%M%S}

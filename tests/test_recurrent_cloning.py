@@ -9,6 +9,7 @@ from soku_rl.rl.behavior_cloning import ObservationContractEnv, fit_demonstratio
 from soku_rl.rl.ppo import create_ppo, parameter_hash
 from soku_rl.rl.recurrent_cloning import demonstration_episodes, episode_chunks, sequence_epoch, zero_states
 from soku_rl.rl.storage import PackedObservation
+from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
 from soku_rl.policy.loader import load_policy
 
 
@@ -24,17 +25,22 @@ def test_chunk_padding_and_state_columns_preserve_episode_identity():
     assert sum(sum(chunk["valid"]) for chunk in chunks) == 9
 
 
-def test_sequence_scoring_matches_framewise_online_memory_and_resets():
+@pytest.mark.parametrize("factorized", [False, True])
+def test_sequence_scoring_matches_framewise_online_memory_and_resets(factorized):
     torch.set_num_threads(1)
     env = fixture_env()
     config = fixture_config("lstm")
+    if factorized:
+        from soku_rl.env.wrappers.learning import LearningConfig, LearningVectorEnv
+        env = LearningVectorEnv(env.env, LearningConfig("full", False, 0, 0.))
+        config["ppo"]["action_factorization"] = {"button_probability": .5}
     model, _ = create_ppo(ObservationContractEnv(env.interface), env.interface, config,
         {"kind": "fresh"}, "cpu", 17)
     rng = np.random.default_rng(19)
     episodes = [[(PackedObservation.pack(rng.normal(size=env.single_observation_space.shape).astype(np.float32)),
         int(rng.integers(env.single_action_space.n)), float(rng.normal()), -1 if j == 0 else 1)
         for j in range(size)] for size in [3, 7, 5]]
-    metrics = []
+    metrics, command_totals = [], {}
     model.policy.set_training_mode(False)
     with torch.no_grad():
         for episode in episodes:
@@ -46,10 +52,16 @@ def test_sequence_scoring_matches_framewise_online_memory_and_resets():
                 metrics.append((-float(distribution.log_prob(torch.tensor([action]))),
                     float(predicted[0] == action), float((values[0, 0] - target) ** 2),
                     float(distribution.entropy()), changed))
+                if factorized:
+                    diagnostics = command_group_totals(distribution, torch.tensor([action]), torch.tensor([True]))
+                    for key, value in diagnostics.items():
+                        command_totals[key] = command_totals.get(key, 0) + value
     expected = dict(zip(["nll", "accuracy", "value_mse", "entropy"], np.mean(np.asarray(metrics)[:, :4], axis=0)))
     expected["changed_samples"] = 12
     changed_rows = np.asarray([row[:4] for row in metrics if row[4] == 1])
     expected.update(changed_nll=changed_rows[:, 0].mean(), changed_accuracy=changed_rows[:, 1].mean())
+    if factorized:
+        expected.update(summarize_command_groups(command_totals))
     before = parameter_hash(model.policy)
     for length, batch in [(1, 1), (2, 4), (4, 12), (16, 32)]:
         for order in ([0, 1, 2], [2, 0, 1]):

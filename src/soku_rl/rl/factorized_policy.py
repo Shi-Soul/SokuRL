@@ -31,7 +31,7 @@ class DirectionButtonHead(nn.Module):
         return factors[:, :9][:, self.directions] + factors[:, 9:] @ self.buttons.T
 
 
-class FactorizedActorCriticPolicy(ActorCriticPolicy):
+class FactorizedHeadMixin:
     def __init__(self, *args, factor_button_probability, **kwargs):
         self.factor_button_probability = factor_button_probability
         super().__init__(*args, **kwargs)
@@ -46,3 +46,7 @@ class FactorizedActorCriticPolicy(ActorCriticPolicy):
 
     def _get_constructor_parameters(self):
         return super()._get_constructor_parameters() | {"factor_button_probability": self.factor_button_probability}
+
+
+class FactorizedActorCriticPolicy(FactorizedHeadMixin, ActorCriticPolicy):
+    """Shared direction/button head with the upstream feedforward policy."""

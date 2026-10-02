@@ -101,15 +101,16 @@ def test_shared_ppo_updates_saves_loads_and_rejects_other_heads(tmp_path):
         env.close()
 
 
-@pytest.mark.parametrize("method", ["ippo", "nfsp"])
-def test_other_marl_methods_use_the_same_factorized_ppo(tmp_path, method):
+@pytest.mark.parametrize("method,policy_type", [("ippo", "mlp"), ("nfsp", "mlp"), ("ippo", "lstm")])
+def test_other_marl_methods_use_the_same_factorized_ppo(tmp_path, method, policy_type):
     from stable_baselines3 import PPO
+    from sb3_contrib import RecurrentPPO
     from soku_rl.marl.ippo import train_ippo
     from soku_rl.marl.nfsp import train_nfsp
     torch.set_num_threads(1)
     original = fixture_env()
     env = LearningVectorEnv(original.env, LearningConfig("full", False, 0, 0.))
-    config = fixture_config("mlp") | {"name": method}
+    config = fixture_config(policy_type) | {"name": method}
     config["ppo"]["action_factorization"] = {"button_probability": .05}
     try:
         if method == "ippo":
@@ -119,7 +120,8 @@ def test_other_marl_methods_use_the_same_factorized_ppo(tmp_path, method):
                 average={"capacity": 12, "batch_size": 4, "updates": 2}, resume={"kind": "fresh"})
             train_nfsp(env, config, "cpu", 7, tmp_path)
         for player in (0, 1):
-            model = PPO.load(tmp_path / f"player_{player}/final.zip", device="cpu")
+            algorithm = RecurrentPPO if policy_type == "lstm" else PPO
+            model = algorithm.load(tmp_path / f"player_{player}/final.zip", device="cpu")
             assert isinstance(model.policy.action_net, DirectionButtonHead)
     finally:
         env.close()

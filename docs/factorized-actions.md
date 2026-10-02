@@ -1,5 +1,7 @@
 # 共享 PPO 的方向/按键动作头
 
+后续已增加[循环 PPO 的同一动作头](recurrent-factorized-actions.md)，以下保留原前馈对照记录。
+
 此前平面 categorical PPO 为 576 个逻辑命令分别预测分数。
 `rl=ppo_factorized` 改为预测 9 个方向分数和 6 个按键分数，再展开为相同的 576 个分数：
 对命令 `a=64*d+b`，分数为方向 `d` 的分数加上 `b` 中被按下按钮的分数之和。
