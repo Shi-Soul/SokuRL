@@ -14,8 +14,10 @@ class OpponentMixtureVecEnv(VecEnv):
     This view borrows the vector environment and does not own its worker.
     """
     def __init__(self, env, player, opponents, probabilities, seed):
-        if player not in (0, 1, "random") or not opponents:
+        if player not in (0, 1, "random", "balanced") or not opponents:
             raise ValueError("a player role and opponent population are required")
+        if player == "balanced" and (env.num_envs < 2 or env.num_envs % 2):
+            raise ValueError("balanced seats require a positive even number of environments")
         weights = np.asarray(probabilities, dtype=np.float64)
         if (weights.shape != (len(opponents),) or not np.isfinite(weights).all()
                 or (weights < 0).any() or not np.isclose(weights.sum(), 1)):
@@ -39,7 +41,13 @@ class OpponentMixtureVecEnv(VecEnv):
 
     def _reset_slots(self, seeds):
         for slot in seeds:
-            self.players[slot] = int(self.rng.integers(0, 2)) if self.player == "random" else self.player
+            if self.player in ("random", "balanced"):
+                # Consume the same draw in both modes so identical reset
+                # schedules retain identical world/opponent RNG streams.
+                sampled = int(self.rng.integers(0, 2))
+                self.players[slot] = slot % 2 if self.player == "balanced" else sampled
+            else:
+                self.players[slot] = self.player
             index = int(self.rng.choice(len(self.opponents), p=self.probabilities))
             self.opponent_indices[slot] = index
             opponent = self.opponents[index]

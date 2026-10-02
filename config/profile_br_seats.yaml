@@ -1,0 +1,30 @@
+defaults:
+  - train
+  - br_opponents: god_target
+  - curriculum: adaptive_noise_frequent_feedback
+  - override algorithm: br
+  - override rl: recurrent_demonstration_transfer
+  - override rules: god
+  - override wrappers: superhuman_learning
+  - override track: superhuman_address_invariant
+  - _self_
+
+# Short fresh-policy reset diagnostic, never a strength evaluation.
+num_envs: 8
+episode:
+  max_frames: 256
+rl:
+  cpu_threads: 1
+  ppo:
+    n_steps: 256
+    batch_size: 512
+    recurrent_storage: sparse
+algorithm:
+  player: balanced
+  target:
+    character: 0
+  timesteps: 4096
+  checkpoint_every: 2048
+  curriculum:
+    initial_random_probability: 0.5
+output: logs/diagnostics/br-seats-${algorithm.player}-${now:%Y%m%d-%H%M%S}

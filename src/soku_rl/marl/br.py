@@ -36,7 +36,7 @@ def train_response(env, config, opponents, probabilities, device, seed, director
     matchups = config["matchups"]
     if matchups == {"mode": "fixed"}:
         if config["player"] not in (0, 1):
-            raise ValueError("random seats require explicit learner and opponent setups")
+            raise ValueError("cross-seat training requires explicit learner and opponent setups")
         view = OpponentMixtureVecEnv(env, config["player"], opponents, probabilities, seed)
     elif matchups["mode"] == "sampled":
         view = MatchupMixtureVecEnv(env, config["player"], opponents, probabilities, seed,

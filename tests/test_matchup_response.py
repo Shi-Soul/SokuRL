@@ -40,17 +40,20 @@ class SeatGame:
         return observations, rewards, terms, truncs, infos
 
 
-def test_sampled_seats_keep_learner_character_and_route_terminal_records():
+@pytest.mark.parametrize("seat_mode", ["random", "balanced"])
+def test_sampled_seats_keep_learner_character_and_route_terminal_records(seat_mode):
     game = SeatGame()
     learner = {"character": 1, "palette": 0, "deck": 0}
     setups = [{"character": c, "palette": 0, "deck": 0} for c in (0, 6)]
     opponents = [UniformPolicy(str(c), 4) for c in (0, 6)]
-    view = MatchupMixtureVecEnv(game, "random", opponents, [.5, .5], 123, learner, setups)
+    view = MatchupMixtureVecEnv(game, seat_mode, opponents, [.5, .5], 123, learner, setups)
     try:
         observations = view.reset()
         seen = set()
         for _ in range(4):
             players = dict(view.players)
+            if seat_mode == "balanced":
+                assert players == {s: s % 2 for s in range(game.num_envs)}
             for s, p in players.items():
                 match = asdict(game.matches[s])
                 assert match[f"player_{p}"] == learner
@@ -72,12 +75,13 @@ def test_sampled_seats_keep_learner_character_and_route_terminal_records():
         view.close()
 
 
-def test_sampled_br_updates_one_model_and_retains_matchup_context(tmp_path, monkeypatch):
+@pytest.mark.parametrize("seat_mode,policy_type", [("random", "mlp"), ("balanced", "lstm")])
+def test_sampled_br_updates_one_model_and_retains_matchup_context(tmp_path, monkeypatch, seat_mode, policy_type):
     torch.set_num_threads(1)
     env = fixture_env()
     backend = env.env.backend
     monkeypatch.setattr(backend, "reset_matchups", lambda seeds, matches: backend.reset_slots(seeds), raising=False)
-    config = fixture_config("mlp") | {"name": "br", "player": "random", "timesteps": 16,
+    config = fixture_config(policy_type) | {"name": "br", "player": seat_mode, "timesteps": 16,
         "checkpoint_every": 8, "initial_policy": {"kind": "fresh"},
         "matchups": {"mode": "sampled", "learner": {"character": 1, "palette": 0, "deck": 0}},
         "opponents": [{"name": "random", "probability": 1., "policy": {"kind": "uniform"},
@@ -103,6 +107,44 @@ def test_sampled_br_updates_one_model_and_retains_matchup_context(tmp_path, monk
             read_training_contract(path, wrong_character)
     finally:
         env.close()
+
+
+def test_balanced_seats_survive_partial_resets_without_changing_opponent_rng():
+    learner = {"character": 1, "palette": 0, "deck": 0}
+    setups = [{"character": c, "palette": 0, "deck": 0} for c in (0, 6)]
+    opponents = [UniformPolicy(str(c), 4) for c in (0, 6)]
+    views = [MatchupMixtureVecEnv(SeatGame(), mode, opponents, [.5, .5], 123, learner, setups)
+             for mode in ("random", "balanced")]
+    try:
+        for view in views:
+            view.reset()
+        for seeds in ({5: 1234}, {0: 5678, 3: 9012}, {7: 3456, 1: 7890}):
+            previous = [dict(view.episode_context) for view in views]
+            actors = dict(views[1].actors)
+            for view in views:
+                view._reset_slots(seeds)
+            assert views[1].players == {s: s % 2 for s in range(8)}
+            for slot in range(8):
+                random, balanced = (view.episode_context[slot] for view in views)
+                for key in ("world_seed", "opponent_seed", "opponent", "opponent_fingerprint"):
+                    assert random[key] == balanced[key]
+                if slot not in seeds:
+                    assert views[1].actors[slot] is actors[slot]
+                    for view, before in zip(views, previous, strict=True):
+                        assert view.episode_context[slot] is before[slot]
+            np.testing.assert_equal(views[0].rng.bit_generator.state, views[1].rng.bit_generator.state)
+    finally:
+        for view in views:
+            view.close()
+
+
+@pytest.mark.parametrize("num_envs", [1, 3, 7])
+def test_balanced_seats_reject_unbalanced_environment_counts(num_envs):
+    game = SeatGame()
+    game.num_envs = num_envs
+    setup = {"character": 1, "palette": 0, "deck": 0}
+    with pytest.raises(ValueError, match="even number"):
+        MatchupMixtureVecEnv(game, "balanced", [UniformPolicy("uniform", 4)], [1.], 1, setup, [setup])
 
 
 def test_full_god_roster_pairs_every_original_script_with_its_character():
