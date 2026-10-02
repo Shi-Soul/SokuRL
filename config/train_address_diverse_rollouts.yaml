@@ -1,0 +1,9 @@
+defaults:
+  - train_address_large_batch
+  - _self_
+
+num_envs: 8
+algorithm:
+  timesteps: 262144
+  checkpoint_every: 65536
+output: logs/training/br-address-diverse-rollouts-${now:%Y%m%d-%H%M%S}
