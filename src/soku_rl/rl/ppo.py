@@ -25,14 +25,21 @@ def create_ppo(env, interface, config, source, device, seed):
     policy = ("MultiInput" if isinstance(env.observation_space, spaces.Dict) else
               "Cnn" if len(env.observation_space.shape) == 3 else "Mlp")
     policy += "LstmPolicy" if config["policy_type"] == "lstm" else "Policy"
-    return initialize_ppo(algorithm, policy, env, interface, config, source, device, seed)
+    model, metadata = initialize_ppo(algorithm, policy, env, interface, config, source, device, seed)
+    if "rehearsal" in config:
+        from soku_rl.rl.rehearsal import attach_rehearsal
+        attach_rehearsal(model, interface, config["rehearsal"], source["kind"] == "checkpoint")
+    if "online_anchor" in config:
+        from soku_rl.rl.online_anchor import attach_anchor
+        attach_anchor(model, interface, config["online_anchor"], source["kind"] == "checkpoint")
+    return model, metadata
 
 
 def snapshot(name, model, path):
     from soku_rl.policy.population import PPOPolicy
     from soku_rl.policy.recurrent import RecurrentPPOPolicy
     model.save(path)
-    policy = PPOPolicy if type(model) is PPO else RecurrentPPOPolicy
+    policy = PPOPolicy if isinstance(model, PPO) else RecurrentPPOPolicy
     return policy(name, model, Path(path))
 
 
@@ -46,10 +53,32 @@ def parameter_hash(policy):
 
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
     validate_payoff(interface, config)
+    if "online_anchor" in config and "rehearsal" in config:
+        raise ValueError("select online_anchor or rehearsal; combining auxiliary objectives is not supported")
     parameters = dict(config["ppo"])
+    if "action_factorization" in parameters:
+        from soku_rl.rl.factorized_policy import FactorizedActorCriticPolicy
+        factorization = parameters.pop("action_factorization")
+        if (algorithm is not PPO or interface.commands != tuple(range(576))
+                or set(factorization) != {"button_probability"}
+                or "action_persistence" in parameters or "initial_action_prior" in parameters):
+            raise ValueError("factorized actions require feedforward full-command PPO without another action-head option")
+        policy_type = FactorizedActorCriticPolicy
+    if "action_persistence" in parameters:
+        from soku_rl.rl.persistent_policy import PersistentActorCriticPolicy
+        persistence = parameters.pop("action_persistence")
+        if (algorithm is not PPO or interface.commands != tuple(range(576))
+                or interface.config.action_history < 1
+                or set(persistence) != {"repeat_probability"}):
+            raise ValueError("action persistence requires feedforward PPO, full commands and action history")
+        policy_type = PersistentActorCriticPolicy
     if "initial_action_prior" in parameters:
         prior_logits = logical_action_prior(interface, parameters.pop("initial_action_prior"))
     architecture = dict(parameters["policy_kwargs"])
+    if "action_factorization" in config["ppo"]:
+        architecture["factor_button_probability"] = factorization["button_probability"]
+    if "action_persistence" in config["ppo"]:
+        architecture["repeat_probability"] = persistence["repeat_probability"]
     if "features_extractor_class" in architecture:
         architecture["features_extractor_class"] = get_class(architecture["features_extractor_class"])
     parameters["policy_kwargs"] = architecture
@@ -58,6 +87,14 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
     elif algorithm is PPO and interface.episode.observation_mode == "privileged_state":
         from soku_rl.rl.buffers import PackedRolloutBuffer
         parameters["rollout_buffer_class"] = PackedRolloutBuffer
+    if "rehearsal" in config:
+        from soku_rl.rl.rehearsal import rehearsal_algorithm, validate_rehearsal
+        validate_rehearsal(config["rehearsal"])
+        algorithm = rehearsal_algorithm(algorithm)
+    if "online_anchor" in config:
+        from soku_rl.rl.online_anchor import anchored_algorithm, validate_anchor
+        validate_anchor(config["online_anchor"])
+        algorithm = anchored_algorithm(algorithm)
     if source == {"kind": "fresh"}:
         model = algorithm(policy_type, env, seed=seed, device=device, **parameters)
         if "initial_action_prior" in config["ppo"]:
@@ -71,9 +108,17 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         raise ValueError("PPO initialization requires the same policy type and payoff")
     if source["kind"] == "checkpoint" and previous["ppo"] != config["ppo"]:
         raise ValueError("continued PPO must retain its algorithm and optimizer configuration")
+    if source["kind"] == "checkpoint":
+        for option in ("rehearsal", "online_anchor"):
+            if ({key: previous[key] for key in (option,) if key in previous}
+                    != {key: config[key] for key in (option,) if key in config}):
+                raise ValueError(f"continued PPO must retain its {option} configuration")
     path = Path(source["path"]).resolve(strict=True)
     if source["kind"] == "weights":
-        if previous["ppo"]["policy_kwargs"] != config["ppo"]["policy_kwargs"]:
+        heads = ("action_persistence", "action_factorization")
+        if (previous["ppo"]["policy_kwargs"] != config["ppo"]["policy_kwargs"]
+                or {key: previous["ppo"][key] for key in heads if key in previous["ppo"]}
+                != {key: config["ppo"][key] for key in heads if key in config["ppo"]}):
             raise ValueError("policy weights require the same network architecture")
         initial = algorithm.load(path, device=device)
         source_steps = initial.num_timesteps

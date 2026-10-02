@@ -1,6 +1,12 @@
 """Load every policy type through the same observation and action contract."""
 def load_policy(name, spec, interface, device):
     kind = spec["kind"]
+    if kind == "greedy":
+        from soku_rl.policy.greedy import GreedyPPOPolicy
+        if (set(spec) != {"kind", "policy"} or not isinstance(spec["policy"], dict)
+                or spec["policy"].get("kind") not in {"sb3", "sb3_recurrent"}):
+            raise ValueError("greedy requires an sb3 or sb3_recurrent policy")
+        return GreedyPPOPolicy(name, load_policy(name, spec["policy"], interface, device))
     if kind == "action_noise":
         from soku_rl.policy.action_noise import ActionNoisePolicy
         if set(spec) != {"kind", "policy", "random_probability"}:

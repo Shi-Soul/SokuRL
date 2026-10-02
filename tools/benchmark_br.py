@@ -1,4 +1,4 @@
-"""Evaluate a saved single BR with paired seats and its fixed learner character."""
+"""Evaluate a saved BR or rule reference with paired seats and one fixed character."""
 from contextlib import closing
 import hashlib
 import json
@@ -8,6 +8,27 @@ import time
 
 import hydra
 from omegaconf import OmegaConf
+
+
+def candidate_specification(config, source, algorithm):
+    candidate = config["candidate"]
+    greedy = candidate == {"kind": "checkpoint", "inference": "greedy"}
+    if candidate == {"kind": "checkpoint"} or greedy:
+        model = (source / config["checkpoint"]).resolve(strict=True)
+        if not model.is_relative_to(source):
+            raise ValueError("checkpoint must belong to training_directory")
+        from soku_rl.rl.learner import artifact_kind
+        kind = artifact_kind(algorithm)
+        spec = {"kind": kind, "path": str(model), "training_config": str(source / "config.yaml")}
+        metadata = {"checkpoint_sha256": hashlib.sha256(model.read_bytes()).hexdigest()}
+        if greedy and kind != "sb3_dqn":
+            return "learned-br:greedy", {"kind": "greedy", "policy": spec}, metadata
+        return "learned-br", spec, metadata
+    if set(candidate) == {"kind", "name", "rules"} and candidate["kind"] == "rule":
+        if not isinstance(candidate["name"], str) or not candidate["name"]:
+            raise ValueError("rule reference requires a rule name")
+        return f"rule-br:{candidate['name']}", dict(candidate), {}
+    raise ValueError("BR candidate must be a checkpoint or an explicit rule reference")
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="benchmark_br")
@@ -41,9 +62,7 @@ def main(cfg):
     else:
         raise ValueError("opponent_source must be training or config")
     population = select_opponents(population, config["opponent_names"])
-    model_path = (source / config["checkpoint"]).resolve(strict=True)
-    if not model_path.is_relative_to(source):
-        raise ValueError("checkpoint must belong to training_directory")
+    candidate, specification, candidate_metadata = candidate_specification(config, source, algorithm)
     device = torch.device(config["device"])
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is unavailable; no CPU fallback")
@@ -51,17 +70,14 @@ def main(cfg):
     wrappers = LearningConfig(**training["wrappers"])
     interface = LearningInterface(episode, wrappers)
     learner = algorithm["matchups"]["learner"]
-    candidate = "learned-br"
     if candidate in {p["name"] for p in population}:
         raise ValueError("candidate name collides with an opponent")
-    from soku_rl.rl.learner import artifact_kind
-    kind = artifact_kind(algorithm)
     output = Path(config["output"]).resolve()
     output.mkdir(parents=True, exist_ok=False)
     # Persist the actual source contract and opponent setups, not train defaults.
     config.update(source_training=training, evaluation_opponents=population,
         policy_inference="grouped_greedy_dqn_v1_other_actors_sequential",
-        checkpoint_sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
+        evaluation_candidate={"name": candidate, "policy": specification}, **candidate_metadata,
         training_config_sha256=hashlib.sha256(training_path.read_bytes()).hexdigest())
     (output / "config.yaml").write_text(OmegaConf.to_yaml(OmegaConf.create(config)), encoding="utf-8")
     report = {"success": False, "phase": "loading_policies",
@@ -69,8 +85,8 @@ def main(cfg):
         "device_name": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu"}
     started = time.perf_counter()
     try:
-        policy = load_policy(candidate, {"kind": kind, "path": str(model_path),
-            "training_config": str(training_path)}, interface, device)
+        policy = load_policy(candidate, specification, interface, device)
+        report["candidate_fingerprint"] = policy.fingerprint
         strategies = {candidate: SeatPolicies(candidate, (policy, policy))}
         setups = {}
         for entry in population:

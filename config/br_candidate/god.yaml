@@ -1,0 +1,5 @@
+# @package candidate
+# Original fixed-character controller under the same paired BR evaluation contract.
+kind: rule
+name: god
+rules: ${rules}

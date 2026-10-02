@@ -74,7 +74,8 @@ def test_empty_rollout_clears_stale_combat_scalars_before_delayed_dump(tmp_path)
     from soku_rl.rl.training import EpisodeRecords
 
     logger = configure(str(tmp_path / "scalars"), ["csv"])
-    callback = EpisodeRecords(tmp_path, 100)
+    from soku_rl.rl.curriculum import FixedOpponentSchedule
+    callback = EpisodeRecords(tmp_path, 100, FixedOpponentSchedule())
     callback.model = SimpleNamespace(logger=logger)
     callback.num_timesteps = 8
     callback.rollout_started = time.perf_counter()

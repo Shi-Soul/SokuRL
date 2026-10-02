@@ -18,6 +18,11 @@ def ppo_settings(config):
             continue
         if learner[name] != shared[name]:
             raise ValueError(f"algorithm-specific {name} differs from the shared rl configuration; configure rl.{name}")
+    for option in ("rehearsal", "online_anchor"):
+        if option in learner and (option not in shared or learner[option] != shared[option]):
+            raise ValueError(f"algorithm-specific {option} differs from shared rl.{option}")
+        if option in shared:
+            learner[option] = shared[option]
     if shared["policy_type"] not in {"mlp", "lstm"}:
         raise ValueError("shared PPO policy_type must be mlp or lstm")
     if shared["timeout_payoff"] != "zero_at_horizon":

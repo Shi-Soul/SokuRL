@@ -1,0 +1,14 @@
+defaults:
+  - collect_demonstrations
+  - _self_
+
+seed: 682903
+collection:
+  episodes_per_seat: 4
+  validation_per_seat: 1
+behavior:
+  kind: sb3
+  path: ???
+  training_config: ???
+excluded_datasets: ???
+output: logs/demonstrations/learner-states-${now:%Y%m%d-%H%M%S}

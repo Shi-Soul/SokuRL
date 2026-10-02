@@ -1,0 +1,6 @@
+# @package algorithm.curriculum
+defaults:
+  - adaptive_noise
+  - _self_
+# Keep long-term performance smoothing; adjust future games after each completion.
+update_every: 1

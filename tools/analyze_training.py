@@ -9,10 +9,43 @@ import hydra
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
 import numpy as np
 from omegaconf import OmegaConf
 
 from soku_rl.rl.episode_metrics import grouped_episode_metrics
+
+
+def align_update_metrics(rows, rollouts, learner, allow_unaligned):
+    """Match delayed scalars to actual updates; live snapshots may miss newer timing."""
+    steps_by_update = {}
+    for rollout in rollouts:
+        if "update_seconds" not in rollout:
+            continue
+        update = rollout.get("learner_n_updates", rollout.get(learner + "_n_updates"))
+        if update == 0:  # DQN collection before learning_starts has no update.
+            continue
+        if type(update) is not int or update < 0:
+            raise ValueError("completed rollout requires an integer learner update counter")
+        if update in steps_by_update:
+            raise ValueError(f"duplicate completed learner update counter: {update}")
+        steps_by_update[update] = rollout["steps"]
+    updates, unaligned = [], []
+    for row in rows:
+        if not row.get("train/n_updates"):
+            continue
+        counter = float(row["train/n_updates"])
+        if not counter.is_integer():
+            raise ValueError(f"scalar update {counter} has no recorded completed rollout")
+        count = int(counter)
+        if count not in steps_by_update:
+            if not allow_unaligned:
+                raise ValueError(f"scalar update {counter} has no recorded completed rollout")
+            unaligned.append(count)
+            continue
+        updates.append({"steps": steps_by_update[count],
+            **{key: float(value) for key, value in row.items() if key.startswith("train/") and value}})
+    return updates, unaligned
 
 
 def snapshot_run(label, source, output):
@@ -36,24 +69,7 @@ def snapshot_run(label, source, output):
     rollout_size = frequency * config["num_envs"]
     # CSV may dump inside a later rollout. Align the gradient counter with
     # completed updates actually recorded by the learner callback, not epochs.
-    counters = {}
-    for record in timing["rollouts"]:
-        count = record.get("learner_n_updates", record.get(learner + "_n_updates"))
-        if count and "update_seconds" in record:
-            if count in counters and counters[count] != record["steps"]:
-                raise ValueError("one update count maps to multiple completed step counts")
-            counters[count] = record["steps"]
-    updates, unaligned = [], []
-    for row in rows:
-        if row.get("train/n_updates"):
-            count = int(float(row["train/n_updates"]))
-            if count not in counters:
-                # Sequential snapshots can include a CSV row newer than timing.
-                # Preserve that raw row, but do not invent its trained step count.
-                unaligned.append(count)
-                continue
-            updates.append({"steps": counters[count],
-                **{key: float(value) for key, value in row.items() if key.startswith("train/") and value}})
+    updates, unaligned = align_update_metrics(rows, timing["rollouts"], learner, True)
     completed = [row for row in timing["rollouts"] if "update_seconds" in row]
     summary = {"source": str(source.resolve()), "sha256": files, "phase": timing["phase"],
         "sampled_steps": progress["steps"], "completed_cycles": len(completed),
@@ -116,12 +132,90 @@ def plot_combat(labels, output, window, palette, styles):
     if axes[0, 0].lines:
         axes[0, 0].legend(fontsize=9)
     figure.suptitle(f"Training combat metrics — mean over last {window} completed episodes\n"
-        "Missing measurements excluded; HP loss is not attributed attack damage; entries are not confirmed casts",
+        "Missing measurements excluded; HP loss is not attributed attack damage; entries are not confirmed casts\n"
+        "Adaptive runs change opponent noise; these are not full god-AI evaluations",
         fontsize=12)
     figure.savefig(output / "combat.png", dpi=150)
     figure.savefig(output / "combat.pdf")
     plt.close(figure)
     (output / "combat_series.json").write_text(json.dumps({"window": window, "runs": series}, indent=2))
+
+
+def plot_curriculum(labels, output):
+    """Keep feedback and applied episode difficulty separate, on the same step axis."""
+    series = {}
+    for label in labels:
+        progress = json.loads((output / label / "progress.json").read_text())
+        state = progress.get("curriculum", {"kind": "fixed"})
+        if state["kind"] not in {"adaptive_action_noise", "adaptive_episode_mixture"}:
+            continue
+        episodic = state["kind"] == "adaptive_episode_mixture"
+        config = OmegaConf.to_container(OmegaConf.load(output / label / "config.yaml"), resolve=True)
+        timing = json.loads((output / label / "timing.json").read_text())
+        learner = config["rl"].get("learner", "ppo")
+        frequency = config["rl"][learner]["train_freq" if learner == "dqn" else "n_steps"]
+        start = timing["rollouts"][0]["steps"] - frequency * config["num_envs"]
+        end = progress["steps"]
+        points = {row["name"]: [] for row in state["opponents"]}
+        for episode in progress["episodes"]:
+            event = episode["curriculum_event"]
+            points[event["opponent"]].append({"end_steps": episode["end_steps"],
+                "learner_seat": episode["training_context"]["player"], **event})
+        series[label] = {"start_steps": start, "end_steps": end, "state": state, "opponents": points}
+        names = list(points)
+        for offset in range(0, len(names), 4):
+            selected = names[offset:offset + 4]
+            figure, axes = plt.subplots(len(selected), 2, figsize=(12, 3.2 * len(selected) + 1),
+                squeeze=False, layout="constrained")
+            for row, name in enumerate(selected):
+                probability, performance = axes[row]
+                events = points[name]
+                x = [event["end_steps"] / 1000 for event in events]
+                if events:
+                    probability.step([start / 1000, *x, end / 1000],
+                        [events[0]["previous_random_probability"],
+                         *[event["next_random_probability"] for event in events],
+                         events[-1]["next_random_probability"]], where="post",
+                        color="#2563a6", label="Probability for future games")
+                    probability.scatter(x, [event["episode_random_probability"] for event in events],
+                        color="#b57427", marker="x", s=28, label="Probability used in finished game", zorder=3)
+                    if episodic:
+                        probability.scatter(x, [int(event["selected_policy"] == "uniform") for event in events],
+                            color="#444444", marker="|", s=40,
+                            label="Chosen policy: uniform=1, original=0", zorder=3)
+                    performance.plot(x, [event["ema_win_rate"] for event in events],
+                        color="#2563a6", marker="o", markersize=3)
+                else:
+                    probability.plot([start / 1000, end / 1000],
+                        [state["states"][name]["random_probability"]] * 2,
+                        color="#2563a6", label="Probability for future games")
+                    performance.text(.5, .72, "No completed episodes in this run", ha="center",
+                        transform=performance.transAxes)
+                target, band = state["config"]["target_win_rate"], state["config"]["deadband"]
+                performance.axhspan(target - band, target + band, color="#777777", alpha=.12)
+                performance.axhline(target, color="#444444", linestyle=":", linewidth=1)
+                probability.set_title(f"{name} — uniform probability", fontsize=10)
+                performance.set_title(f"EMA win rate — {len(events)} completed games in this run", fontsize=10)
+                probability.legend(fontsize=8, loc="lower left")
+                for axis in (probability, performance):
+                    margin = (end - start) / 1000 * .015
+                    axis.set_xlim(start / 1000 - margin, end / 1000 + margin)
+                    axis.set_ylim(-.04, 1.04)
+                    axis.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+                    axis.set_xlabel("Environment steps (thousands)")
+                    axis.grid(alpha=.2)
+                    axis.spines[["top", "right"]].set_visible(False)
+            figure.suptitle(f"{label}: adaptive training curriculum through {end:,} steps\n"
+                + ("Per-game strategy selection; " if episodic else "Per-decision action replacement; ") +
+                f"EMA half-life {state['config']['ema_half_life']:g} games; shaded band is controller deadband\n"
+                "Episode points are placed at completion; training win rate is not full god-AI evaluation",
+                fontsize=11)
+            stem = f"curriculum-{label}-{offset // 4 + 1}"
+            figure.savefig(output / f"{stem}.png", dpi=150)
+            figure.savefig(output / f"{stem}.pdf")
+            plt.close(figure)
+    if series:
+        (output / "curriculum_series.json").write_text(json.dumps(series, indent=2))
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="analyze_training")
@@ -188,6 +282,7 @@ def main(cfg):
         axes[0, 2].set_ylim(0, 1)
     if not dqn:
         axes[1, 2].set_yscale("symlog", linthresh=1)
+        axes[1, 1].yaxis.set_major_formatter(PercentFormatter(xmax=1))
     # Do not magnify floating-point noise around an all-loss return of -1.
     axes[0, 0].set_ylim(min(return_limits) - .05, max(return_limits) + .05)
     for axis in (axes[0, 1], axes[0, 2], axes[1, 0], axes[1, 1], *axes[2]):
@@ -210,6 +305,7 @@ def main(cfg):
     figure.savefig(output / "curves.pdf")
     plt.close(figure)
     plot_combat(list(cfg.runs), output, cfg.combat_window, palette, styles)
+    plot_curriculum(list(cfg.runs), output)
     (output / "summary.json").write_text(json.dumps(summaries, indent=2))
     print(json.dumps(summaries, indent=2))
 

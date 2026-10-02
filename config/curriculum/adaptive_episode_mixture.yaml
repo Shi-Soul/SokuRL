@@ -1,0 +1,6 @@
+# @package algorithm.curriculum
+defaults:
+  - adaptive_noise
+  - _self_
+# Probability of choosing a pure uniform policy for the entire episode.
+kind: adaptive_episode_mixture

@@ -2,14 +2,15 @@
 from dataclasses import dataclass
 import json
 import numpy as np
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
+from stable_baselines3.common.callbacks import CallbackList
 from stable_baselines3.common.logger import configure
 
 from soku_rl.policy.loader import load_policy
 from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
 from soku_rl.rl.matchup_env import MatchupMixtureVecEnv
 from soku_rl.rl.learner import create_learner, parameter_hash, learner_kind, save_checkpoint
-from soku_rl.rl.training import EpisodeRecords
+from soku_rl.rl.training import EpisodeRecords, ResponseCheckpointCallback
+from soku_rl.rl.curriculum import create_curriculum
 from soku_rl.policy.matchups import opponent_interface
 
 
@@ -43,6 +44,10 @@ def train_response(env, config, opponents, probabilities, device, seed, director
     else:
         raise ValueError("BR matchups must be fixed or sampled")
     try:
+        curriculum = create_curriculum(config.get("curriculum", {"kind": "fixed"}),
+            opponents, probabilities, int(env.single_action_space.n))
+        curriculum.restore(config["initial_policy"])
+        view.curriculum = curriculum
         model, source = create_learner(view, env.interface, config,
             config["initial_policy"], device, seed)
         model.set_logger(configure(str(directory / "scalars"), ["csv", "stdout"]))
@@ -52,9 +57,8 @@ def train_response(env, config, opponents, probabilities, device, seed, director
         # This inference artifact intentionally has no replay/continuation bundle.
         model.save(directory / "initial.zip")
         callbacks = [
-            EpisodeRecords(directory, config["checkpoint_every"]),
-            CheckpointCallback(save_freq=config["checkpoint_every"] // env.num_envs,
-                save_path=str(directory / "checkpoints"), name_prefix="ppo"),
+            EpisodeRecords(directory, config["checkpoint_every"], curriculum),
+            ResponseCheckpointCallback(directory, config["checkpoint_every"] // env.num_envs, curriculum),
         ]
         if learner_kind(config) == "dqn":
             callbacks = callbacks[:1]
@@ -70,6 +74,7 @@ def train_response(env, config, opponents, probabilities, device, seed, director
             try:
                 path = directory / "interrupted.zip"
                 save_checkpoint(model, path)
+                curriculum.save(path, model.num_timesteps)
                 recovery.update(saved=True, checkpoint=str(path))
             except Exception as save_error:
                 recovery["save_error"] = repr(save_error)
@@ -84,12 +89,13 @@ def train_response(env, config, opponents, probabilities, device, seed, director
             raise RuntimeError("BR completed without a policy update")
         path = directory / "final.zip"
         save_checkpoint(model, path)
+        curriculum.save(path, model.num_timesteps)
         return {"steps": model.num_timesteps, "start_steps": start_steps,
             "additional_steps": model.num_timesteps - start_steps, "initial_policy": source,
             "initial_policy_hash": initial, "final_policy_hash": final,
             "checkpoint": str(path), "player": config["player"],
             "opponents": {p.name: p.fingerprint for p in opponents},
-            "opponent_probabilities": view.probabilities.tolist()}
+            "opponent_probabilities": view.probabilities.tolist(), "curriculum": curriculum.snapshot()}
     finally:
         view.close()
 

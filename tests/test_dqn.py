@@ -26,6 +26,13 @@ def dqn_config():
         "policy_kwargs": {"net_arch": [8]}, "verbose": 0}}
 
 
+@pytest.mark.parametrize("option", ["rehearsal", "online_anchor"])
+def test_dqn_rejects_ppo_auxiliary_objectives(option):
+    from soku_rl.rl.learner import learner_kind
+    with pytest.raises(ValueError, match="require the PPO learner"):
+        learner_kind(dqn_config() | {option: {}})
+
+
 def contract(directory, env, config):
     path = directory / "config.yaml"
     shared = config["response"] if config["name"] == "psro" else config
@@ -297,13 +304,17 @@ def test_dqn_learns_terminal_rewards_instead_of_only_changing_weights():
         env.close()
 
 
-def test_br_runtime_failure_preserves_recoverable_dqn_without_claiming_success(tmp_path, monkeypatch):
+@pytest.mark.parametrize("curriculum", ["fixed", "adaptive_action_noise", "adaptive_episode_mixture"])
+def test_br_runtime_failure_preserves_recoverable_dqn_without_claiming_success(tmp_path, monkeypatch, curriculum):
     from soku_rl.marl.br import train_br
     torch.set_num_threads(1)
     env=fixture_env()
     config=dqn_config() | {"name":"br", "player":0, "matchups":{"mode":"fixed"},
         "timesteps":16, "checkpoint_every":8, "initial_policy":{"kind":"fresh"},
         "opponents":[{"name":"random", "probability":1., "policy":{"kind":"uniform"}}]}
+    if curriculum != "fixed":
+        from test_adaptive_curriculum import settings
+        config["curriculum"] = settings() | {"kind": curriculum, "warmup_episodes": 1, "update_every": 1}
     first, second=tmp_path/'first', tmp_path/'second'
     first.mkdir(); second.mkdir()
     original=DoubleDQN.learn
@@ -328,6 +339,11 @@ def test_br_runtime_failure_preserves_recoverable_dqn_without_claiming_success(t
         model=DoubleDQN.load(second/'final.zip',device='cpu')
         model.load_replay_buffer(second/'final.replay.pkl')
         assert model._n_updates==4 and model.replay_buffer.size()*model.n_envs==16
+        if curriculum != "fixed":
+            state = json.loads((first / "interrupted.curriculum.json").read_text())
+            assert state["steps"] == recovery["steps"]
+            new_records = json.loads((second / "progress.json").read_text())["episodes"]
+            assert resumed["curriculum"]["states"]["random"]["episodes"] == state["states"]["random"]["episodes"] + len(new_records)
     finally:
         env.close()
 

@@ -1,0 +1,4 @@
+defaults:
+  - pretrain_recurrent_demonstrations
+  - override track: superhuman_numeric_combat
+  - _self_

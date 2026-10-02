@@ -1,0 +1,5 @@
+defaults:
+  - pretrain_recurrent_numeric_combat_demonstrations
+  - _self_
+pretraining:
+  action_change_weight: 4.0

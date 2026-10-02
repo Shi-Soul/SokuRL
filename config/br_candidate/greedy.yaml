@@ -1,0 +1,4 @@
+# @package candidate
+# Distinct derived policy: choose the categorical mode on every frame.
+kind: checkpoint
+inference: greedy

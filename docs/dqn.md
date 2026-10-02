@@ -271,3 +271,26 @@ Linux 入口可用，嵌套入口不可用；未放宽存储限制，已删除�
 删除的 ENOTEMPTY/EBUSY/并发 ENOENT 作有界重试，权限错误立即抛出，始终保存
 清理结果。7 项回归见 `logs/pytest-dqn-worker-cleanup-20261001.txt`。这不涉及
 共享 Wine 服务、其他任务或游戏/学习算法修改。
+
+## 与 main 的合并验证（2026-10-02）
+
+在独立 `SokuRL-dqn` worktree 的 `feat/dqn-marl` 中合入 `main` 的
+`5815bc1a0569255ac0d1510fe926523e276df8fb`。保留主线的自适应课程、PPO
+示范训练与在线锚定选项，同时将 BR 创建、保存和评测接入共享 PPO/DQN 层。
+DQN 的更新后、最终和中断检查点均保存回放与课程状态；PPO 专用的 `rehearsal`
+及 `online_anchor` 与 DQN 组合时明确拒绝，不静默忽略。课程图与延迟标量按
+实际 learner 的采样频率和更新计数对齐，显式贪心评测直接使用原生 DQN 策略。
+
+全量 Python 回归为 **1140 passed、12 skipped、1 deselected、2 subtests passed**，
+包括两种自适应课程下 DQN 的最终、更新后与中断恢复测试。日志为
+`logs/pytest-dqn-main-merge-full-20261002.txt`；最终绘图标签调整后的 10 项诊断
+回归见 `logs/pytest-dqn-main-merge-analysis-final-20261002.txt`。
+
+使用已冻结的 16384 步精简观测模型，在 GPU 0 上通过新 `+br_candidate=greedy`
+入口重跑原 validation 的 4 个世界种子、双座位 8 局，结果 **8 胜、0 负、0 超时**，
+每座位各 4 胜，耗时 122.84 秒。8 份回放的全部数组与合并前验证逐项完全相同，
+并核对胜负、帧数、回报及策略种子；这项验证未重新训练或选择模型。
+结果、回放与源码树审计保存在
+`logs/benchmark/br-dqn-main-merge-validation-20261002/`，审计为 `merge-audit.json`。
+已知的长预算贪心策略退化仍按 `docs/dqn-weak-opponent.md` 保留，不属于此次
+合并修复范围。

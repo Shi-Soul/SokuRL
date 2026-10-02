@@ -1,0 +1,163 @@
+# PPO 在线更新后的示范复习
+
+共享和分离特征的循环 PPO 都在在线训练后丢失了较多教师动作拟合能力，
+完整神 AI 对照仍未获得胜局。现在增加一个可选的、计算预算明确的监督复习实验，
+暂不视为已找到有效 BR 配置。
+
+`rl=recurrent_rehearsal` 保留 `recurrent_demonstration_transfer` 的 PPO 参数和网络。
+每次调用共享模型的 `train()`，先执行上游 SB3/RecurrentPPO 更新，再进行配置数量的
+教师动作交叉熵更新。没有复制 PPO 损失、优势估计或采样实现；BR、IPPO、PSRO 和
+NFSP 的 PPO 创建入口相同。NFSP 原有的前馈模型约束仍适用。
+这是交替优化的 PPO + BC，不是联合损失，也不是已实现 PPG 或 Kickstarting。
+
+默认每个 1024 帧在线 rollout 后复习一次，抽取四段、每段最多 64 帧，
+监督学习率 1e-4。它复用策略 Adam 优化器及其动量，临时设置监督学习率，更新后恢复
+PPO 学习率；监督次数、样本数和耗时单独计数，不计入 PPO epoch 或环境步数。
+不拟合示范回报。独立 critic 分支没有监督梯度；共享 actor/critic 特征仍可能影响 critic。
+监督学习率和更新频率会约束偏离教师的速度，可能也妨碍超过教师，后续需依据实战调节。
+
+只从严格验证后的数据集 train split 中均匀抽取窗口起始帧，有放回；
+窗口在本局末尾截断，损失按实际有效帧数平均。长局按帧数获得更大采样概率，
+窗口末尾截断也意味着这不是每帧等概率的完整监督 epoch。
+验证局仅做完整性检查，不能进入复习存储。
+循环模型对每个窗口从本局起点重新计算全部历史，使用当前参数、关闭梯度，
+然后只对窗口反向传播。历史恢复按最多 256 帧分块，不缩短历史，不复用旧参数产生的缓存状态。
+多个窗口累积梯度后才更新，彼此不共享记忆。恢复历史和窗口均使用 eval mode，
+避免 dropout 或 BatchNorm 修改前缀状态；窗口仍启用梯度。
+cuDNN 的 eval LSTM 不支持反向传播，因此短窗口明确使用 PyTorch 原生 LSTM 路径，
+完整历史仍使用 cuDNN 推断；上下文结束后恢复原 cuDNN 开关，不修改 PPO 路径。
+这部分计算上界取决于最长对局，必须把 `burn_in_frames` 和耗时计入效率判断。
+
+检查点保存数据集 manifest/config 哈希、完整复习设置、采样随机数状态及累计计数，
+不打包示范样本。通过共享 factory 续训时重新严格验证文件，并要求身份和设置一致。
+仅导入权重则重置复习计数、采样随机数和优化器。
+标准策略加载器仍可直接推断，不需要示范数据。直接加载扩展模型后自行训练会明确报错，
+要求从共享 factory 附加已验证数据。
+标量日志记录 `rehearsal/*`；BR 的 `timing.json` 也保存每次复习指标，含最终一次，
+避免 SB3 下一轮才输出标量而遗漏最后更新。对手课程继续由长期 EMA 水平决定 uniform 混合比例，
+没有改回固定阶段。
+
+初次针对性检查 24 项通过，增加双座位联合采样和私有 critic 优化器隔离后 33 项通过，
+日志为 `.dev/pytest-rehearsal-20261001.log` 和 `-v2.log`。
+涵盖实际短 PPO 更新、前馈/循环共享入口、窗口与逐帧历史一致性、监督梯度、
+保存/加载、恢复采样序列和优化器更新的一致性、权重初始化重置。
+这些测试使用模拟环境，不代表真实游戏强度已改善。
+全量回归为 986 passed、12 skipped、1 deselected、2 subtests passed，耗时 59.14 秒；
+三条警告来自已有 TorchRL/PettingZoo 版本提示。日志 `.dev/pytest-rehearsal-full-20261001.log`。
+
+首轮实战对照计划从原循环 BC best 初始化，保持原在线对照的种子、网络、
+131072 步预算和自适应课程，仅增加复习原教师训练集：
+
+```bash
+bash scripts/linux.sh tools/train.py linux.cuda_devices=7 algorithm=br \
+  rl=recurrent_rehearsal rl.cpu_threads=1 rules=god \
+  wrappers=superhuman_learning track=superhuman_combat \
+  +br_opponents=god_target algorithm.target.character=0 +curriculum=adaptive_noise \
+  num_envs=4 algorithm.timesteps=131072 \
+  '++algorithm.initial_policy={kind:weights,path:logs/pretraining/god-marisa-reimu-recurrent-20261001/best.zip,training_config:logs/pretraining/god-marisa-reimu-recurrent-20261001/config.yaml}' \
+  output=logs/training/br-superhuman-reimu-recurrent-rehearsal-adaptive-20261001-v2
+```
+
+实际总计算量和样本复用量会增加，不能把相同在线步数说成相同计算预算。
+完整神 AI 测评使用原对手，不带训练课程的 uniform 扰动。
+
+首个真实 GPU 运行（不带 `-v2`，源码 `8511fab`）在第一次复习反向传播时失败：
+`cudnn RNN backward can only be called in training mode`。CPU 单元测试没有覆盖该限制。
+原运行耗时 151.74 秒，保留失败 result、配置、源码指纹及日志，不作为完成的 PPO 对照。
+私有 worker `7d0aa118768a4736a4dfe21bc41ca2b0` 及服务退出码均为 0，前缀和游戏副本已清理。
+随后按上文方式限定短窗口走原生 LSTM，增加实际 CUDA 反向测试。
+相关 37 项检查通过（`.dev/pytest-rehearsal-cuda-20261001.log`）。
+另在 GPU 0 用真实原循环 BC、原教师数据和生产复习设置完成一次更新：
+256 个监督帧、12633 帧历史恢复、1.200 秒，最大分配显存 2046389760 字节。
+参数哈希改变、所有参数有限，PPO/环境计数均为零，cuDNN 开关已恢复。
+该局部检查不产生真实游戏胜率，证据见
+`logs/diagnostics/rehearsal-cuda-real-data-20261001/summary.json`。
+修复后从相同原始权重重新开始 `-v2`，不从失败运行的局部状态续接。
+
+`-v2` 已从源码 `7c79b98` 在 GPU 7 完成首轮真实游戏更新。
+1024 步采样耗时 8.795 秒，PPO 加复习更新共 3.081 秒，其中复习 0.649 秒，
+256 个监督帧、12633 帧历史恢复；两个 PPO epoch 与一次复习分别计数。
+首个 updated 检查点 SHA256 为 `e3ae2256fe9c7997efb7a70ad12f6fbcf0c27b1ec8f588e0d7faf9203594c17c`，
+课程 sidecar、复习计数/数据身份及源码指纹验证通过，actor LSTM 参数确实变化。
+与原循环 BC 在线 PPO 的网络、PPO 参数、种子、观察、环境数和课程配置一致。
+日志 `.dev/audit-recurrent-rehearsal-first-update-20261001.log`，结构化记录在
+`logs/diagnostics/recurrent-rehearsal-first-update-20261001/summary.json`。
+此时还没有完整训练局，uniform 为 0.90；这只是运行正确性的证据。
+
+49152 步快照在 `logs/diagnostics/recurrent-rehearsal-curves-20261001`，包含原循环、
+分离特征循环和复习对照的训练/战斗/课程 PNG、PDF、原始输入快照与 SHA256。
+五张 PNG 已目视检查，EMA 用历史结果显式加权重新核对，源快照哈希一致；没有声明检查 PDF。
+复习配置此时 8 局为 6 负、2 超时，EMA=0、uniform=0.90，仍处于 20 局预热期。
+48 次更新复习 12169 帧，并恢复 618082 帧历史；复习耗时 32.348 秒，
+平均每次 0.674 秒，占优化时间 22.51%、完整采样/更新周期 4.98%。
+该运行的完整周期吞吐为 75.71 步/秒；节点负载及对局重置次数不同，不能据此声称相对基线加速。
+课程和耗时核对保存在 `.dev/audit-recurrent-rehearsal-curves-20261001.log` 及图目录 `audit.json`。
+
+## 65536 步的固定教师验证
+
+新只读验证入口对两个 65536 步检查点评分，完整四局及其哈希、世界种子完全配对：
+
+| 模型 | NLL | 总准确率 | 变化帧准确率 | 价值 MSE |
+| --- | --- | --- | --- | --- |
+| 原循环 BC 起点 | 0.35580 | 91.847% | 46.581% | 0.12841 |
+| 不复习 PPO，65536 步 | 1.53217 | 57.538% | 37.957% | 0.11694 |
+| 带复习 PPO，65536 步 | 0.43370 | 89.625% | 43.009% | 0.11743 |
+
+本次单种子对照中，复习明显减少教师标签拟合的丢失，但相对 BC 起点仍有下降。
+这尚不是完整神 AI 胜率改善的证据；相同四局真实游戏评估另行运行。
+复习检查点 SHA256 为 `ef70f293d7633b88d09a0e02fd7098387c564d4640e7564c1e6985dc55dda5d6`，
+课程 sidecar 匹配：累计 8 局、EMA=0、uniform=0.90。
+输出 `logs/diagnostics/recurrent-rehearsal-midpoint-retention-20261001` 保存两座位指标、来源和核对结果，
+日志 `.dev/audit-recurrent-rehearsal-midpoint-retention-20261001.log`。
+
+对应完整神 AI 测评已完成：186.94 秒、4 局全负，平均自身/对手 HP 下降为 10000/0，
+双方符卡动作进入均为 0。相同种子、角色和座位与不复习的 65536 步对照配对核对通过，
+模型 SHA256 匹配，私有 worker `53ba50b8627847908370f9a00287f4f0` 正常退出并清理。
+证据为同诊断目录 `full_god_evaluation.json`，日志
+`.dev/audit-recurrent-rehearsal-midpoint-evaluation-20261001.log`。
+行为保留改善没有在该小样本转化为实战提升，因此不扩大当前 131072 步预算。
+
+`logs/diagnostics/recurrent-rehearsal-midpoint-actions-20261001` 进一步检查了实际提交命令。
+复习中点的 A/B/C 按下比例为 0.820%/0.304%/0.144%，原循环 BC 为 2.227%/1.557%/0.749%；
+平均相同命令连续长度分别为 7.508/7.142 帧，重复率 86.710%/86.033%。
+它仍提交少量攻击按键，不能描述成完全不进攻；但攻击输入频率下降、且四局没有观测到
+对手 HP 下降。逻辑按键不等同招式成功或命中，现有指标不能单独确定未命中的具体原因。
+
+## 原定预算完成
+
+复习对照已自然完成 131072 步、1786.99 秒，20 局为 1 胜、12 负、7 超时。
+平均自身/对手 HP 下降 9366.20/5770.25，双方符卡动作进入均值均为 0.30。
+这属于掺水训练对手的结果；最终完整神 AI 测评另行检查。
+累计到第 20 局时 EMA=5.454%，下一局 uniform 比例由 0.90 自适应上调到 0.95，
+没有把最终配置解释为已在 0.95 下完成全部训练。
+
+共 128 次复习、32396 个监督帧、1583877 帧历史恢复，耗时 83.169 秒，
+占完整采样/更新周期 4.934%，该运行周期吞吐 77.75 步/秒。
+所有复习计数和步骤与 timing 对齐，最终检查点 SHA256 为
+`fcd26f807814de6dc5cd9e3806a26c1f75c67821e195f9b811d3333cb121794b`，课程 sidecar 一致。
+私有 worker `0d86e636ca434dc39809f377d7ab758c` 正常退出并清理，不再继续该配置。
+记录 `logs/diagnostics/recurrent-rehearsal-final-20261001/training.json`，核对日志
+`.dev/audit-recurrent-rehearsal-final-training-20261001.log`。
+
+最终完整神 AI 配对测评完成：187.37 秒、4 局全负，平均自身/对手 HP 下降
+10286.50/2562.50，双方符卡动作进入均为 0。
+与同预算不复习对照的对手 HP 下降 310.25 相比，该小样本的伤害代理量更高，仍未取得胜局。
+相同种子/角色/座位及模型哈希已核对；私有 worker `dfeda7c9352b40338edbc415cefbc97f`
+正常退出并清理。结果位于 `logs/diagnostics/recurrent-rehearsal-final-20261001/full_god_evaluation.json`，
+日志 `.dev/audit-recurrent-rehearsal-final-evaluation-20261001.log`。
+
+最终教师验证 NLL 0.52094、总准确率 88.215%、变化帧准确率 39.408%、价值 MSE 0.06811。
+新增命令分组诊断使用完全相同的四局 28800 帧，并单独核对按座位加权结果：
+
+| 检查点 | 攻击命令平均概率 | 攻击标签上的完整命令准确率 | 符卡标签上的完整命令准确率 |
+| --- | --- | --- | --- |
+| 原 BC | 5.266% | 72.785% | 63.636% |
+| 复习 65536 步 | 4.306% | 68.897% | 68.182% |
+| 复习 131072 步 | 8.189% | 66.184% | 65.152% |
+
+验证标签中攻击为 1106 帧（3.840%），符卡为 66 帧，换卡为 46 帧。
+中点在教师状态的攻击概率并不低于标签频率，但实际游戏攻击输入频率更低，
+所以这些结果不足以用全局攻击概率压低来单独解释失败。
+保留行为、命令正确性和真实访问状态需要分别判断；极少的卡片标签也限制结论。
+来源 `logs/diagnostics/recurrent-rehearsal-command-retention-20261001`，核对日志
+`.dev/audit-recurrent-rehearsal-command-retention-20261001.log`。

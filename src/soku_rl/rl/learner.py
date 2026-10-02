@@ -18,6 +18,8 @@ def learner_kind(config):
     kind = config.get("learner", "ppo")
     if kind not in {"ppo", "dqn"}:
         raise ValueError("rl.learner must be ppo or dqn")
+    if kind == "dqn" and any(option in config for option in ("rehearsal", "online_anchor")):
+        raise ValueError("rehearsal and online_anchor require the PPO learner")
     return kind
 
 

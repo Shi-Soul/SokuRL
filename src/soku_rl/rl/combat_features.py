@@ -2,7 +2,7 @@
 import torch
 
 from soku_rl.env.observation.memory_schema import FIGHTER_NAMES, PLAYER_WIDTH, WORLD_NAMES
-from soku_rl.rl.features import PrivilegedFeatures
+from soku_rl.rl.features import PrivilegedFeatures, NumericPrivilegedFeatures
 
 
 # Engineering scales, not bounds or claims about every character's valid range.
@@ -37,3 +37,11 @@ class CombatPrivilegedFeatures(PrivilegedFeatures):
             difference[:, fields["xspeed"]] * facing, difference[:, fields["yspeed"]],
             -difference[:, fields["hp"]], -difference[:, fields["rei"]]), dim=1)
         return torch.cat((scaled.flatten(1), relative), dim=1)
+
+
+class NumericCombatPrivilegedFeatures(CombatPrivilegedFeatures):
+    """Combine full-record numeric channels with the existing combat context."""
+    numeric_width = 3
+
+    def numeric_features(self, records):
+        return NumericPrivilegedFeatures.numeric_features(self, records)

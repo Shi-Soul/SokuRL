@@ -10,11 +10,15 @@ from soku_rl.env.observation.memory_schema import (
     FIGHTER_NAMES, FIGHTER_WIDTH, MAX_OBJECTS, OBJECT_WIDTH, PLAYER_WIDTH,
     PRIVILEGED_FEATURES, WORLD_NAMES)
 from soku_rl.rl.features import PrivilegedFeatures, NumericPrivilegedFeatures
-from soku_rl.rl.combat_features import CombatPrivilegedFeatures, FIGHTER_SCALES
+from soku_rl.rl.combat_features import CombatPrivilegedFeatures, NumericCombatPrivilegedFeatures, FIGHTER_SCALES
+from soku_rl.rl.persistent_policy import ActionContextFeatures
+from soku_rl.rl.address_invariant_features import AddressInvariantCombatFeatures
 from soku_rl.env.observation.privileged import encode_values
 
 
-@pytest.mark.parametrize("encoder_type", [PrivilegedFeatures, NumericPrivilegedFeatures, CombatPrivilegedFeatures])
+@pytest.mark.parametrize("encoder_type", [PrivilegedFeatures, NumericPrivilegedFeatures, CombatPrivilegedFeatures,
+                                         NumericCombatPrivilegedFeatures, ActionContextFeatures,
+                                         AddressInvariantCombatFeatures])
 def test_every_object_position_affects_features_and_padding_is_ignored(encoder_type):
     torch.set_num_threads(1)
     torch.manual_seed(17)
@@ -39,9 +43,10 @@ def test_every_object_position_affects_features_and_padding_is_ignored(encoder_t
     assert sum(p.numel() for p in encoder.parameters()) < 1_000_000
 
 
-def test_numeric_features_keep_lossless_parts_and_scale_small_signed_values():
+@pytest.mark.parametrize("encoder_type", [NumericPrivilegedFeatures, NumericCombatPrivilegedFeatures])
+def test_numeric_features_keep_lossless_parts_and_scale_small_signed_values(encoder_type):
     space = spaces.Box(-np.inf, np.inf, (PRIVILEGED_FEATURES,), np.float32)
-    encoder = NumericPrivilegedFeatures(space, 1, 4, 16, 8)
+    encoder = encoder_type(space, 1, 4, 16, 8)
     raw = np.array([-1., 0., 1., 0.125, 10000., 4294967295.])
     parts = torch.from_numpy(encode_values(raw).reshape(1, -1))
     features = encoder.numeric_features(parts)
@@ -51,9 +56,10 @@ def test_numeric_features_keep_lossless_parts_and_scale_small_signed_values():
     assert features[0, parts.shape[-1] + 2] > 1000 * parts[0, 5]
 
 
-def test_combat_context_scales_health_and_facing_relative_geometry():
+@pytest.mark.parametrize("encoder_type", [CombatPrivilegedFeatures, NumericCombatPrivilegedFeatures])
+def test_combat_context_scales_health_and_facing_relative_geometry(encoder_type):
     space = spaces.Box(-np.inf, np.inf, (PRIVILEGED_FEATURES,), np.float32)
-    encoder = CombatPrivilegedFeatures(space, 1, 4, 16, 8)
+    encoder = encoder_type(space, 1, 4, 16, 8)
     observations = np.zeros((2, PRIVILEGED_FEATURES), np.float32)
     # Mirrored positions and facing should preserve the learner-relative distance.
     for batch, facing in enumerate((1, -1)):
@@ -74,13 +80,31 @@ def test_combat_context_scales_health_and_facing_relative_geometry():
     assert encoder(tensor).shape == (2, 8)
 
 
-def test_combat_context_supports_history_and_checkpoint_roundtrip(tmp_path):
+@pytest.mark.parametrize("encoder_type", [CombatPrivilegedFeatures, NumericCombatPrivilegedFeatures,
+                                         AddressInvariantCombatFeatures])
+def test_combat_context_supports_history_and_checkpoint_roundtrip(tmp_path, encoder_type):
     space = spaces.Box(-np.inf, np.inf, (2 * PRIVILEGED_FEATURES + 8,), np.float32)
-    encoder = CombatPrivilegedFeatures(space, 2, 4, 16, 8)
+    encoder = encoder_type(space, 2, 4, 16, 8)
     values = torch.zeros(1, space.shape[0])
     assert encoder(values).shape == (1, 8)
     path = tmp_path / "encoder.pt"
     torch.save(encoder.state_dict(), path)
-    reloaded = CombatPrivilegedFeatures(space, 2, 4, 16, 8)
+    reloaded = encoder_type(space, 2, 4, 16, 8)
     reloaded.load_state_dict(torch.load(path, weights_only=True))
     torch.testing.assert_close(encoder(values), reloaded(values), rtol=0, atol=0)
+
+
+def test_numeric_combat_offline_and_online_configs_share_the_same_input_contract():
+    from pathlib import Path
+    from hydra import compose, initialize_config_dir
+    from omegaconf import OmegaConf
+    with initialize_config_dir(config_dir=str(Path(__file__).parents[1] / "config"), version_base="1.3"):
+        original = compose(config_name="pretrain_recurrent_demonstrations")
+        offline = compose(config_name="pretrain_recurrent_numeric_combat_demonstrations")
+        online = compose(config_name="train", overrides=["algorithm=br", "rl=recurrent_demonstration_transfer",
+            "track=superhuman_numeric_combat", "wrappers=superhuman_learning"])
+        assert OmegaConf.to_container(original.episode) == OmegaConf.to_container(offline.episode)
+        assert OmegaConf.to_container(original.wrappers) == OmegaConf.to_container(offline.wrappers)
+        assert OmegaConf.to_container(offline.rl.ppo.policy_kwargs) == OmegaConf.to_container(online.rl.ppo.policy_kwargs)
+        assert offline.rl.ppo.policy_kwargs.features_extractor_class.endswith("NumericCombatPrivilegedFeatures")
+        assert offline.pretraining.initial_policy.kind == "fresh"
