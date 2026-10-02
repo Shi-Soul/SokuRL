@@ -65,7 +65,7 @@ PNG/PDF、62 行 CSV、源文件哈希。根据 timing 的实际 n_updates 匹�
 每组展示 31/32 次更新，最后一次没有 scalar dump，不补造该点。
 图中训练 KL 是 SB3 最后 epoch 的 minibatch 统计，value loss 也不是留出轨迹 MSE。
 PNG 已检查，PDF 未独立渲染。脚本/日志 `.dev/plot-address-small-step-20261002.*`。
-完整神 AI 四局筛查已启动，尚待结果。
+完整神 AI 四局筛查结果见下节。
 
 ## 四局筛查完成
 
@@ -105,3 +105,25 @@ bash scripts/linux.sh tools/train.py --config-name train_address_control_continu
 sidecar 与配置匹配，历史 3 局及 EMA 累计量保留。
 证据 `logs/diagnostics/address-control-continuation-preflight-20261002/summary.json`，
 脚本/日志 `.dev/check-address-control-continuation-20261002.*`。
+
+
+## 扩展验证与续训初始化审核
+
+小学习率额外 12 局为 0 胜 12 负，平均自身/对手掉血 10040.58/1889.92，
+符卡动作进入均值 0.0833/0.0833，耗时 595.22 秒。
+与首次四局合计 **0/16**；原 BC 为 1/16，原学习率 PPO 为 2/16。
+四局中观察到的较高对手掉血没有在扩展验证中保持，因此停止小学习率分支的训练扩展。
+固定验证集反复用于选择模型，不是独立最终测试，也不足以证明原学习率稳定占优。
+原始结果 `logs/benchmark/br-address-small-step-expanded-20261002`；
+审核目录 `logs/diagnostics/address-small-step-audit-20261002` 的
+`expanded-god-evaluations.json` 与 `combined-validation.json` 保留身份、配对和汇总证据。
+该 worker 正常退出，独立 Wine 前缀和游戏副本清理完成。
+
+原学习率续训的实际 initial.zip 已核对：完整参数和 Adam 状态与预检及源模型一致，
+从 16384 步 / 88 PPO epoch 开始，课程的历史 3 局保留。
+实际启动源码逐文件对照提交 `b114307`，证据为续训预检目录的 `actual-start.json`。
+启动后工作区并入 NFSP/IPPO 产物修复 `ddae660`，BR 实现没有改变；
+不能把当前工作区版本误记成已启动实验版本。
+当前主分支全量回归为 1180 passed、12 skipped、1 deselected、7 warnings、
+2 subtests passed（97.47 秒），日志 `.dev/pytest-main-artifacts-ippo-20261002.log`。
+续训最终效果仍待完成后的纯神 AI 对局验证。
