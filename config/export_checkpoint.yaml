@@ -1,0 +1,12 @@
+defaults:
+  - export_policy
+  - _self_
+
+training_directory: ???
+checkpoint: best.zip
+candidate:
+  name: learned-checkpoint
+  policy:
+    kind: checkpoint
+    path: ${training_directory}/${checkpoint}
+    training_config: ${training_directory}/config.yaml

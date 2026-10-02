@@ -18,6 +18,9 @@ class OnnxDQNPolicy(RLPolicy):
         if manifest["format"] != "sokurl-dqn-onnx-v1":
             raise ValueError("unsupported DQN CPU policy format")
         read_training_contract(path.parent / manifest["training_config"], interface)
+        if "training_sha256" in manifest and hashlib.sha256(
+                (path.parent / manifest["training_config"]).read_bytes()).hexdigest() != manifest["training_sha256"]:
+            raise ValueError("CPU training contract checksum differs")
         model = path.parent / manifest["model"]
         self.fingerprint = hashlib.sha256(model.read_bytes()).hexdigest()
         if self.fingerprint != manifest["model_sha256"]:

@@ -4,12 +4,14 @@ from dataclasses import asdict
 import gzip
 import json
 from pathlib import Path
+import sys
 
 import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import OmegaConf
 
 from soku_rl.play.connection import PlayConnection
+from soku_rl.play.deployment import prepare_play_candidate
 from soku_rl.play.loader import load_play_policy, play_interface, warm_play_policy
 from soku_rl.play.menu import play_menu
 from soku_rl.play.opponents import opponent_catalog
@@ -48,6 +50,9 @@ def main(cfg):
     interface = play_interface(candidate, config["episode"], config["wrappers"], config["track"],
                                overrides)
     print("正在准备 AI；完成后才建立网络连接。", flush=True)
+    if candidate["policy"]["kind"] != "rule" and config["device"] != "cpu":
+        raise ValueError("learned play opponents use CPU ONNX inference; set device=cpu")
+    candidate = prepare_play_candidate(candidate, config["deployment"])
     policy = load_play_policy(candidate, interface, rules, config["device"], ai["seat"])
     warmed = warm_play_policy(policy, interface, config["seed"])
     controller = RealtimePolicy(policy, interface, ai["seat"], config["seed"])
@@ -62,7 +67,8 @@ def main(cfg):
     output.mkdir(parents=True, exist_ok=False)
     OmegaConf.save(cfg, output / "config.yaml", resolve=True)
     report = {"success": False, "opponent": config["opponent"], "policy_fingerprint": policy.fingerprint,
-              "track": config["track"], "clients": plan}
+              "track": config["track"], "clients": plan, "deployment": candidate["policy"],
+              "torch_imported": "torch" in sys.modules}
     try:
         with closing(PlayConnection(log_path=output / "worker.log", **config["runtime"])) as connection:
             if connection.identity["kind"] != "realtime_play":

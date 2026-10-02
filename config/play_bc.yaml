@@ -1,0 +1,17 @@
+defaults:
+  - play
+  - _self_
+
+training_directory: ???
+checkpoint: best.zip
+ai_character: 1
+opponent: learned-bc
+checkpoints:
+  learned-bc:
+    label: BC（ONNX CPU）
+    characters: ["${ai_character}"]
+    tracks: [human, superhuman]
+    policy:
+      kind: checkpoint
+      path: ${training_directory}/${checkpoint}
+      training_config: ${training_directory}/config.yaml

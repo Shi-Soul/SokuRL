@@ -9,6 +9,9 @@ operation: play
 opponent: god:reimu
 checkpoints: {}
 device: cpu
+deployment:
+  cache: logs/deployment/play-cache
+  verification_steps: 512
 play:
   connection: local
   ai:

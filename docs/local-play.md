@@ -38,6 +38,9 @@ Windows 入口是 `scripts/play.cmd`。双击后依次选择连接方式、拟�
 
 入口先加载策略，再建立网络连接。神 AI 在准备阶段读取原文件、编译 Lua 源码，并创建本场独立的
 执行环境；依赖实际比赛观测的脚本初始化仍在第一帧执行，避免用虚假观测改变原策略行为。
+学习模型统一使用单线程 CPU ONNX Runtime 推理。原生 checkpoint 在独立进程中提前导出，
+校验成功才发布到 `deployment.cache`；缓存按模型、训练配置及导出源码身份隔离。
+导出进程结束后才进入游玩，实时进程不加载 PyTorch。失败会在开局前报错，不回退到 PyTorch。
 学习模型提前加载并执行八次预热。混合策略的所有模型成员都预热，临时记忆和随机状态随后丢弃，
 正式比赛使用新的独立状态。准备过程没有对战实时性要求。
 
@@ -55,6 +58,46 @@ Windows 入口是 `scripts/play.cmd`。双击后依次选择连接方式、拟�
 跨局及队列已满的请求不终止比赛。AI 停顿时，已提交按键仍按原到期时间释放。
 恢复期间会跳过观测并重置策略记忆，因此此游玩模式不能用作逐帧策略一致性或强度评测。
 神 AI 的实时路径直接使用同一份完整状态，省去大型数值数组的往返转换。
+
+## BC checkpoint 与统一 ONNX 推理
+
+BC 保留共享学习器的 checkpoint 格式；无需将训练步数为零的 BC 产物改名成 PPO 模型。
+支持前馈/循环 PPO actor 和 DQN，公开状态、精简状态及完整状态均从原训练配置读取。
+导出核验至少 512 次连续决策、循环记忆及重置，完整状态覆盖双方零对象、不同数量及每方
+1024 个对象；部署只计算实际存在的对象，再放回原槽位，不删除或重排输入对象。
+PPO/BC 保留分类分布采样，DQN 保留贪心动作。
+
+```bash
+# 默认 best.zip；首次导出，之后复用已验证缓存。只检查，不启动游戏。
+bash scripts/linux.sh tools/play.py --config-name play_bc operation=check \
+  training_directory=logs/pretraining/god-marisa-reimu-address-invariant-20261002
+# 正式游玩去掉 operation=check；连接与座位选项和其他对手相同。
+# Windows 将相同参数交给 scripts/play.ps1；需配置本机游戏工作进程。
+
+# 提前导出，供只安装 ONNX Runtime 的游玩机器使用。
+bash scripts/linux.sh tools/export_policy.py --config-name export_checkpoint \
+  training_directory=logs/pretraining/god-marisa-reimu-address-invariant-20261002 \
+  output=logs/deployment/bc-address-invariant
+```
+
+`play_bc` 默认 AI 角色为魔理沙（1），其他模型用 `ai_character` 明确指定；公开状态另加
+`track=human`。普通菜单中可将模型登记到本机 `config/local/play.yaml`：
+
+```yaml
+# @package _global_
+checkpoints:
+  bc-address-invariant:
+    label: 地址不变 BC（ONNX CPU）
+    characters: [1]
+    tracks: [superhuman]
+    policy:
+      kind: onnx
+      path: logs/deployment/bc-address-invariant/policy.json
+```
+
+也可登记 `kind: checkpoint`，并提供 `path`、`training_config`，由开局前准备自动导出。
+原有 SB3、NFSP 平均策略、PSRO 混合策略和历史网络登记也经过同一准备流程；规则与神 AI
+仍执行原策略。ONNX 目录的模型与训练配置哈希均检查，模型格式来自实际 checkpoint。
 
 ## DQN 对手
 
@@ -82,8 +125,8 @@ bash scripts/linux.sh tools/play.py --config-name play_dqn_onnx operation=check 
 
 CPU 部署目录包含 `policy.json`、`actor.onnx` 和 `training.yaml`，登记类型是
 `onnx_dqn`。也可将 `play_dqn.yaml` 中的 `checkpoints` 条目放入本机
-`config/local/play.yaml`，让 DQN 出现在统一菜单中。原生完整状态 DQN 可直接加载；
-ONNX 导出当前覆盖公开状态和精简状态，不宣称完整状态对象编码器已通过部署验证。
+`config/local/play.yaml`，让 DQN 出现在统一菜单中。完整状态 DQN 也经过同一 ONNX 导出核验，
+不在实时进程中执行原生网络。
 更多训练与部署支持范围见 [DQN 流程](dqn.md)。
 
 ## 本机配置

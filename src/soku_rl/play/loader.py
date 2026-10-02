@@ -15,7 +15,7 @@ from soku_rl.policy.population import MixturePolicy
 
 
 def checkpoint_training(spec):
-    if spec["kind"] in {"onnx_recurrent", "onnx_dqn"}:
+    if spec["kind"] in {"onnx", "onnx_recurrent", "onnx_dqn"}:
         path = Path(spec["path"]).resolve(strict=True)
         manifest = json.loads(path.read_text(encoding="utf-8"))
         training_path = path.parent / manifest["training_config"]
@@ -83,7 +83,7 @@ def load_play_policy(candidate, interface, rules, device, seat):
         raise ValueError("policy seat must be 0 or 1")
     if spec["kind"] == "rule":
         spec = spec | {"rules": rules}
-    if spec["kind"] in {"sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo", "onnx_recurrent", "onnx_dqn"}:
+    if spec["kind"] in {"sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo", "onnx", "onnx_recurrent", "onnx_dqn"}:
         interface = checkpoint_interface(spec, interface)
     if spec["kind"] in {"sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo"}:
         import torch

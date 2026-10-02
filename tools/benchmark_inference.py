@@ -13,12 +13,13 @@ from soku_rl.env import EpisodeConfig
 from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
 from soku_rl.policy.loader import load_policy
 from soku_rl.play.loader import checkpoint_training
+from soku_rl.policy.verification_inputs import verification_observation
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="benchmark_inference")
 def main(cfg):
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    if config["device"] != "cpu" or config["candidate"]["policy"]["kind"] not in {"onnx_recurrent", "onnx_dqn"}:
+    if config["device"] != "cpu" or config["candidate"]["policy"]["kind"] not in {"onnx", "onnx_recurrent", "onnx_dqn"}:
         raise ValueError("this deployment benchmark requires the CPU ONNX actor")
     if type(config["decisions"]) is not int or config["decisions"] < 2048 or config["maximum_p99_ms"] <= 0:
         raise ValueError("measure at least 2048 decisions with an explicit positive latency bound")
@@ -29,7 +30,7 @@ def main(cfg):
     policy = load_policy(config["candidate"]["name"], config["candidate"]["policy"], interface, "cpu")
     load_seconds = time.perf_counter()-started
     rng = np.random.default_rng(config["seed"])
-    observations = rng.uniform(-1, 1, size=(128, *policy.shape)).astype(np.float32)
+    observations = [verification_observation(interface, rng, step) for step in range(24)]
     actor = policy.spawn(config["seed"])
     for observation in observations:
         actor.act(observation)
@@ -44,6 +45,7 @@ def main(cfg):
     report = {"success": latency["p99"] <= config["maximum_p99_ms"],
         "model_sha256": policy.fingerprint, "platform": platform.platform(),
         "providers": policy.session.get_providers(), "torch_imported": "torch" in sys.modules,
+        "observation_probes": "structured numeric inputs; privileged object counts 0 through 1024",
         "decisions": config["decisions"], "load_seconds": load_seconds, "latency_ms": latency,
         "maximum_p99_ms": config["maximum_p99_ms"], "intra_op_threads": 1, "inter_op_threads": 1}
     directory = Path(config["output"]).resolve()

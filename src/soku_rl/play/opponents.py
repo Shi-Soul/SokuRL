@@ -63,7 +63,7 @@ def opponent_catalog(rules, package, checkpoints):
                 or not tracks or any(t not in ("human", "superhuman") for t in tracks)):
             raise ValueError(f"invalid opponent capabilities: {name}")
         if entry["policy"]["kind"] not in {
-                "sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo", "onnx_recurrent", "onnx_dqn"}:
+                "checkpoint", "sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo", "onnx", "onnx_recurrent", "onnx_dqn"}:
             raise ValueError(f"unsupported checkpoint opponent: {name}")
         result[name] = Opponent(name, entry["label"], characters, tracks, deepcopy(entry["policy"]), "")
     return result

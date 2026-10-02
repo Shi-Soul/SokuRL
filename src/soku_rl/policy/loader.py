@@ -1,6 +1,11 @@
 """Load every policy type through the same observation and action contract."""
 def load_policy(name, spec, interface, device):
     kind = spec["kind"]
+    if kind == "onnx":
+        from soku_rl.policy.portable import load_portable
+        if str(device) != "cpu":
+            raise ValueError("the deployment model requires device=cpu")
+        return load_portable(name, spec["path"], interface)
     if kind == "greedy":
         from soku_rl.policy.greedy import GreedyPPOPolicy
         if (set(spec) != {"kind", "policy"} or not isinstance(spec["policy"], dict)
