@@ -76,6 +76,14 @@ class RealtimeSession:
                 "seat": self.seat, "character": self.character, "clients": self.plan}
 
     def poll(self):
+        try:
+            return self._poll()
+        except TimeoutError as error:
+            # A busy snapshot/menu channel must not close either game process.
+            return {"closed": False, "records": (),
+                    "events": ({"kind": "observation_wait", "reason": str(error)},)}
+
+    def _poll(self):
         for game in self.games.values():
             code = game.process.poll()
             if code is not None:
@@ -86,7 +94,9 @@ class RealtimeSession:
         states = {name: self.games[name].clients["state"].read_status(.2) for name in self.menus}
         for name, menu in self.menus.items():
             events.extend(event | {"client": name} for event in menu.poll(states[name]))
-        self.cursor, captures = self.history.read_after(self.cursor)
+        self.cursor, captures, dropped = self.history.read_latest(self.cursor)
+        if dropped:
+            events.append({"kind": "observation_resync", "skipped": dropped})
         records = []
         for capture in captures:
             characters = (capture.raw.p1.characterId, capture.raw.p2.characterId)
@@ -127,15 +137,12 @@ class RealtimeSession:
             if identity != self.input_identity:
                 events.append({"kind": "input_status", **current})
                 self.input_identity = identity
-                if current["result"] in {"invalid", "stale", "queue_full"}:
+                if current["result"] == "invalid":
                     raise RuntimeError(f"invalid realtime input protocol: {current}")
         return {"closed": False, "records": records, "events": events}
 
     def submit(self, state, keys):
-        submitted = self.input.submit(state, keys, self.episode.latency_frames, self.episode.decision_frames)
-        return {"submitted": submitted, "request": self.input.sequence,
-                "target": state.frame+self.episode.latency_frames,
-                "expires": state.frame+self.episode.latency_frames+self.episode.decision_frames}
+        return self.input.submit_current(state, keys, self.episode.latency_frames, self.episode.decision_frames)
 
     def close(self):
         self.stack.close()

@@ -9,7 +9,7 @@ import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import OmegaConf
 
-from soku_rl.env.worker_pipe import WorkerConnection
+from soku_rl.play.connection import PlayConnection
 from soku_rl.play.loader import load_play_policy, play_interface, warm_play_policy
 from soku_rl.play.menu import play_menu
 from soku_rl.play.opponents import opponent_catalog
@@ -64,7 +64,7 @@ def main(cfg):
     report = {"success": False, "opponent": config["opponent"], "policy_fingerprint": policy.fingerprint,
               "track": config["track"], "clients": plan}
     try:
-        with closing(WorkerConnection(log_path=output / "worker.log", **config["runtime"])) as connection:
+        with closing(PlayConnection(log_path=output / "worker.log", **config["runtime"])) as connection:
             if connection.identity["kind"] != "realtime_play":
                 raise ValueError("play requires tools/play_worker.py")
             games = connection.request("start", {"settings": config["play"], "episode": asdict(interface.episode)})

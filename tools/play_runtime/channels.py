@@ -66,6 +66,22 @@ class RealtimeHistory(_Mapping):
             raise ValueError("unsupported realtime history ABI")
         self.frequency = header[4]
 
+    def read_latest(self, cursor):
+        """Prefer current play over replaying a backlog; keep strict reads separate."""
+        if not self.view or type(cursor) is not int or not 0 <= cursor < 2**32:
+            raise ValueError("read requires an open history and uint32 cursor")
+        written = C.c_uint32.from_address(self.view + 24).value
+        count = (written - cursor) & 0xFFFFFFFF
+        start = (written - 1) & 0xFFFFFFFF if count else cursor
+        try:
+            end, frames = self.read_after(start)
+        except BufferError:
+            # The writer lapped this copy. Retry the newest slot on the next poll.
+            return cursor, (), 0
+        if not frames:
+            return cursor, (), 0
+        return end, frames[-1:], ((end - cursor) & 0xFFFFFFFF) - 1
+
     def read_after(self, cursor):
         if not self.view or type(cursor) is not int or not 0 <= cursor < 2**32:
             raise ValueError("read requires an open history and uint32 cursor")
@@ -157,3 +173,15 @@ class RealtimeInput(_Mapping):
         guard.value = (guard.value + 1) & 0xFFFFFFFF
         self.sequence = sequence
         return True
+
+    def submit_current(self, state, keys, latency, lifetime):
+        """Preserve minimum reaction delay but give late actions a future deadline."""
+        target = state.frame + latency
+        status = self.status()
+        valid = status is not None and (status["match"], status["round"]) == (state.match, state.round)
+        if valid:
+            target = max(target, status["frame"] + 1)
+        delay = target - state.frame
+        submitted = valid and delay <= 10000 and self.submit(state, keys, delay, lifetime)
+        return {"submitted": submitted, "request": self.sequence,
+                "target": target, "expires": target + lifetime}

@@ -1,6 +1,6 @@
 """Run rule policies from the same observation tensors given to learners."""
 from collections import deque
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from functools import cached_property
 import hashlib
 import json
@@ -15,7 +15,7 @@ from soku_rl.env.encoding import FRAME_FEATURES, FIGHTER_SCALES, encode_action
 from soku_rl.policy.rules.strategies import strategy_from_config
 from soku_rl.policy.rules.tactical_observation import screen_view
 from soku_rl.env.observation.visible_state import STATE_FEATURES
-from soku_rl.policy.base import PlayActor, RulePolicy as RulePolicyBase
+from soku_rl.policy.base import RulePolicy as RulePolicyBase
 
 
 def decode_diagnostic(values, horizon):
@@ -233,7 +233,7 @@ class LearningRulePolicy(RulePolicyBase):
 
     def spawn_play(self, seed):
         instance = self.policy.spawn_play(seed)
-        return PlayActor(LearningRuleEpisode(instance.actor, self.interface), instance.reset_each_round)
+        return replace(instance, actor=LearningRuleEpisode(instance.actor, self.interface))
 
 
 @dataclass
@@ -243,3 +243,6 @@ class LearningRuleEpisode:
 
     def act(self, observation):
         return self.interface.action(self.actor.act(self.interface.base_observation(observation)))
+
+    def act_observation(self, observation):
+        return self.interface.action(self.actor.act_observation(observation))
