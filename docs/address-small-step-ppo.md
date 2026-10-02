@@ -30,3 +30,39 @@ bash scripts/linux.sh tools/train.py --config-name train_address_small_step \
 预检 `logs/diagnostics/address-small-step-preflight-20261002/summary.json`，
 脚本/日志 `.dev/check-address-small-step-20261002.*`。仅新增配置及文档，
 没有改动训练实现；当前预检不代表训练或强度通过。
+
+## 16384 步完成
+
+源码 `4702082`，GPU 0，351.07 秒完成 32 个 rollout、96 个 PPO epoch 计数。
+实际配置、初始参数、PPO 计数、源码、课程 sidecar、逐局反馈与战斗均值核对通过。
+final SHA256 为 `bbcea47a7a0d986eedae8b18fa7c4abd24dde3d42f0b24d3cf5e03c75205cc3c`。
+训练完成 4 局均负，自身/对手平均掉血 10000/1998.5，双方符卡动作进入为 0。
+尚未达到课程预热，uniform 概率保持 0。这些训练结果不能代替固定模型独立评测。
+
+采样/更新分别耗时 216.00/45.73 秒；总耗时还包含工作进程启动、初始化、保存等。
+原学习率对照为 197.26/41.25 秒；不把不同动态轨迹耗时直接归因于学习率。
+worker `c2a78a68951143fa831595661c28995c` 正常退出，前缀和游戏副本已清理。
+审核 `logs/diagnostics/address-small-step-audit-20261002/summary.json`，
+脚本/日志 `.dev/audit-address-small-step-20261002.*`。
+
+固定教师标签验证显示，小学习率保留了更多原有拟合：
+
+| 模型 | 原教师 NLL / 准确率 | 扩充教师 NLL / 准确率 | BC 自身轨迹 NLL / 准确率 |
+| --- | --- | --- | --- |
+| 原 BC | 0.20752 / 94.56% | 0.21927 / 94.55% | 3.16699 / 53.74% |
+| LR 1e-4，16384 步 | 0.36940 / 88.68% | 0.38263 / 88.62% | 3.04410 / 51.94% |
+| LR 1e-5，16384 步 | 0.21458 / 94.47% | 0.22521 / 94.40% | 3.20496 / 53.66% |
+
+验证帧数分别为 28800、49744、18551，数据划分不变，关闭 TF32。
+BC 自身轨迹上需改动作准确率为原 BC 7.34%、LR 1e-4 9.18%、LR 1e-5 7.26%。
+较好的总体拟合不代表已学会新行为或打败神 AI。
+原始结果 `logs/diagnostics/address-small-step-fixed-fit-20261002`，
+验证身份和分座位加权审核在训练审核目录的 `fixed-fit.json`。
+
+PPO 更新曲线在 `logs/diagnostics/address-small-step-curves-20261002`，包含
+PNG/PDF、62 行 CSV、源文件哈希。根据 timing 的实际 n_updates 匹配横轴，
+修正 SB3 在下一 rollout 后才输出上次更新指标的 512 步错位。
+每组展示 31/32 次更新，最后一次没有 scalar dump，不补造该点。
+图中训练 KL 是 SB3 最后 epoch 的 minibatch 统计，value loss 也不是留出轨迹 MSE。
+PNG 已检查，PDF 未独立渲染。脚本/日志 `.dev/plot-address-small-step-20261002.*`。
+完整神 AI 四局筛查已启动，尚待结果。
