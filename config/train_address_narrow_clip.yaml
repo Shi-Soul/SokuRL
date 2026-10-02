@@ -1,0 +1,9 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+# Preserve critic learning rate while testing a narrower policy surrogate clip.
+rl:
+  ppo:
+    clip_range: 0.02
+output: logs/diagnostics/br-address-narrow-clip-${now:%Y%m%d-%H%M%S}
