@@ -1,0 +1,9 @@
+defaults:
+  - train_address_action_mix50
+  - _self_
+
+algorithm:
+  player: balanced
+  timesteps: 65536
+  checkpoint_every: 32768
+output: logs/training/br-address-teacher-control-${now:%Y%m%d-%H%M%S}

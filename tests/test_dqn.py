@@ -26,7 +26,7 @@ def dqn_config():
         "policy_kwargs": {"net_arch": [8]}, "verbose": 0}}
 
 
-@pytest.mark.parametrize("option", ["rehearsal", "online_anchor"])
+@pytest.mark.parametrize("option", ["rehearsal", "online_anchor", "online_teacher"])
 def test_dqn_rejects_ppo_auxiliary_objectives(option):
     from soku_rl.rl.learner import learner_kind
     with pytest.raises(ValueError, match="require the PPO learner"):

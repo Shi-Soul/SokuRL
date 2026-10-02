@@ -94,6 +94,8 @@ class EpisodeRecords(BaseCallback):
             self.timings[-1]["rehearsal"] = dict(self.model.rehearsal_state["last_update"])
         if hasattr(self.model, "anchor_state"):
             self.timings[-1]["online_anchor"] = dict(self.model.anchor_state["last_update"])
+        if hasattr(self.model, "teacher_state"):
+            self.timings[-1]["online_teacher"] = dict(self.model.teacher_state["last_update"])
         steps = self.model.num_timesteps
         if self.model._n_updates and (not self.last_saved_steps
                 or steps // self.checkpoint_every > self.last_saved_steps // self.checkpoint_every):

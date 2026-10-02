@@ -32,6 +32,9 @@ def create_ppo(env, interface, config, source, device, seed):
     if "online_anchor" in config:
         from soku_rl.rl.online_anchor import attach_anchor
         attach_anchor(model, interface, config["online_anchor"], source["kind"] == "checkpoint")
+    if "online_teacher" in config:
+        from soku_rl.rl.online_teacher import attach_teacher
+        attach_teacher(model, interface, config["online_teacher"], source["kind"] == "checkpoint")
     return model, metadata
 
 
@@ -54,8 +57,8 @@ def parameter_hash(policy):
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
     from soku_rl.rl.recurrent_storage import attach_requested_storage
     validate_payoff(interface, config)
-    if "online_anchor" in config and "rehearsal" in config:
-        raise ValueError("select online_anchor or rehearsal; combining auxiliary objectives is not supported")
+    if sum(option in config for option in ("online_anchor", "rehearsal", "online_teacher")) > 1:
+        raise ValueError("select online_anchor, rehearsal or online_teacher; combining auxiliary objectives is not supported")
     parameters = dict(config["ppo"])
     if "recurrent_storage" in parameters:
         from sb3_contrib import RecurrentPPO
@@ -106,6 +109,10 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         from soku_rl.rl.online_anchor import anchored_algorithm, validate_anchor
         validate_anchor(config["online_anchor"])
         algorithm = anchored_algorithm(algorithm)
+    if "online_teacher" in config:
+        from soku_rl.rl.online_teacher import teacher_algorithm, validate_teacher
+        validate_teacher(config["online_teacher"])
+        algorithm = teacher_algorithm(algorithm)
     if source == {"kind": "fresh"}:
         model = algorithm(policy_type, env, seed=seed, device=device, **parameters)
         if "initial_action_prior" in config["ppo"]:
@@ -120,7 +127,7 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
     if source["kind"] == "checkpoint" and previous["ppo"] != config["ppo"]:
         raise ValueError("continued PPO must retain its algorithm and optimizer configuration")
     if source["kind"] == "checkpoint":
-        for option in ("rehearsal", "online_anchor"):
+        for option in ("rehearsal", "online_anchor", "online_teacher"):
             if ({key: previous[key] for key in (option,) if key in previous}
                     != {key: config[key] for key in (option,) if key in config}):
                 raise ValueError(f"continued PPO must retain its {option} configuration")

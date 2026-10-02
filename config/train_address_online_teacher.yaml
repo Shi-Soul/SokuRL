@@ -1,0 +1,6 @@
+defaults:
+  - train_address_teacher_control
+  - override rl: recurrent_online_teacher
+  - _self_
+
+output: logs/training/br-address-online-teacher-${now:%Y%m%d-%H%M%S}
