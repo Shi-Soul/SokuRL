@@ -127,3 +127,20 @@ sidecar 与配置匹配，历史 3 局及 EMA 累计量保留。
 当前主分支全量回归为 1180 passed、12 skipped、1 deselected、7 warnings、
 2 subtests passed（97.47 秒），日志 `.dev/pytest-main-artifacts-ippo-20261002.log`。
 续训最终效果仍待完成后的纯神 AI 对局验证。
+
+
+## 65536 步续训完成
+
+原学习率续训完成 49152 个新增环境步、96 次 rollout，最终全局步数 65536，
+PPO epoch 累计计数从 88 到 360。完整耗时 959.26 秒，采样 700.95 秒，更新 119.18 秒。
+新完成 14 局均败，两座位各 7 局；平均自身/对手掉血 10110.71/2558.21，
+符卡动作进入均值 0.2143/0.1429。
+课程历史合计 17 局，长期胜率 EMA 为 0，仍未达到 20 局预热门槛，uniform 比例保持 0。
+因此这次实验实际尚未发生自适应难度变化，不能据此判断控制器调整后的效果。
+
+最终 checkpoint SHA256 为
+`19525c343f54a5817c7c19d5f924235289feb5d889728c063859c5d755b9de82`。
+源码、完整初始化、计数、96 次采样、从历史状态重算的 EMA、战斗均值与正常清理均通过核对；
+证据 `logs/diagnostics/address-control-continuation-audit-20261002/summary.json`，
+原始训练 `logs/training/br-address-control-continued-20261002`。
+已启动固定四局、纯原神 AI、双座位评估，结果待回收；没有追加训练预算。
