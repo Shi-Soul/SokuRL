@@ -35,4 +35,21 @@ bash scripts/linux.sh tools/train.py --config-name train_address_diverse_rollout
   linux.cuda_devices=7 output=logs/training/br-address-diverse-rollouts-20261002
 ```
 
-此处为预定方案，尚无新候选的强度结果。
+## 实际初始化与首轮更新
+
+提交 `cad6451` 在 GPU 7 启动。启动前检查主机可用内存约 243 GiB、NAS 可用 20 TiB，
+目标 GPU 空闲；没有停止其他任务。完整 Hydra 配置比较仅存在声明的四类差异。
+共享 learner 的原 BC 参数、空 Adam、零计数通过预检，实际训练保存的 initial.zip
+再次确认初始参数哈希为 `2cd1875312d06aee209beda08847c70ca613bf6a59cbcf1c17ff7648e4f03550`。
+
+首轮 2048 步检查点确认实际 n_envs=8、n_steps=256、batch=512，完成 3 个 PPO epoch、
+12 次 Adam 更新。源码逐文件身份、配置、原对手指纹及课程 sidecar 通过核对。
+首轮 checkpoint SHA256 为 `1baeaa65e045557f95b4356662d60a58b1233cfbd0fad5c98219090c3ce8be21`，
+参数哈希为 `5c51c18d6a5b5f3d00cef5f91efd12a74aff1949fdc92dc822d32e13c630c7d4`。
+GPU 显存一次观测约 6.9 GB，不是峰值测量。审计快照为 6144 步，尚无完整局，
+课程局数为零、uniform=0；这些只是初始化/更新机制证据，不是胜率证据。
+
+预检与实际核对在 `logs/diagnostics/address-diverse-rollouts-preflight-20261002`，
+脚本/日志 `.dev/check-address-diverse-rollouts-20261002.*`、
+`.dev/audit-address-diverse-rollouts-start-20261002.*`。
+训练继续运行；65536 和 262144 步的完整验证尚待完成。

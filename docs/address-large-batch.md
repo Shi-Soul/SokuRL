@@ -141,3 +141,24 @@ bash scripts/linux.sh tools/train.py --config-name train_address_large_batch \
 `logs/diagnostics/address-large-batch-final-fixed-fit-audit-20261002`。
 最终 16 局纯神 AI 评估已在 GPU 3 启动，结果尚待完成，输出
 `logs/benchmark/br-address-large-batch-final-20261002`。
+
+## 最终 16 局：仍未得到胜局
+
+65536 步模型为 **0 胜/16 负**，无超时；均值自身/对手掉血 10143/4103.4375，
+双方符卡动作进入 0.125/0.0625。HP 下降累计可能超过初始 HP，不把治疗后再次掉血
+直接解释成单次攻击伤害。角色、世界/策略种子、原对手、完整对局和战斗均值均已核对。
+评估 602.96 秒，worker 正常退出、游戏与前缀副本已清理；
+证据 `logs/diagnostics/address-large-batch-audit-20261002/final-games.json`，
+脚本/日志 `.dev/audit-address-large-batch-final-games-20261002.*`。
+
+| 配置与检查点 | 同一验证集胜/负 | 平均对手掉血 |
+| --- | ---: | ---: |
+| batch 128，16384 步 | 2/14 | 4505.0625 |
+| batch 512，16384 步 | 0/16 | 853 |
+| batch 128，65536 步 | 0/16 | 128.125 |
+| batch 512，65536 步 | 0/16 | 4103.4375 |
+
+扩大 batch 显著降低了记录 KL 和梯度更新次数，最终伤害指标也好于已经退化的原控制，
+但两个预定检查点都未得到胜局。本次配置不能作为已验证的强 BR，不自动延长该运行。
+下一项[并行采样对照](address-diverse-rollouts.md)重新从同一 BC 初始化，
+单独记录 8 环境在相同 65536 步处的结果和更长预算的结果；不与本运行串接。
