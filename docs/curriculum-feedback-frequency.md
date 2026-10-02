@@ -58,3 +58,28 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=0 algorithm=br \
 源码哈希与提交后的工作树一致，证据
 `logs/diagnostics/frequent-feedback-first-update-20261002/summary.json`，
 日志 `.dev/audit-frequent-feedback-launch-20261002.log`。
+
+## 完整预算与独立评测
+
+运行正常完成 262144 步，耗时 3859.74 秒，528 个 PPO epoch，
+256 次复习、65017 帧监督及 3387551 帧前缀重放；私有 worker 正常退出并清理。
+51 局总体为 30 胜 19 负 2 超时。第 20/21 局后未来 uniform 已降到 0.85/0.80，
+最终降到 0，EMA=0.52639；开局实际 uniform=0 的 7 局全部告负。
+长期 EMA 包含此前较容易对局的成绩，因此不能将它解释为当前完整神 AI 胜率。
+
+| 检查点 | 完整神 AI 胜 / 负 | 平均对手 HP 下降 | 自身 / 对手符卡动作进入每局 |
+| --- | --- | --- | --- |
+| 65536 | 0 / 4 | 796.75 | 0.25 / 0 |
+| 131072 | 0 / 4 | 1515.50 | 0 / 0 |
+| 262144 | 0 / 4 | 1723.50 | 0 / 0 |
+
+更频繁的反馈确实在预算内到达原神 AI 难度，但没有得到胜局，
+最终掉血指标也低于初始化和旧间隔对照。课程推进速度本身不足以解决本轮 BR 的失败。
+不延长该轮预算。检查点、PPO/复习计数、EMA、配对评测身份和 worker 清理核对在
+`logs/diagnostics/curriculum-candidates-training-20261002`，包含 `full_god_evaluations.json`。
+
+固定验证的原教师/扩充教师准确率在中期为 92.861%/92.835%，最终为 90.677%/90.256%；
+旧学习者状态准确率为 51.582%/49.991%，修正帧准确率为 9.891%/9.375%。
+数据/模型身份及分座位加权指标核对通过，
+证据 `logs/diagnostics/curriculum-candidates-retention-20261002`，
+日志 `.dev/audit-curriculum-candidates-retention-20261002.log`。
