@@ -23,3 +23,11 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 两者按相同数据集做验证，并以相同两个世界种子、双座位、common_roles 和 policy_seed=728341
 检查原神 AI 表现。若有改善，再扩展验证及接入共享 PPO；不由监督准确率决定已取得更强 BR。
 新采集的 64 局不进入此容量对照，数据扩充另见[独立实验](address-invariant-data-expansion.md)。
+
+已由提交 `b854354` 在 GPU 1 启动。实际配置逐字段核对通过，只有 LSTM 宽度与输出目录
+不同；数据身份、包版本、原教师指纹及源码哈希匹配。两个初始检查点的 PPO 步数均为 0、
+优化器为空；actor/critic 均使用所声明的宽度，动作头仍输出完整 576 个命令。
+参数量为 3761489 → 5993809；不声称参数初始化相同。
+初始化核对位于 `logs/diagnostics/address-lstm512-initialization-20261002/summary.json`，
+脚本及日志 `.dev/audit-address-lstm512-initialization-20261002.{py,log}`。
+已观察到第 3 轮拟合完成；完整训练、固定验证和原神 AI 表现尚待评估。
