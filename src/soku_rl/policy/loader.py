@@ -1,6 +1,17 @@
 """Load every policy type through the same observation and action contract."""
 def load_policy(name, spec, interface, device):
     kind = spec["kind"]
+    if kind == "teacher_takeover":
+        from soku_rl.policy.takeover import TeacherTakeoverPolicy, validate_takeover_frame
+        if (set(spec) != {"kind", "learner", "teacher", "after_frames"}
+                or any(not isinstance(spec[key], dict) for key in ("learner", "teacher"))):
+            raise ValueError("teacher_takeover requires learner, teacher and after_frames")
+        validate_takeover_frame(spec["after_frames"])
+        if interface.episode.decision_frames != 1 or interface.episode.latency_frames != 0:
+            raise ValueError("teacher takeover requires every-frame decisions and zero latency")
+        return TeacherTakeoverPolicy(name,
+            load_policy(name + ":learner", spec["learner"], interface, device),
+            load_policy(name + ":teacher", spec["teacher"], interface, device), spec["after_frames"])
     if kind == "onnx":
         from soku_rl.policy.portable import load_portable
         if str(device) != "cpu":

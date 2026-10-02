@@ -12,6 +12,18 @@ from omegaconf import OmegaConf
 
 def candidate_specification(config, source, algorithm):
     candidate = config["candidate"]
+    if candidate.get("kind") == "teacher_takeover":
+        from soku_rl.policy.takeover import validate_takeover_frame
+        if (set(candidate) != {"kind", "teacher", "after_frames"}
+                or not isinstance(candidate["teacher"], dict)
+                or set(candidate["teacher"]) != {"kind", "name", "rules"}
+                or candidate["teacher"]["kind"] != "rule"
+                or candidate["teacher"]["name"] != "god"):
+            raise ValueError("teacher_takeover diagnostic requires an explicit God teacher")
+        validate_takeover_frame(candidate["after_frames"])
+        _, learner, metadata = candidate_specification(config | {"candidate": {"kind": "checkpoint"}},
+                                                     source, algorithm)
+        return "diagnostic-br:teacher-takeover", dict(candidate) | {"learner": learner}, metadata
     if set(candidate) == {"kind", "path"} and candidate["kind"] == "onnx":
         manifest = Path(candidate["path"]).resolve(strict=True)
         return "learned-br:onnx", {"kind": "onnx", "path": str(manifest)}, {
@@ -32,7 +44,7 @@ def candidate_specification(config, source, algorithm):
         if not isinstance(candidate["name"], str) or not candidate["name"]:
             raise ValueError("rule reference requires a rule name")
         return f"rule-br:{candidate['name']}", dict(candidate), {}
-    raise ValueError("BR candidate must be a checkpoint, ONNX deployment or an explicit rule reference")
+    raise ValueError("BR candidate must be a checkpoint, ONNX deployment, rule reference or teacher_takeover")
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="benchmark_br")

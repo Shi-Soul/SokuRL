@@ -90,3 +90,27 @@ def test_dqn_candidate_uses_native_greedy_policy(candidate, tmp_path):
     assert name == "learned-br"
     assert spec == {"kind": "sb3_dqn", "path": str(model), "training_config": str(tmp_path / "config.yaml")}
     assert metadata["checkpoint_sha256"] == hashlib.sha256(model.read_bytes()).hexdigest()
+
+
+def test_teacher_takeover_candidate_is_explicit_diagnostic_with_frozen_checkpoint(tmp_path):
+    with initialize_config_dir(config_dir=str(Path(__file__).parents[1] / "config"), version_base="1.3"):
+        cfg = compose(config_name="benchmark_br", overrides=["+br_candidate=teacher_takeover"])
+        candidate = OmegaConf.to_container(cfg.candidate, resolve=True)
+    model = tmp_path / "best.zip"
+    model.write_bytes(b"frozen-learner")
+    config = {"candidate": candidate, "checkpoint": "best.zip"}
+    name, spec, metadata = specification(config, tmp_path, {"policy_type": "lstm"})
+    assert name == "diagnostic-br:teacher-takeover"
+    assert spec == candidate | {"learner": {"kind": "sb3_recurrent", "path": str(model),
+        "training_config": str(tmp_path / "config.yaml")}}
+    assert spec["teacher"]["rules"]["god"]["script"] == "character"
+    assert spec["after_frames"] == 1024
+    assert metadata["checkpoint_sha256"] == hashlib.sha256(model.read_bytes()).hexdigest()
+    for change in ({"after_frames": -1}, {"after_frames": True}, {"extra": 1},
+            {"teacher": {"kind": "uniform"}}, {"teacher": None}):
+        with pytest.raises(ValueError):
+            specification(config | {"candidate": candidate | change}, tmp_path, {"policy_type": "lstm"})
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    with pytest.raises(ValueError, match="belong"):
+        specification(config | {"checkpoint": "../best.zip"}, nested, {"policy_type": "lstm"})

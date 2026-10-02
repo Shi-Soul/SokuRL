@@ -1,0 +1,8 @@
+# @package candidate
+# Diagnostic composite; never report its score as a learned-policy win rate.
+kind: teacher_takeover
+after_frames: 1024
+teacher:
+  kind: rule
+  name: god
+  rules: ${rules}
