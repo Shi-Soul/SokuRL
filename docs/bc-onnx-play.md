@@ -46,3 +46,6 @@ bash scripts/linux.sh tools/play.py operation=check opponent=bc-address-invarian
 ```
 
 任意兼容 BC checkpoint 的自动导出入口及其他机器登记方法见 [人机 play](local-play.md)。
+
+同一 ONNX 模型的 15 个规则对手、双座位 240 局强度评测已完成：200 胜、9 负、31 超时，
+胜率 83.33%。逐对手及双座位比分见 [BC 规则对手评测](bc-rule-benchmark.md)。
