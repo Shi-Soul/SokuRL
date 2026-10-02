@@ -1,0 +1,8 @@
+defaults:
+  - train_address_long_rollout
+  - _self_
+
+rl:
+  ppo:
+    gae_lambda: 1.0
+output: logs/diagnostics/br-address-long-credit-${now:%Y%m%d-%H%M%S}
