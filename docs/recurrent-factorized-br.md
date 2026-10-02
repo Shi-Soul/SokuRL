@@ -53,3 +53,11 @@ bash scripts/linux.sh tools/train.py --config-name train_recurrent_factorized_ad
 预检/核对位于 `logs/diagnostics/recurrent-factorized-br-preflight-20261002`，
 脚本/日志 `.dev/check-recurrent-factorized-br-20261002.*`、
 `.dev/audit-recurrent-factorized-br-start-20261002.*`。
+
+两个预定评估已接入本任务的自动衔接流程：等待 65536 步模型及匹配 sidecar 后核对，
+再做中间 16 局评估；训练进程成功退出后核对完整预算，再做最终 16 局评估。
+每次启动评估前等待工作树干净和 GPU 0 空闲；不杀其他进程，也不覆盖已有输出。
+流程 PID 绑定本次训练，身份变化或训练失败会停止后续步骤并保留错误。
+状态/脚本/日志为 `.dev/finish-recurrent-factorized-br-20261002.*`，
+输出分别为 `br-recurrent-factorized-ppo-mid-20261002` 和
+`br-recurrent-factorized-ppo-final-20261002` 两个 benchmark 目录。
