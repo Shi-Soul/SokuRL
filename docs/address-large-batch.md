@@ -101,3 +101,43 @@ bash scripts/linux.sh tools/train.py --config-name train_address_large_batch \
 证据 `logs/diagnostics/address-large-batch-preflight-20261002/mid-games.json`，
 脚本/日志 `.dev/audit-address-large-batch-mid-games-20261002.*`。
 按预先声明继续至 65536 步及其 16 局验证，不按本次中途结果改变训练预算。
+
+## 65536 步训练完成
+
+128 轮 rollout 正常完成，18 个训练对局全部失败（1P 11 局、2P 7 局）。
+平均自身/对手掉血 10078.94/2542.5，双方符卡动作进入均值均为 0.1111。
+累计 18 局未达 20 局统计预热，EMA=0、uniform 始终为 0；
+这一轮没有触发自适应比例调整，不能据此评价控制器效果。
+
+| 配置 | PPO epoch / Adam 更新次数 | 采样 / 更新 / 总耗时（秒） |
+| --- | ---: | ---: |
+| batch 128 原控制 | 360 / 1208 | 965.43 / 192.82 / 1289.15 |
+| batch 512 候选 | 384 / 384 | 916.41 / 176.91 / 1231.64 |
+
+全部参数的 Adam step 计数已从实际最终检查点读取，不能只用 epoch 数比较更新量。
+不同对局长度、重置及课程路径影响实际耗时；该单次时间差不是硬件加速基准。
+候选最终 SHA256 为 `cea9374de57c0a0ddc618b231aa0e491939e8ec113021105c55e265601fcae00`，
+参数哈希为 `511e597543203270e2614a8666b449d9addd7600293e5a1b33fe181e3477be5a`。
+源码、完整配置、初始化、两个选定检查点、逐局课程反馈、战斗均值与 worker 清理核对通过。
+证据 `logs/diagnostics/address-large-batch-audit-20261002/{summary,optimizer-comparison}.json`。
+
+训练曲线在 `logs/diagnostics/address-large-batch-curves-20261002`，254 行 CSV 对齐到
+真实 PPO 更新步数，来源快照/哈希和所有数值逐项核对。每组 128 轮有 127 次 scalar
+记录，末次未输出不补造；PNG 已查看，PDF 未另行渲染。
+记录 KL 的均值为控制 0.018269、候选 0.001511；value loss 均值 0.002522/0.002845；
+动作熵均值 0.187233/0.170419。SB3 的 KL 记录来自最后进入 epoch 的 minibatch，
+不是整个训练所有梯度步的平均，也不是同一组访问状态；较低 KL 不能替代实战验证。
+
+最终模型固定轨迹重评分也已完成：
+
+| 数据 | NLL | 总准确率 | 变化标签准确率 |
+| --- | ---: | ---: | ---: |
+| 原教师 | 0.662699 | 79.5590% | 53.7538% |
+| 扩展教师 | 0.701058 | 78.8477% | 55.1109% |
+| BC 自身轨迹 | 3.166622 | 48.9138% | 13.5013% |
+
+数据/模型身份、验证划分、分座位加权与精度设置核对通过，原始和审核目录分别为
+`logs/diagnostics/address-large-batch-final-fixed-fit-20261002`、
+`logs/diagnostics/address-large-batch-final-fixed-fit-audit-20261002`。
+最终 16 局纯神 AI 评估已在 GPU 3 启动，结果尚待完成，输出
+`logs/benchmark/br-address-large-batch-final-20261002`。
