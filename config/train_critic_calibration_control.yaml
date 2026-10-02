@@ -1,0 +1,26 @@
+defaults:
+  - train
+  - br_opponents: god_target
+  - curriculum: adaptive_noise_frequent_feedback
+  - override algorithm: br
+  - override rl: recurrent_demonstration_transfer
+  - override rules: god
+  - override wrappers: superhuman_learning
+  - override track: superhuman_address_invariant
+  - _self_
+
+num_envs: 2
+rl:
+  cpu_threads: 1
+algorithm:
+  target:
+    character: 0
+  timesteps: 16384
+  checkpoint_every: 4096
+  curriculum:
+    initial_random_probability: 0.0
+  initial_policy:
+    kind: weights
+    path: logs/pretraining/god-marisa-reimu-address-invariant-20261002/best.zip
+    training_config: logs/pretraining/god-marisa-reimu-address-invariant-20261002/config.yaml
+output: logs/diagnostics/br-critic-control-${now:%Y%m%d-%H%M%S}

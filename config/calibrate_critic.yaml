@@ -1,0 +1,18 @@
+checkpoint: logs/pretraining/god-marisa-reimu-address-invariant-20261002/best.zip
+training_config: logs/pretraining/god-marisa-reimu-address-invariant-20261002/config.yaml
+dataset: logs/demonstrations/learner-address-invariant-marisa-reimu-20261002
+device: cuda:0
+cpu_threads: 1
+seed: 391927
+calibration:
+  epochs: 10
+  batch_size: 256
+  sequence_length: 64
+  learning_rate: 0.0003
+output: logs/pretraining/critic-calibration-${now:%Y%m%d-%H%M%S}
+hydra:
+  run:
+    dir: logs/hydra/calibrate-critic-${now:%Y%m%d-%H%M%S}
+  output_subdir: null
+  job:
+    chdir: false

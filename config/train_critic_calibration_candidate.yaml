@@ -1,0 +1,10 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+algorithm:
+  initial_policy:
+    kind: weights
+    path: logs/pretraining/god-marisa-reimu-critic-calibrated-20261002/best.zip
+    training_config: logs/pretraining/god-marisa-reimu-critic-calibrated-20261002/config.yaml
+output: logs/diagnostics/br-critic-calibrated-${now:%Y%m%d-%H%M%S}
