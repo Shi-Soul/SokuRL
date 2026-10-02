@@ -85,3 +85,18 @@ PPO 战力，也不证明组合控制器与纯教师强弱相同。尤其当前�
 原始与回放哈希、逐局前后结果在 `logs/diagnostics/teacher-takeover-audit-20261002/summary.json`，
 核对日志 `.dev/audit-teacher-takeover-20261002.log`。后续独立训练方案见
 [恢复示范](recovery-demonstrations.md)。
+
+## 较晚接管的后续诊断
+
+1024 接管恢复数据上的原 BC 固定状态准确率已有 94.48%，首 256 个教师控制帧为
+95.31%；它们未显示与纯学习者后续状态一样大的标签差距。因此补充 2048 帧接管的
+同组冻结诊断，检验更长 BC 前缀之后教师是否仍能恢复。
+其余原模型、原神 AI、八个世界 × 两座位、private policy seeds 和完整接口不变。
+原 BC 在这 16 局中最早于 2607 帧结束，因此 2048 帧边界不会预先筛掉早败局。
+仍完整执行 16 局，核对前 2048 帧双方联合动作，结果仅解释为组合控制器表现。
+不改变已启动的恢复拟合预算，不将这些验证轨迹并入训练。
+
+使用现有 `+br_candidate=teacher_takeover candidate.after_frames=2048`，输出
+`logs/benchmark/br-address-teacher-takeover2048-20261002`，核对脚本
+`.dev/audit-teacher-takeover2048-20261002.py`。只有核对完整结果后，才决定是否采集
+新的独立较晚恢复示范；当前没有为其分配额外训练预算。
