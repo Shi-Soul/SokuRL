@@ -120,3 +120,19 @@ BC 自身验证轨迹 18551 帧为 3.208572/49.9488%，变化标签准确率 7.9
 详见[critic 校准](critic-calibration.md)。训练用 `train_address_split_calibrated`，
 除初始化 critic 外与本页独立特征训练配置一致，重新开始 Adam/PPO/课程计数。
 预算仍为 16384 步，先验证四局；结果未出前不把组合当作更强模型。
+
+组合转换和训练均由提交 `f37066a` 在 GPU 3 启动。转换产物位于
+`logs/pretraining/god-marisa-reimu-split-calibrated-20261002`，checkpoint SHA256 为
+`210ded1c6c1a4da86e486c6c4719841c6f1a83db471c6cc1f4a6d91c210c4568`，
+参数哈希 `953d14052fe61c1d94d3981bf617f2b259daa00dc53052a1d25d8e2e80441b9b`。
+对源模型及契约、逐文件源码身份和全部缓冲区核对通过。
+四局 18551 帧重放中，完整动作分布、价值、动作、log probability 和双 LSTM 状态与校准源逐位相同；
+相较未校准的拆分初始模型，只有私有 critic LSTM/价值网络参数不同。
+实际策略加载器另核对了四局前 64 帧共 256 帧的采样动作和 actor 状态。
+
+训练目录 `logs/diagnostics/br-address-split-calibrated-20261002` 的配置与预检一致，
+初始化 Adam 为空、PPO 计数为零；首个 512 步更新完成 2 个 PPO epoch，
+actor/critic 特征已分化。预检证据目录
+`logs/diagnostics/address-split-calibrated-preflight-20261002` 保存
+`summary.json`、`conversion-audit.json`、`actor-adapter.json` 和 `actual-start.json`。
+此记录只确认已启动并更新，不代表训练完成或实战提升。
