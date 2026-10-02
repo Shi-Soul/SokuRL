@@ -5,6 +5,7 @@ import os
 import time
 
 from game_runtime.privileged import PrivilegedReader
+from game_runtime.diagnostic import DiagnosticReader
 from network_runtime.game import NetworkGame
 from play_runtime.channels import RealtimeHistory, RealtimeInput
 from soku_rl.env.observation.visible_state import observe_visible_states
@@ -41,8 +42,8 @@ class Menu:
 
 class RealtimeSession:
     def __init__(self, settings, episode, timeout):
-        if episode.observation_mode not in {"state", "privileged_state"}:
-            raise ValueError("realtime transport currently requires state or privileged_state observations")
+        if episode.observation_mode not in {"state", "privileged_state", "diagnostic_state"}:
+            raise ValueError("realtime transport requires state, privileged_state or diagnostic_state observations")
         self.episode = episode
         self.plan = client_plan(settings)
         self.stack = ExitStack()
@@ -98,6 +99,8 @@ class RealtimeSession:
                 reader = self.readers[match]
                 reader.memory = capture.memory
                 observations = reader.observe_snapshot(capture.raw)
+            elif self.episode.observation_mode == "diagnostic_state":
+                observations = DiagnosticReader(capture.memory).observe_snapshot(capture.raw)
             else:
                 observations = observe_visible_states(capture.raw, capture.render, self.episode.visibility)
             records.append({"frame": MatchFrame(capture.match, observations), "characters": characters,

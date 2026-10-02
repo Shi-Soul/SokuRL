@@ -11,19 +11,22 @@ from omegaconf import OmegaConf
 
 from soku_rl.env import EpisodeConfig
 from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
-from soku_rl.policy.onnx import OnnxPolicy
+from soku_rl.policy.loader import load_policy
+from soku_rl.play.loader import checkpoint_training
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="benchmark_inference")
 def main(cfg):
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    if config["device"] != "cpu" or config["candidate"]["policy"]["kind"] != "onnx_recurrent":
+    if config["device"] != "cpu" or config["candidate"]["policy"]["kind"] not in {"onnx_recurrent", "onnx_dqn"}:
         raise ValueError("this deployment benchmark requires the CPU ONNX actor")
     if type(config["decisions"]) is not int or config["decisions"] < 2048 or config["maximum_p99_ms"] <= 0:
         raise ValueError("measure at least 2048 decisions with an explicit positive latency bound")
+    training = checkpoint_training(config["candidate"]["policy"])
+    config.update(episode=training["episode"], wrappers=training["wrappers"])
     interface = LearningInterface(EpisodeConfig.from_dict(config["episode"]), LearningConfig(**config["wrappers"]))
     started = time.perf_counter()
-    policy = OnnxPolicy(config["candidate"]["name"], config["candidate"]["policy"]["path"], interface)
+    policy = load_policy(config["candidate"]["name"], config["candidate"]["policy"], interface, "cpu")
     load_seconds = time.perf_counter()-started
     rng = np.random.default_rng(config["seed"])
     observations = rng.uniform(-1, 1, size=(128, *policy.shape)).astype(np.float32)
@@ -45,7 +48,7 @@ def main(cfg):
         "maximum_p99_ms": config["maximum_p99_ms"], "intra_op_threads": 1, "inter_op_threads": 1}
     directory = Path(config["output"]).resolve()
     directory.mkdir(parents=True, exist_ok=False)
-    (directory / "config.yaml").write_text(OmegaConf.to_yaml(cfg, resolve=True), encoding="utf-8")
+    (directory / "config.yaml").write_text(OmegaConf.to_yaml(OmegaConf.create(config)), encoding="utf-8")
     (directory / "result.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2), flush=True)
     if not report["success"]:

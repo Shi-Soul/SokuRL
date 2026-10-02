@@ -4,6 +4,7 @@ from sb3_contrib import RecurrentPPO
 
 from soku_rl.rl.behavior_cloning import score_samples
 from soku_rl.rl.recurrent_cloning import demonstration_episodes, sequence_epoch
+from soku_rl.rl.dqn import DoubleDQN
 
 
 def score_validation(model, samples, manifest, batch_size, sequence_length):
@@ -45,4 +46,5 @@ def score_validation(model, samples, manifest, batch_size, sequence_length):
         if transitions:
             scores[name]["copy_previous_action"]["accuracy"] = float(sum(row[3] == 0 for row in rows) / transitions)
     return {"value_target": "omitted_for_learner_controlled_data" if learner_controlled else
-        "recorded_teacher_trajectory_return", "groups": scores}
+        "recorded_teacher_trajectory_return", "groups": scores,
+        "prediction": "softmax_q_ranking_and_teacher_action_q" if isinstance(model, DoubleDQN) else "actor_and_state_value"}

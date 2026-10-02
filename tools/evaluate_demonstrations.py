@@ -1,4 +1,4 @@
-"""Compare frozen shared-PPO models on separate, hashed demonstration validation sets."""
+"""Compare frozen shared learners on separate, hashed demonstration validation sets."""
 import hashlib
 from importlib.metadata import version
 import io
@@ -65,13 +65,18 @@ def main(cfg):
             # Load the exact bytes hashed here, so an active writer cannot change
             # which checkpoint this result describes between hashing and load.
             checkpoint_bytes = path.read_bytes()
-            model = algorithm_type(training["rl"]["policy_type"]).load(io.BytesIO(checkpoint_bytes), device=device)
+            from soku_rl.rl.learner import learner_kind
+            from soku_rl.rl.dqn import DoubleDQN
+            kind = learner_kind(training["rl"])
+            loader = DoubleDQN if kind == "dqn" else algorithm_type(training["rl"]["policy_type"])
+            model = loader.load(io.BytesIO(checkpoint_bytes), device=device)
             if model.observation_space != interface.observation_space or model.action_space != interface.action_space:
                 raise ValueError("checkpoint spaces disagree with its training contract")
             initial_hash, initial_steps = parameter_hash(model.policy), model.num_timesteps
             entry = {"checkpoint": str(path), "checkpoint_sha256": hashlib.sha256(checkpoint_bytes).hexdigest(),
                 "training_config": str(training_path), "training_config_sha256": hashlib.sha256(contract_bytes).hexdigest(),
-                "policy_parameter_hash": initial_hash, "ppo_steps": initial_steps, "datasets": {}}
+                "policy_parameter_hash": initial_hash, "learner": kind, "learner_steps": initial_steps,
+                **({"ppo_steps": initial_steps} if kind == "ppo" else {}), "datasets": {}}
             del checkpoint_bytes
             for dataset_label, source in config["datasets"].items():
                 dataset_path = Path(source).resolve(strict=True)

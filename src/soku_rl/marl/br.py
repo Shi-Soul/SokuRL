@@ -1,5 +1,6 @@
 """Train an approximate best response to an explicit frozen strategy mixture."""
 from dataclasses import dataclass
+import json
 import numpy as np
 from stable_baselines3.common.callbacks import CallbackList
 from stable_baselines3.common.logger import configure
@@ -7,7 +8,7 @@ from stable_baselines3.common.logger import configure
 from soku_rl.policy.loader import load_policy
 from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
 from soku_rl.rl.matchup_env import MatchupMixtureVecEnv
-from soku_rl.rl.ppo import create_ppo, parameter_hash
+from soku_rl.rl.learner import create_learner, parameter_hash, learner_kind, save_checkpoint
 from soku_rl.rl.training import EpisodeRecords, ResponseCheckpointCallback
 from soku_rl.rl.curriculum import create_curriculum
 from soku_rl.policy.matchups import opponent_interface
@@ -47,22 +48,47 @@ def train_response(env, config, opponents, probabilities, device, seed, director
             opponents, probabilities, int(env.single_action_space.n))
         curriculum.restore(config["initial_policy"])
         view.curriculum = curriculum
-        model, source = create_ppo(view, env.interface, config,
+        model, source = create_learner(view, env.interface, config,
             config["initial_policy"], device, seed)
         model.set_logger(configure(str(directory / "scalars"), ["csv", "stdout"]))
         initial = parameter_hash(model.policy)
         start_steps = model.num_timesteps
-        callbacks = CallbackList([
+        # Keep the exact pre-training policy for paired strength comparisons.
+        # This inference artifact intentionally has no replay/continuation bundle.
+        model.save(directory / "initial.zip")
+        callbacks = [
             EpisodeRecords(directory, config["checkpoint_every"], curriculum),
             ResponseCheckpointCallback(directory, config["checkpoint_every"] // env.num_envs, curriculum),
-        ])
-        model.learn(total_timesteps=config["timesteps"], callback=callbacks,
-                    reset_num_timesteps=False)
+        ]
+        if learner_kind(config) == "dqn":
+            callbacks = callbacks[:1]
+        callbacks = CallbackList(callbacks)
+        try:
+            model.learn(total_timesteps=config["timesteps"], callback=callbacks,
+                        reset_num_timesteps=False)
+        except BaseException as error:
+            # Game/process failures must not discard all learning since the last
+            # periodic checkpoint. Keep the original failure and a recovery pair.
+            recovery = {"error": repr(error), "steps": model.num_timesteps,
+                        "updates": model._n_updates, "saved": False}
+            try:
+                path = directory / "interrupted.zip"
+                save_checkpoint(model, path)
+                curriculum.save(path, model.num_timesteps)
+                recovery.update(saved=True, checkpoint=str(path))
+            except Exception as save_error:
+                recovery["save_error"] = repr(save_error)
+                error.add_note(f"recovery checkpoint failed: {save_error!r}")
+            try:
+                (directory / "interrupted.json").write_text(json.dumps(recovery, indent=2), encoding="utf-8")
+            except OSError as write_error:
+                error.add_note(f"recovery record failed: {write_error!r}")
+            raise
         final = parameter_hash(model.policy)
         if initial == final:
             raise RuntimeError("BR completed without a policy update")
         path = directory / "final.zip"
-        model.save(path)
+        save_checkpoint(model, path)
         curriculum.save(path, model.num_timesteps)
         return {"steps": model.num_timesteps, "start_steps": start_steps,
             "additional_steps": model.num_timesteps - start_steps, "initial_policy": source,

@@ -64,3 +64,34 @@ def test_unresolved_random_seat_is_rejected():
     record["training_context"]["player"] = "random"
     with pytest.raises(ValueError, match="actual learner seat"):
         summarize_episodes([record])
+
+
+def test_empty_rollout_clears_stale_combat_scalars_before_delayed_dump(tmp_path):
+    import csv
+    import time
+    from types import SimpleNamespace
+    from stable_baselines3.common.logger import configure
+    from soku_rl.rl.training import EpisodeRecords
+
+    logger = configure(str(tmp_path / "scalars"), ["csv"])
+    from soku_rl.rl.curriculum import FixedOpponentSchedule
+    callback = EpisodeRecords(tmp_path, 100, FixedOpponentSchedule())
+    callback.model = SimpleNamespace(logger=logger)
+    callback.num_timesteps = 8
+    callback.rollout_started = time.perf_counter()
+    callback.records = [episode(0, "p1_win", "rush", 0, 100)]
+    callback._on_rollout_end()
+    assert logger.name_to_value["combat/own_hp_loss"] == 100
+    assert logger.name_to_value["combat/win_rate"] == 1
+    logger.record("train/loss", .123)
+    callback.rollout_record_start = 1
+    callback.rollout_started = time.perf_counter()
+    callback._on_rollout_end()
+    assert logger.name_to_value["combat/episodes"] == 0
+    assert logger.name_to_value["combat/own_hp_loss"] is None
+    assert logger.name_to_value["combat/win_rate"] is None
+    assert logger.name_to_value["train/loss"] == .123
+    logger.dump(16)
+    logger.close()
+    row = list(csv.DictReader((tmp_path / "scalars/progress.csv").open()))[0]
+    assert row["combat/episodes"] == "0" and row["combat/own_hp_loss"] == ""

@@ -5,7 +5,7 @@ import numpy as np
 
 from soku_rl.policy.population import PPOPolicy
 from soku_rl.rl.opponent_env import OpponentMixtureVecEnv
-from soku_rl.rl.ppo import create_ppo, snapshot
+from soku_rl.rl.learner import create_learner, snapshot, learner_kind
 
 
 class PPOResponseOracle:
@@ -30,7 +30,7 @@ class PPOResponseOracle:
                 seed = int(self.rng.integers(0, 2**31))
                 view = OpponentMixtureVecEnv(self.env, player, opponents, probabilities, seed)
                 try:
-                    model, _ = create_ppo(view, self.env.interface, self.config,
+                    model, _ = create_learner(view, self.env.interface, self.config,
                         {"kind": "fresh"}, self.device, seed)
                     # Copy only policy parameters. New optimizer and schedule belong
                     # to this response; old population snapshots remain unchanged.
@@ -39,7 +39,7 @@ class PPOResponseOracle:
                         model.policy.load_state_dict(parent.model.policy.state_dict())
                     model.learn(total_timesteps=self.config["timesteps_per_response"])
                     self.responses += 1
-                    name = f"ppo-p{player}-response-{self.responses}"
+                    name = f"{learner_kind(self.config)}-p{player}-response-{self.responses}"
                     path = self.directory / (name + ".zip")
                     model.save(path)
                     results[player].append(snapshot(name, model, path))

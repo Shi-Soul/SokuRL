@@ -187,9 +187,12 @@ def test_active_episode_keeps_its_probability_when_another_episode_finishes(monk
         view.close()
 
 
-@pytest.mark.parametrize("checkpoint", ["final.zip", "checkpoints/updated_8_steps.zip", "checkpoints/ppo_8_steps.zip"])
+@pytest.mark.parametrize("learner,checkpoint", [
+    ("ppo", "final.zip"), ("ppo", "checkpoints/updated_8_steps.zip"), ("ppo", "checkpoints/ppo_8_steps.zip"),
+    ("dqn", "final.zip"), ("dqn", "checkpoints/updated_8_steps.zip")])
 @pytest.mark.parametrize("kind", ["adaptive_action_noise", "adaptive_episode_mixture"])
-def test_actual_ppo_training_records_and_resumes_curriculum(tmp_path, checkpoint, kind):
+def test_actual_training_records_and_resumes_curriculum(tmp_path, learner, checkpoint, kind):
+    from test_dqn import dqn_config, contract as dqn_contract
     torch.set_num_threads(1)
     env = fixture_env()
     config = fixture_config("mlp") | {"name": "br", "player": 1,
@@ -197,6 +200,8 @@ def test_actual_ppo_training_records_and_resumes_curriculum(tmp_path, checkpoint
         "initial_policy": {"kind": "fresh"}, "curriculum": settings() | {
             "kind": kind, "warmup_episodes": 1, "update_every": 1},
         "opponents": [{"name": "random", "probability": 1., "policy": {"kind": "uniform"}}]}
+    if learner == "dqn":
+        config.update({key: dqn_config()[key] for key in ("learner", "dqn")})
     first, second, third = [tmp_path / name for name in ("first", "second", "weights")]
     for path in (first, second, third):
         path.mkdir()
@@ -206,9 +211,14 @@ def test_actual_ppo_training_records_and_resumes_curriculum(tmp_path, checkpoint
         assert progress["curriculum"] == result["curriculum"]
         assert all("curriculum_event" in row for row in progress["episodes"])
         assert "curriculum/opponent_0/ema_win_rate" in (first / "scalars/progress.csv").read_text()
-        contract = save_contract(first, env, config)
+        contract = (dqn_contract if learner == "dqn" else save_contract)(first, env, config)
         path = first / checkpoint
         state = json.loads(path.with_suffix(".curriculum.json").read_text())
+        if learner == "dqn":
+            replay = json.loads(path.with_suffix(".replay.json").read_text())
+            assert replay["steps"] == state["steps"]
+            assert path.with_suffix(".replay.pkl").is_file()
+            assert not list((first / "checkpoints").glob("ppo_*.zip"))
         config["initial_policy"] = {"kind": "checkpoint", "path": str(path), "training_config": contract}
         resumed = train_br(env, config, "cpu", 14, second)
         new_records = json.loads((second / "progress.json").read_text())["episodes"]

@@ -64,7 +64,7 @@ def load_population(name, spec, interface, device, path, identity):
             if entry["num_actions"] != interface.action_space.n:
                 raise ValueError("PSRO member action space differs")
             member = UniformPolicy(entry["name"], entry["num_actions"])
-        elif entry["kind"] in {"sb3", "sb3_recurrent"}:
+        elif entry["kind"] in {"sb3", "sb3_recurrent", "sb3_dqn"}:
             member = load_policy(entry["name"], {
                 "kind": entry["kind"], "path": str(path.parent / entry["path"]),
                 "training_config": spec["training_config"]}, interface, device)
@@ -84,8 +84,11 @@ def load_checkpoint(name, spec, interface, device):
     shape, num_actions = interface.observation_space.shape, interface.action_space.n
     if spec["kind"] == "psro_mixture":
         return load_population(name, spec, interface, device, path, identity)
-    if spec["kind"] in {"sb3", "sb3_recurrent"}:
-        if spec["kind"] == "sb3_recurrent":
+    if spec["kind"] in {"sb3", "sb3_recurrent", "sb3_dqn"}:
+        if spec["kind"] == "sb3_dqn":
+            from soku_rl.rl.dqn import DoubleDQN as Algorithm
+            from soku_rl.policy.dqn import DQNPolicy as Policy
+        elif spec["kind"] == "sb3_recurrent":
             from sb3_contrib import RecurrentPPO as Algorithm
             from soku_rl.policy.recurrent import RecurrentPPOPolicy as Policy
         else:

@@ -17,10 +17,11 @@ def candidate_specification(config, source, algorithm):
         model = (source / config["checkpoint"]).resolve(strict=True)
         if not model.is_relative_to(source):
             raise ValueError("checkpoint must belong to training_directory")
-        kind = {"mlp": "sb3", "lstm": "sb3_recurrent"}[algorithm["policy_type"]]
+        from soku_rl.rl.learner import artifact_kind
+        kind = artifact_kind(algorithm)
         spec = {"kind": kind, "path": str(model), "training_config": str(source / "config.yaml")}
         metadata = {"checkpoint_sha256": hashlib.sha256(model.read_bytes()).hexdigest()}
-        if greedy:
+        if greedy and kind != "sb3_dqn":
             return "learned-br:greedy", {"kind": "greedy", "policy": spec}, metadata
         return "learned-br", spec, metadata
     if set(candidate) == {"kind", "name", "rules"} and candidate["kind"] == "rule":
@@ -75,6 +76,7 @@ def main(cfg):
     output.mkdir(parents=True, exist_ok=False)
     # Persist the actual source contract and opponent setups, not train defaults.
     config.update(source_training=training, evaluation_opponents=population,
+        policy_inference="grouped_greedy_dqn_v1_other_actors_sequential",
         evaluation_candidate={"name": candidate, "policy": specification}, **candidate_metadata,
         training_config_sha256=hashlib.sha256(training_path.read_bytes()).hexdigest())
     (output / "config.yaml").write_text(OmegaConf.to_yaml(OmegaConf.create(config)), encoding="utf-8")

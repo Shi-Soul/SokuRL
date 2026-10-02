@@ -1,11 +1,11 @@
-# 共享 PPO 与多智能体训练
+# 共享 RL 与多智能体训练
 
 BR 的 uniform / 神 AI 混合现支持按长期胜率连续反馈调整，配置、日志与恢复约定见
 [自适应课程](adaptive-curriculum.md)。
 共享 PPO 还可启用[当前轨迹上的冻结策略约束](online-policy-anchor.md)，
 其实现诊断已完成，但首个短程配置在完整神 AI 四局筛查中全负，尚无强度收益。
 
-全部新训练使用 `rl/ppo.py` 创建的 Stable-Baselines3 PPO；需要循环记忆时使用同一配置空间中的 sb3-contrib RecurrentPPO。MARL 层只决定双方何时学习、对手从哪里来、是否维护平均策略或种群，不再实现自己的 PPO 或 DQN 更新。
+新训练可选 `rl=ppo` 或 `rl=dqn`；DQN 的接口、回放和实机验证见 [DQN 说明](dqn.md)。默认使用 `rl/ppo.py` 创建的 Stable-Baselines3 PPO；需要循环记忆时使用同一配置空间中的 sb3-contrib RecurrentPPO。MARL 层只决定双方何时学习、对手从哪里来、是否维护平均策略或种群，不再实现自己的 PPO 或 DQN 更新。
 
 | 配置 | 学习组织 | 导出策略 |
 | --- | --- | --- |

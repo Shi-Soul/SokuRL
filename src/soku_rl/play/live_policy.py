@@ -3,6 +3,7 @@ from dataclasses import replace
 
 from soku_rl.env.encoding import AGENTS
 from soku_rl.env.observation.privileged import PrivilegedObservation
+from soku_rl.env.observation.diagnostic import Observation
 from soku_rl.env.observation_history import ObservationHistory
 from soku_rl.env.wrappers.learning import LearningEpisode
 
@@ -20,7 +21,7 @@ class LivePolicy:
     def __init__(self, policy, interface, seat):
         if type(seat) is not int or seat not in (0, 1):
             raise ValueError("live policy requires a local seat")
-        if interface.episode.observation_mode not in ("state", "image", "privileged_state"):
+        if interface.episode.observation_mode not in ("state", "image", "privileged_state", "diagnostic_state"):
             raise ValueError("live policy requires public or complete privileged observations")
         self.policy, self.interface = policy, interface
         self.agent = AGENTS[seat]
@@ -53,6 +54,11 @@ class LivePolicy:
         self.active = True
 
     def _round_observations(self, frame, observations):
+        if self.interface.episode.observation_mode == "diagnostic_state":
+            if any(not isinstance(value, Observation) or value.frame != frame for value in observations):
+                raise ValueError("diagnostic observation must identify the exact supplied frame")
+            return tuple(replace(value, frame=min(frame - self.origin, self.interface.episode.max_frames))
+                         for value in observations)
         if self.interface.episode.observation_mode != "privileged_state":
             return observations
         for value in observations:

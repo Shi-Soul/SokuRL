@@ -17,3 +17,5 @@ opponents:
       kind: rule
       name: god
       rules: ${rules}
+learner: ${rl.learner}
+dqn: ${rl.dqn}

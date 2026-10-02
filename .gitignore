@@ -37,3 +37,6 @@ HISTORY.md
 PROGRESS.md
 STRUCTURES.md
 *.zip
+
+# External original community AI package, reused by local worktrees
+/third_party/th123_ai

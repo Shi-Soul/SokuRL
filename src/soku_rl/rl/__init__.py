@@ -13,7 +13,9 @@ def ppo_settings(config):
     shared = config["rl"]
     algorithm = config["algorithm"]
     learner = algorithm["response"] if algorithm["name"] == "psro" else algorithm
-    for name in ("policy_type", "timeout_payoff", "ppo"):
+    for name in ("policy_type", "timeout_payoff", "ppo", "learner", "dqn"):
+        if name not in shared and name not in learner:
+            continue
         if learner[name] != shared[name]:
             raise ValueError(f"algorithm-specific {name} differs from the shared rl configuration; configure rl.{name}")
     for option in ("rehearsal", "online_anchor"):
@@ -25,6 +27,11 @@ def ppo_settings(config):
         raise ValueError("shared PPO policy_type must be mlp or lstm")
     if shared["timeout_payoff"] != "zero_at_horizon":
         raise ValueError("shared PPO requires zero_at_horizon")
+    from soku_rl.rl.learner import learner_kind, validate_dqn
+    if learner_kind(shared) == "dqn":
+        if shared["policy_type"] != "mlp":
+            raise ValueError("DQN requires a feedforward policy")
+        validate_dqn(shared["dqn"])
     return shared
 
 
@@ -32,5 +39,6 @@ def validate_payoff(interface, config):
     """The implemented potential telescopes only for undiscounted episode returns."""
     if config["timeout_payoff"] != "zero_at_horizon":
         raise ValueError("PPO requires the declared finite-horizon payoff")
-    if interface.config.health_potential_scale and config["ppo"]["gamma"] != 1.:
+    from soku_rl.rl.learner import learner_kind
+    if interface.config.health_potential_scale and config[learner_kind(config)]["gamma"] != 1.:
         raise ValueError("the finite-horizon health potential requires gamma=1")

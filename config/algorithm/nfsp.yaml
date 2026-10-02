@@ -11,3 +11,5 @@ average:
   capacity: 20000
   batch_size: 128
   updates: 128
+learner: ${rl.learner}
+dqn: ${rl.dqn}

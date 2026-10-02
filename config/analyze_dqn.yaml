@@ -1,0 +1,13 @@
+runs:
+  three_step_failed: logs/training/br-dqn-reimu-baseline-20261001
+  three_step_resumed: logs/training/br-dqn-reimu-baseline-resumed-20261001
+  five_step: logs/training/br-dqn-reimu-five-step-20261001
+  more_replay: logs/training/br-dqn-reimu-more-replay-20261001
+combat_window: 10
+output: logs/diagnostics/dqn-curves-${now:%Y%m%d-%H%M%S}
+hydra:
+  run:
+    dir: ${output}/hydra
+  output_subdir: null
+  job:
+    chdir: false
