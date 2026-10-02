@@ -32,6 +32,12 @@
 47 项相关检查通过，覆盖填充帧排除、精确梯度权重、普通目标兼容、全局验证归一化、
 前馈/循环模型实际训练及预定目标选取检查点、共享 PPO 加载和继续训练。
 日志 `.dev/pytest-change-weight-20261002.log`。这只验证实现，不是实战提升证据。
+全量检查为 1043 passed、12 skipped、1 deselected、2 subtests passed，
+日志 `.dev/pytest-change-weight-full-20261002.log`，3 条警告来自既有 TorchRL 导入。
+两组完整 Hydra 配置逐字段核对通过，除输出和权重外相同；初始检查点 SHA256、
+输入契约、完整动作空间和训练预算均确认。
+证据 `logs/diagnostics/change-supervision-preflight-20261002/summary.json`，
+日志 `.dev/check-change-supervision-config-20261002.log`。
 
 ```bash
 # 普通组改用 --config-name pretrain_recurrent_numeric_combat_demonstrations、另一空闲 GPU 和 output。
