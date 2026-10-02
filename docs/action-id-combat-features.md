@@ -51,4 +51,10 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 
 按同一验证 NLL 选择 best，然后用两个公共世界种子、双座位、common_roles、policy_seed=728341
 评测完整灵梦神 AI。若有改善再扩展验证；不因教师拟合好就直接接入 PPO 长训练。
-代码先提交，再启动上述拟合。尚无正式拟合或实战结果。
+正式拟合已由提交 `3a0eaf1` 在 GPU 4 启动。初始化核对确认实际配置只改特征编码器类、
+embedding 宽度和输出目录，数据身份、训练参数、包版本及教师身份保持相同。
+两者均为 256 维 actor/critic LSTM、完整 576 动作、PPO 0 步、空优化器；
+候选初始参数哈希与上述 GPU 检查完全一致。源码哈希亦通过核验。
+记录在 `logs/diagnostics/action-id-initialization-20261002/summary.json`，入口及日志为
+`../.dev/audit-action-id-initialization-20261002.{py,log}`。
+拟合仍在进行，尚无该候选的实战结果。
