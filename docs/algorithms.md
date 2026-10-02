@@ -81,6 +81,10 @@ L^{\mathrm{clip}}(\theta)=\mathbb E_t\left[
 
 策略损失、价值损失、熵项、梯度裁剪和优化器更新均由上游 PPO 执行。IPPO 的 `JointRollouts` 只负责同时收集双方数据，再调用同一个缓冲区的 GAE 和模型的 `train()`。
 
+IPPO 的公共训练循环在每轮采样与更新后，将双方指标分别写入
+`player_0/scalars/progress.csv` 和 `player_1/scalars/progress.csv`，适用于 PPO、循环 PPO 和 DQN。
+`time/total_timesteps` 保留续训后的全局步数；DQN 尚未开始优化时只记录已有指标。
+
 所有路径声明 `timeout_payoff=zero_at_horizon`：到达对局帧数上限后收益为零，并结束该有限时域任务。训练不对该时限之外的状态自举；评测仍保留 `time_limit` 标签，不能把它记成原游戏双杀。
 
 血量塑形使用双方血量差构成的势函数。启用时必须设置 \(\gamma=1\)，终止或超时时令下一势函数为零：

@@ -1,9 +1,15 @@
 # 固定验证集上的行为保留检查
 
-`tools/evaluate_demonstrations.py` 对已保存的共享 PPO 模型进行只读验证，支持前馈与循环模型。
+`tools/evaluate_demonstrations.py` 对已保存的共享 PPO/DQN 模型进行只读验证，支持前馈与循环 PPO。
 它报告每个数据集的整体及双座位 NLL、最高概率动作准确率、变化帧准确率和分布熵，
 同时列出复制上一实际动作的基线、有效帧数及完整局数。
 指标回答教师标签拟合程度，不能替代完整神 AI 对局胜率。
+DQN 的分布指标使用 Q 值的 softmax 衡量动作排序，不表示部署时采用随机策略。
+
+加载器读取 ZIP 内保存的策略类选择模型类型，不从训练配置的 `rl.learner` 推断。
+因此 DQN-NFSP 的响应检查点与 `player_*/final.zip` 平均策略都能使用原配置评估；
+后者仍是 PPO 格式的分类策略。历史 ZIP 无须转换。报告中 `training_learner` 记录
+训练配置，`policy_kind` 和 `learner` 记录实际加载的策略类型及模型类别。
 
 数据继续经过已有严格 loader：完整采样结果、manifest/shard 哈希、契约、整局 split
 和正式评估种子排除均需通过。只评分 validation，不采样训练帧。
@@ -15,7 +21,7 @@
 入口读取检查点字节后，从这同一份内存字节加载并计算哈希；不会在文件可能变化时
 先哈希一个版本再加载另一个版本。仍应优先选已完成训练的 best/final 或不可变的定期检查点，
 不要依赖正在重写的 ZIP 文件。输出保存模型、数据 manifest/config 与验证 shard 的哈希、
-验证世界种子、源码及依赖身份；验证前后核对模型参数和 PPO 步数不变。
+验证世界种子、源码及依赖身份；验证前后核对模型参数和学习器步数不变。
 
 ```bash
 bash scripts/linux.sh tools/evaluate_demonstrations.py linux.cuda_devices=0 \

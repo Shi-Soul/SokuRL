@@ -60,17 +60,39 @@ def test_bad_validation_partition_is_rejected(dataset, problem):
         score_validation(model, samples, manifest, 3 if problem == "batch" else 4, 2)
 
 
-@pytest.mark.parametrize("kind", ["mlp", "lstm"])
+@pytest.mark.parametrize("kind", ["mlp", "lstm", "dqn", "nfsp_average", "nfsp_response"])
 def test_entrypoint_records_the_exact_loaded_checkpoint_and_fixed_validation_games(dataset, kind):
     directory, interface, _ = dataset
     torch.set_num_threads(1)
-    config = fixture_config(kind)
-    model, _ = create_ppo(ObservationContractEnv(interface), interface, config,
-        {"kind": "fresh"}, "cpu", 11)
-    checkpoint = directory / "checkpoint.zip"
-    model.save(checkpoint)
+    from test_dqn import dqn_config
+    from test_shared_ppo import fixture_env
+    from soku_rl.marl.nfsp import train_nfsp
+    from soku_rl.rl.learner import create_learner
+    from stable_baselines3 import PPO
+    from soku_rl.rl.dqn import DoubleDQN
+    config = fixture_config(kind) if kind in {"mlp", "lstm"} else dqn_config()
+    if kind.startswith("nfsp_"):
+        config.update(name="nfsp", iterations=1, timesteps_per_iteration=8, anticipatory_param=.1,
+            average={"capacity": 12, "batch_size": 4, "updates": 2}, resume={"kind": "fresh"})
+        output = directory / "nfsp"
+        output.mkdir()
+        env = fixture_env()
+        try:
+            train_nfsp(env, config, "cpu", 11, output)
+        finally:
+            env.close()
+        checkpoint = output / ("player_0/final.zip" if kind == "nfsp_average" else "checkpoint-1/response-p0.zip")
+        model = (PPO if kind == "nfsp_average" else DoubleDQN).load(checkpoint, device="cpu")
+    else:
+        model, _ = create_learner(ObservationContractEnv(interface), interface, config,
+            {"kind": "fresh"}, "cpu", 11)
+        checkpoint = directory / "checkpoint.zip"
+        model.save(checkpoint)
     training = OmegaConf.load(directory / "config.yaml")
-    training.rl = {key: config[key] for key in ("policy_type", "timeout_payoff", "ppo")}
+    training.rl = {key: config[key] for key in ("policy_type", "timeout_payoff", "ppo", "learner", "dqn")
+        if key in config}
+    if kind.startswith("nfsp_"):
+        training.algorithm = config
     path = directory / "policy-config.yaml"
     OmegaConf.save(training, path)
     output = directory / "scoring"
@@ -84,6 +106,12 @@ def test_entrypoint_records_the_exact_loaded_checkpoint_and_fixed_validation_gam
     candidate = report["models"]["candidate"]
     assert candidate["checkpoint_sha256"] == hashlib.sha256(checkpoint.read_bytes()).hexdigest()
     assert candidate["policy_parameter_hash"] == parameter_hash(model.policy)
+    expected_learner = "dqn" if kind in {"dqn", "nfsp_response"} else "ppo"
+    expected_policy = "sb3_dqn" if expected_learner == "dqn" else "sb3_recurrent" if kind == "lstm" else "sb3"
+    assert candidate["learner"] == expected_learner
+    assert candidate["policy_kind"] == expected_policy
+    assert candidate["training_learner"] == config.get("learner", "ppo")
+    assert candidate["learner_steps"] == model.num_timesteps
     assert candidate["datasets"]["held_out"]["groups"]["overall"]["frames"] == 6
     assert {row["learner_seat"] for row in candidate["datasets"]["held_out"]["validation_episodes"]} == {0, 1}
     with pytest.raises(ValueError, match="fresh"):

@@ -58,4 +58,3 @@ class JointDQN:
                     steps = model.train_freq.frequency * self.env.num_envs
                 if steps:
                     model.train(gradient_steps=steps, batch_size=model.batch_size)
-            model.logger.dump(model.num_timesteps)

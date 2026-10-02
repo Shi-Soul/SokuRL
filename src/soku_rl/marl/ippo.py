@@ -33,6 +33,9 @@ def train_ippo(env, config, device, seed, directory):
         updates = 0
         while models[0].num_timesteps < targets[0]:
             collector.update(targets)
+            for model in models:
+                model.logger.record("time/total_timesteps", model.num_timesteps)
+                model.logger.dump(model.num_timesteps)
             updates += 1
             if updates % config["checkpoint_every"] == 0:
                 for player, model in enumerate(models):
