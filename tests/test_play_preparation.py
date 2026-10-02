@@ -86,7 +86,8 @@ def test_menu_composes_the_same_hydra_config_for_all_connections(connection, tra
             answers.append("192.0.2.7")
         answers.append("10812")
     values, printed = iter(answers), []
-    overrides = play_menu(catalog, {"network": {"port": 10811}}, lambda prompt: next(values), printed.append)
+    overrides = play_menu(catalog, {"network": {"address": "127.0.0.1", "port": 10811}},
+                          lambda prompt: next(values), printed.append)
     with initialize_config_dir(version_base="1.3", config_dir=str(Path(__file__).parents[1] / "config")):
         config = compose(config_name="play", overrides=overrides)
     clients = client_plan(OmegaConf.to_container(config.play))
