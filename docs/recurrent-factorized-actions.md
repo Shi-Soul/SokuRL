@@ -22,7 +22,8 @@
 NFSP 的现有前馈路径保持原适用范围，不声称新增循环平均策略支持。
 早期测试的两个问题分别是加载后 Adam step 张量设备迁移，以及完整动作空间增加了
 按键诊断字段；测试现按相同数值设备比较，并累积全部逐帧指标作参照，没有放宽数值容差。
-全量回归尚待完成。
+提交 `60cc14e` 的全量回归为 **1227 passed、12 skipped、1 deselected、2 subtests passed**，
+125.74 秒；日志 `.dev/pytest-recurrent-factorized-full-20261002.log`。
 
 ## 预定训练与验证
 
@@ -43,3 +44,19 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=6 \
   'pretraining.additional_datasets=[logs/demonstrations/god-marisa-reimu-expanded-20261001]' \
   output=logs/pretraining/god-marisa-reimu-recurrent-factorized-address-20261002
 ```
+
+## 预检与启动
+
+提交 `60cc14e` 已在空闲 GPU 6 启动上述 20 轮预训练。完整学习/观测/示范参数对照通过；
+当前共享配置另有 `learner=ppo` 和空 `dqn` 映射，历史 BC 配置早于这两个字段。
+预检明确验证并剔除这两项元数据后，RL 参数仅增加 action_factorization；没有切换学习器。
+两个数据 manifest SHA256 与原实验一致，原始观测仍为 590890 维、576 动作。
+
+新模型共 3617312 参数，其中动作头 3855；原模型共 3761489 参数。
+公共编码器、MLP 等共 2560785 个参数逐位相同；两个 LSTM 的八个参数张量因随机数
+消耗变化而不同，未把它们误记为相同初始化。初始参数哈希为
+`6698cdccd7635093b96ef91b83985122031ee0434bfea8708381f9f8cbd1ad2b`，
+PPO 步数与更新计数为零，Adam 为空。
+预检在 `logs/diagnostics/recurrent-factorized-address-preflight-20261002/summary.json`，
+脚本/日志 `.dev/check-recurrent-factorized-address-20261002*`。
+这是启动前检查；实际保存的初始模型、完整 20 轮结果及 16 局评估仍待核对。
