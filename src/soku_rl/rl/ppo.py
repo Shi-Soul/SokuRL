@@ -29,6 +29,9 @@ def create_ppo(env, interface, config, source, device, seed):
     if "rehearsal" in config:
         from soku_rl.rl.rehearsal import attach_rehearsal
         attach_rehearsal(model, interface, config["rehearsal"], source["kind"] == "checkpoint")
+    if "online_anchor" in config:
+        from soku_rl.rl.online_anchor import attach_anchor
+        attach_anchor(model, interface, config["online_anchor"], source["kind"] == "checkpoint")
     return model, metadata
 
 
@@ -50,6 +53,8 @@ def parameter_hash(policy):
 
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
     validate_payoff(interface, config)
+    if "online_anchor" in config and "rehearsal" in config:
+        raise ValueError("select online_anchor or rehearsal; combining auxiliary objectives is not supported")
     parameters = dict(config["ppo"])
     if "action_factorization" in parameters:
         from soku_rl.rl.factorized_policy import FactorizedActorCriticPolicy
@@ -86,6 +91,10 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         from soku_rl.rl.rehearsal import rehearsal_algorithm, validate_rehearsal
         validate_rehearsal(config["rehearsal"])
         algorithm = rehearsal_algorithm(algorithm)
+    if "online_anchor" in config:
+        from soku_rl.rl.online_anchor import anchored_algorithm, validate_anchor
+        validate_anchor(config["online_anchor"])
+        algorithm = anchored_algorithm(algorithm)
     if source == {"kind": "fresh"}:
         model = algorithm(policy_type, env, seed=seed, device=device, **parameters)
         if "initial_action_prior" in config["ppo"]:
@@ -99,10 +108,11 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         raise ValueError("PPO initialization requires the same policy type and payoff")
     if source["kind"] == "checkpoint" and previous["ppo"] != config["ppo"]:
         raise ValueError("continued PPO must retain its algorithm and optimizer configuration")
-    if source["kind"] == "checkpoint" and (
-            {key: previous[key] for key in ("rehearsal",) if key in previous}
-            != {key: config[key] for key in ("rehearsal",) if key in config}):
-        raise ValueError("continued PPO must retain its rehearsal configuration")
+    if source["kind"] == "checkpoint":
+        for option in ("rehearsal", "online_anchor"):
+            if ({key: previous[key] for key in (option,) if key in previous}
+                    != {key: config[key] for key in (option,) if key in config}):
+                raise ValueError(f"continued PPO must retain its {option} configuration")
     path = Path(source["path"]).resolve(strict=True)
     if source["kind"] == "weights":
         heads = ("action_persistence", "action_factorization")
