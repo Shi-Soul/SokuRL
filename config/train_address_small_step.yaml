@@ -1,0 +1,9 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+# Same original BC actor and critic; isolate the PPO optimizer step size.
+rl:
+  ppo:
+    learning_rate: 0.00001
+output: logs/diagnostics/br-address-small-step-${now:%Y%m%d-%H%M%S}
