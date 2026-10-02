@@ -84,3 +84,29 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 并单独验证完整轨迹。原始概率和计时见
 `logs/diagnostics/learner-collection-batching-profile-20261002/result.json`；
 脚本/日志 `.dev/profile-learner-batching-20261002.{py,log}`。
+
+## 聚合拟合与固定状态评分
+
+源码 `490116d`，GPU 6，646.695 秒完成 20 epoch、26491 次监督更新，PPO 步数为 0。
+最佳聚合验证 NLL 出现在第 8 epoch；best SHA256 为
+`10086f60269302c74a613f42e367de5ad5ec5fffd3cbb2025610adfe93228c4e`。
+逐轮重放训练局排列和序列窗口预算，与实际更新次数、Adam 步数一致。
+初始化参数与原 BC 相同；独立 critic LSTM、价值头参数始终不变，
+但共享特征改变仍会影响价值输出。
+
+以下均为固定验证局、完整前缀递推、关闭 TF32 的评分，不是实战胜率。
+“需改动作”表示教师标签与实际上一帧动作不同，不是教师标签自己前后变化。
+独立失败 PPO 数据从未加入本次拟合或检查点选择。
+
+| 验证数据 | 帧数 | 原 BC / 新候选 NLL | 原 BC / 新候选准确率 | 原 BC / 新候选需改动作准确率 |
+| --- | ---: | ---: | ---: | ---: |
+| 原教师 | 28800 | 0.20752 / 0.23893 | 94.56% / 93.55% | 65.81% / 67.01% |
+| 扩充教师 | 49744 | 0.21927 / 0.25459 | 94.55% / 93.09% | 65.40% / 65.98% |
+| 新 BC 学习者轨迹 | 18551 | 3.16699 / 1.63297 | 53.74% / 60.01% | 7.34% / 25.19% |
+| 独立失败 PPO 轨迹 | 4581 | 5.09683 / 1.76952 | 27.29% / 49.29% | 3.37% / 34.76% |
+
+新学习者状态的标签拟合改善，同时旧教师总体准确率下降，不能仅凭前者替换当前最好策略。
+训练审核在 `logs/diagnostics/address-aggregate-training-20261002/summary.json`；
+固定评分原始结果分别在 `logs/diagnostics/address-aggregate-{reference,candidate}-fit-20261002/`，
+数据划分/模型身份与按座位加权复核在同一训练审核目录的 `fixed-fit-audit.json`。
+脚本和完整日志保留在工作区 `.dev/audit-address-aggregate-{training,fit}-20261002.*`。
