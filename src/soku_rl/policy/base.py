@@ -18,6 +18,13 @@ class PlayActor:
         return self.actor.act(observation)
 
 
+class PrivilegedPlayActor(PlayActor):
+    """Also accept the complete decoded frame, without a dense tensor roundtrip."""
+
+    def act_observation(self, observation):
+        return self.actor.act_observation(observation)
+
+
 class Policy(ABC):
     name: str
     fingerprint: str

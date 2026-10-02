@@ -118,3 +118,41 @@ def test_network_controller_matches_original_scheduler_through_knockout(script, 
     finally:
         reference.close()
         controller.stop()
+
+
+@pytest.mark.parametrize("seat", (0, 1))
+def test_realtime_god_consumes_complete_observations_without_dense_tensor_roundtrip(seat, monkeypatch):
+    if not SCRIPTS.is_dir():
+        pytest.skip("original strategy package is unavailable")
+    package = ScriptPackage(SCRIPTS, ROOT / "third_party/th123_ai/source/th123_ai/api.ai")
+    episode = EpisodeConfig(7200, 1, 1, 0, "privileged_state", VISIBILITY, LEGACY_MATCH)
+    interface = LearningInterface(episode, LearningConfig("full", False, 0, 0.))
+    policy = LearningRulePolicy(GodPolicy("god", package, "00_reimuEX1_main.ai", episode), interface)
+    baseline = policy.spawn(1732 + seat)
+    frames, expected = [], []
+    for index in range(24):
+        current = observation(0)
+        current.world.update(frame=index, battle_time=500 + index)
+        for player in current.players:
+            player["objects"] = tuple(player | {"address": 0x100000 + i * 0x1000,
+                "x": 450. + i} for i in range(128))
+            player["obj_n"] = 128
+        expected.append(interface.command(baseline.act(episode.encode(current))))
+        absolute = replace(current, world=current.world | {"frame": index + 1})
+        pair = (absolute, replace(absolute, players=absolute.players[::-1]))
+        if seat:
+            pair = pair[::-1]
+        frames.append(MatchFrame(MatchState(1, 0, index + 1, (0, 0), (10000, 10000), "battle"), pair))
+
+    def reject_dense_encoding(*args):
+        raise AssertionError("realtime god rebuilt a dense learning tensor")
+
+    monkeypatch.setattr(EpisodeConfig, "encode", reject_dense_encoding)
+    controller = RealtimePolicy(policy, interface, seat, 1732)
+    try:
+        for frame, command in zip(frames, expected, strict=True):
+            assert controller.advance(frame).inputs[seat] == decode_action(command).inputs
+        with pytest.raises(RuntimeError, match="lost a simulation frame"):
+            controller.advance(replace(frames[-1], match=replace(frames[-1].match, frame=26)))
+    finally:
+        controller.stop()
