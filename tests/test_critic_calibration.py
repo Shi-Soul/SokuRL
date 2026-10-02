@@ -22,13 +22,16 @@ class FrozenFeatureFixture(BaseFeaturesExtractor):
 
 
 @pytest.mark.parametrize('shared', [True, False])
-def test_private_fit_preserves_actor_features_buffers_and_shared_ppo_resume(tmp_path, shared):
+@pytest.mark.parametrize('device', ['cpu', 'cuda:0'])
+def test_private_fit_preserves_actor_features_buffers_and_shared_ppo_resume(tmp_path, shared, device):
+    if device == 'cuda:0' and not torch.cuda.is_available():
+        pytest.skip('CUDA unavailable')
     torch.set_num_threads(1)
     env = fixture_env()
     config = fixture_config('lstm') | {'name': 'br'}
     config['ppo']['policy_kwargs'].update(share_features_extractor=shared,
         features_extractor_class='test_critic_calibration.FrozenFeatureFixture')
-    model, _ = create_ppo(ObservationContractEnv(env.interface), env.interface, config, {'kind': 'fresh'}, 'cpu', 23)
+    model, _ = create_ppo(ObservationContractEnv(env.interface), env.interface, config, {'kind': 'fresh'}, device, 23)
     rng = np.random.default_rng(37)
     episodes = [[(PackedObservation.pack(rng.normal(size=env.single_observation_space.shape).astype(np.float32)),
         0, -.7, -1 if frame == 0 else 1) for frame in range(size)] for size in (3, 7, 5)]
@@ -44,8 +47,8 @@ def test_private_fit_preserves_actor_features_buffers_and_shared_ppo_resume(tmp_
         for episode in episodes:
             states = zero_states(model.policy, 1)
             for obs, _, target, _ in episode:
-                _, values, _, states = model.policy(torch.from_numpy(obs.unpack()).unsqueeze(0),
-                    states, torch.zeros(1), deterministic=True)
+                _, values, _, states = model.policy(torch.from_numpy(obs.unpack()).unsqueeze(0).to(device),
+                    states, torch.zeros(1, device=device), deterministic=True)
                 errors.append(float((values.item() - target) ** 2))
                 actor_before.append(model.policy.action_dist.distribution.probs.clone())
     for length, batch in ((1, 1), (2, 4), (8, 16)):
@@ -69,8 +72,8 @@ def test_private_fit_preserves_actor_features_buffers_and_shared_ppo_resume(tmp_
         for episode in episodes:
             states = zero_states(model.policy, 1)
             for obs, _, _, _ in episode:
-                _, _, _, states = model.policy(torch.from_numpy(obs.unpack()).unsqueeze(0), states,
-                    torch.zeros(1), deterministic=True)
+                _, _, _, states = model.policy(torch.from_numpy(obs.unpack()).unsqueeze(0).to(device), states,
+                    torch.zeros(1, device=device), deterministic=True)
                 actor_after.append(model.policy.action_dist.distribution.probs.clone())
     assert all(torch.equal(a, b) for a, b in zip(actor_before, actor_after))
     path = tmp_path / 'calibrated.zip'
@@ -81,7 +84,7 @@ def test_private_fit_preserves_actor_features_buffers_and_shared_ppo_resume(tmp_
     from test_demonstrations import ConstantPolicy
     view = OpponentMixtureVecEnv(env, 0, [OpponentEntry('constant', ConstantPolicy(8))], [1.], 17)
     resumed, _ = create_ppo(view, env.interface, config,
-        {'kind': 'weights', 'path': str(path), 'training_config': contract}, 'cpu', 31)
+        {'kind': 'weights', 'path': str(path), 'training_config': contract}, device, 31)
     assert parameter_hash(resumed.policy) == parameter_hash(model.policy)
     resumed.learn(8)
     assert resumed.num_timesteps == 8 and parameter_hash(resumed.policy) != parameter_hash(model.policy)

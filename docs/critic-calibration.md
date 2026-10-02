@@ -57,3 +57,13 @@ GAE=.95、target_kl=.015、熵系数 .001、seed=1732；没有额外监督或 KL
 自适应 uniform 初值为 0，保留 50 局 EMA 半衰期、20 局预热及之后每局反馈。
 该短预算主要检验 PPO 转换早期行为，不能保证积累足够完整对局触发课程更新。
 预热期间保持原神 AI，与 critic 数据的对手分布一致。
+
+首个 GPU 校准在第一次反向传播失败，原因是 cuDNN RNN 不允许 eval 模式反向传播。
+失败目录 `logs/pretraining/god-marisa-reimu-critic-calibrated-20261002` 保留，
+仅有初始验证和零监督更新，不用于后续训练。
+修正为只给独立 critic LSTM/价值头开启训练模式，特征/actor 继续 eval。
+新增 CUDA 与 CPU、共享与分离特征的交叉检查，**11 passed**，包括实际反向传播、
+冻结缓冲区、逐位相同 actor 概率及共享 PPO 续训。
+日志 `.dev/pytest-critic-calibration-cuda-20261002.log`。
+成功重试目标改为 `logs/pretraining/god-marisa-reimu-critic-calibrated-v2-20261002`，
+候选 PPO 配置同步引用新目录，原失败证据不覆盖。

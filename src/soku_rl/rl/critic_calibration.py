@@ -35,6 +35,10 @@ def critic_epoch(model, episodes, order, batch_size, sequence_length, optimizer,
     # Frozen feature buffers and dropout behavior must also remain fixed.
     policy = model.policy
     policy.set_training_mode(False)
+    # cuDNN LSTM backward requires training mode on this branch, while frozen
+    # feature buffers/dropout and the actor must stay in evaluation mode.
+    for module in (policy.lstm_critic, policy.mlp_extractor.value_net, policy.value_net):
+        module.train(training)
     squared_error, frames, updates = 0., 0, 0
     with torch.set_grad_enabled(training):
         for chunk in episode_chunks(episodes, order, sequence_length, batch_size // sequence_length):
