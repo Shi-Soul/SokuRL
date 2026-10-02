@@ -1,0 +1,8 @@
+defaults:
+  - train_address_action_mix50
+  - _self_
+
+algorithm:
+  curriculum:
+    kind: adaptive_episode_mixture
+output: logs/training/br-address-episode-mix50-${now:%Y%m%d-%H%M%S}

@@ -1,0 +1,11 @@
+defaults:
+  - train_address_diverse_rollouts
+  - _self_
+
+rl:
+  ppo:
+    recurrent_storage: sparse
+algorithm:
+  curriculum:
+    initial_random_probability: 0.5
+output: logs/training/br-address-action-mix50-${now:%Y%m%d-%H%M%S}
