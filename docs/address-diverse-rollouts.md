@@ -53,3 +53,17 @@ GPU 显存一次观测约 6.9 GB，不是峰值测量。审计快照为 6144 步
 脚本/日志 `.dev/check-address-diverse-rollouts-20261002.*`、
 `.dev/audit-address-diverse-rollouts-start-20261002.*`。
 训练继续运行；65536 和 262144 步的完整验证尚待完成。
+
+## 65536 步检查点
+
+预定中间检查点已保存，SHA256 为
+`61b75307ec5e7d202e96a06e3fb79e3c5fb2b599d5a76bfec103eb7b486dfadf`，参数哈希
+`4c6c01bec494d6bda589637421be3c0ca842c656552779566d7c347543ce1238`。
+实际 96 个 PPO epoch、380 次 Adam 更新；相同步数的两环境大 batch 对照为
+384 个 epoch、384 次 Adam 更新。此处 epoch 次数不同主要来自每轮数据量不同。
+完成 16 个训练对局，全负，尚未达到 20 局预热，uniform=0、长期 EMA 胜率为零。
+检查点及课程哈希审计为预检目录的 `midpoint.json`。
+
+提交 `0e36984` 在 GPU 0 启动该检查点的预定 16 局纯神 AI 验证，输出
+`logs/benchmark/br-address-diverse-rollouts-mid-20261002`，使用八个固定种子 × 两座位。
+评估只加载模型做推理；候选仍来自原稠密缓存训练，新的可选存储实现没有改变该训练。
