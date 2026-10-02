@@ -48,7 +48,7 @@ bash scripts/linux.sh tools/collect_demonstrations.py --config-name collect_addr
   linux.cuda_devices=2 output=logs/demonstrations/address-recovery-marisa-reimu-20261002
 ```
 
-采集与拟合结果见下文；独立模型对局尚未完成，当前不记作已验证的强 BR。
+采集、拟合与独立模型对局结果见下文；本轮没有得到已验证的强 BR。
 
 ## 实现验证
 
@@ -176,5 +176,24 @@ NLL .20428 → .20615、准确率 95.3125% → 94.8242%；其余三个时间窗�
 `logs/diagnostics/address-recovery-fixed-fit-20261002` 和
 `logs/diagnostics/address-recovery-trained-windows-20261002`。
 
-最佳模型已由源码 `6355b5d` 在 GPU 2 启动预定的 16 局纯神 AI 评估，输出
-`logs/benchmark/br-address-recovery-20261002`。评估完成并核对前不据此追加 PPO 预算。
+最佳模型由源码 `6355b5d` 在 GPU 2 完成预定的 16 局纯神 AI 评估，输出
+`logs/benchmark/br-address-recovery-20261002`，结果见下一节。
+
+## 独立模型对局：未改善
+
+全部 16 局正常完成，1P/2P 各 8 负，没有胜局或超时。耗时 791.46 秒。
+双方角色/策略种子、原对手身份、所选 checkpoint、战斗均值和 worker 清理均核对通过，
+证据 `logs/diagnostics/address-recovery-pretraining-audit-20261002/games.json`，日志
+`.dev/finish-address-recovery-games_audit-20261002.log`。
+
+| 独立学习策略 | 胜 / 负 / 超时 | 自身 / 对手平均掉血 | 双方符卡动作进入均值 |
+| --- | --- | --- | --- |
+| 原 BC | 1 / 15 / 0 | 9970.94 / 3777.00 | .125 / .0625 |
+| 恢复后缀 BC | 0 / 16 / 0 | 10135.69 / 2689.69 | .25 / .125 |
+
+固定验证标签拟合改善没有转化为本组实战收益；对手平均掉血也下降。
+HP 减少按逐帧累计，因此受回复等影响可以超过初始生命值；符卡计数是动作进入，
+不是把按钮提交次数直接解释为成功施放。
+这轮采集、拟合、评估及自动核对流程已全部结束，不追加该初始化的 PPO 预算。
+它不证明所有教师恢复示范无效，但当前证据不支持仅延长同一配置。
+较晚接管的冻结诊断仍按独立计划完成，不能把组合控制器成绩计入学习策略。
