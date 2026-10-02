@@ -66,3 +66,42 @@ PNG/PDF、62 行 CSV、源文件哈希。根据 timing 的实际 n_updates 匹�
 图中训练 KL 是 SB3 最后 epoch 的 minibatch 统计，value loss 也不是留出轨迹 MSE。
 PNG 已检查，PDF 未独立渲染。脚本/日志 `.dev/plot-address-small-step-20261002.*`。
 完整神 AI 四局筛查已启动，尚待结果。
+
+## 四局筛查完成
+
+完整原神 AI 四局 **0 胜 4 负**，平均自身/对手掉血 10000/5276.5，
+自身/对手符卡动作进入均值 0.25/0.25；耗时 253.66 秒。
+模型身份、种子、角色、双方座位和原神 AI 均与原学习率组配对一致，
+战斗均值重算，worker `f3d3b1b64d1f4376911c64a262ffca45` 正常退出并清理。
+原始 `logs/benchmark/br-address-small-step-20261002`，审核 `full-god-evaluations.json`。
+
+相同四局，原学习率 PPO 为 1 胜 3 负、平均对手掉血 4619；
+小学习率保持拟合并增加平均掉血，但没有改善胜局，不据此替换候选。
+四局对低胜率策略辨别力有限，且掉血不等于净伤害或胜率。
+因此预先选择同一额外六种子 × 两座位验证来比较双方，不增加小学习率训练预算。
+该扩展仍使用 `244381756,3884668474,1067982671,3435502516,2494848888,749036788`，
+策略种子 728341；原学习率 PPO 在这 12 局有 1 胜。
+
+## 原学习率候选的有界续训
+
+原学习率候选已在 16 局验证中得到 2 胜，双座位和两个世界种子均有胜局。
+据此进行一次续训到总计 65536 步的检验，不把小样本收益视为稳定增强。
+`train_address_control_continued.yaml` 从其 final 以 `kind: checkpoint` 恢复，
+保留 actor、critic、Adam、PPO 计数和自适应课程状态，额外预算 49152 步。
+PPO 和课程超参数不变，检查点间隔为 16384；游戏现场重开，显式改用采样 seed=893177，
+不是声称连续恢复了旧游戏现场或全部环境 RNG。
+初始课程统计应保留 3 个已完成败局；新日志中的完成对局与该历史累计量分别解释。
+
+```bash
+bash scripts/linux.sh tools/train.py --config-name train_address_control_continued \
+  linux.cuda_devices=7 output=logs/training/br-address-control-continued-20261002
+```
+
+续训前核对完整源参数/优化器、步数和课程状态，结束后仍先做固定四局筛查。
+不得用续训后的课程胜率替代纯神 AI 验收；没有预设自动追加预算。
+
+续训预检已通过：完整参数哈希、Adam 每个状态张量和参数组与源模型一致，
+起始步数 16384、PPO epoch 计数 88；使用实际加载的原神 AI 身份恢复课程，
+sidecar 与配置匹配，历史 3 局及 EMA 累计量保留。
+证据 `logs/diagnostics/address-control-continuation-preflight-20261002/summary.json`，
+脚本/日志 `.dev/check-address-control-continuation-20261002.*`。
