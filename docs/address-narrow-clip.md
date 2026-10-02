@@ -34,3 +34,8 @@ bash scripts/linux.sh tools/train.py --config-name train_address_narrow_clip \
 解析后的完整配置除裁剪范围和输出外一致，证据
 `logs/diagnostics/address-narrow-clip-preflight-20261002/summary.json`，
 脚本/日志 `.dev/check-address-narrow-clip-20261002.*`。
+
+实际训练由提交 `ace431d` 启动；initial 参数、空优化器/零计数、原神 AI 身份、
+首个 512 步 checkpoint 的真实更新和 clip=0.02 均核对通过。
+证据为预检目录 `actual-start.json`，脚本/日志 `.dev/audit-address-narrow-clip-start-20261002.*`。
+训练尚在进行，尚未得到完整神 AI 对局结果。
