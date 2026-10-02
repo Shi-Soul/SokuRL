@@ -53,4 +53,34 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 一致，优化器为空、PPO 步数和更新次数为零。采集计划包含 16 个独立新种子，与 228 个
 已排除种子不重叠，12/4 局训练/验证划分覆盖两座位。预检证据为
 `logs/diagnostics/address-learner-plan-20261002/summary.json`，脚本/日志在工作区
-`.dev/check-address-learner-plan-20261002.{py,log}`。尚无新增数据或拟合/胜率结果。
+`.dev/check-address-learner-plan-20261002.{py,log}`。
+
+## 16 局采集完成
+
+源码 `d383731`，GPU 4，834.651 秒完成。16 局均负，1P/2P 各 8 局；自身/对手
+平均掉血 10097.9375/3081.375，双方符卡动作进入次数均值 0/0.0625。
+这些是采集行为策略的结果，不是聚合拟合后策略的验证成绩。
+
+新数据共 66213 帧，训练 47662、验证 18551；原神 AI 标签与实际执行动作在 31203 帧
+不同，包含策略随机抽样差异，不能直接当作 argmax 准确率。manifest SHA256 为
+`c140f2ebb78076ca8c68de49088fae5f82a0b7f1e0f6c597ab0397033c95af59`。
+16 个种子的计划已逐项重建，分片与完整动作/回报约定通过严格加载器，聚合三份数据
+兼容且不重叠。聚合后共 64 局，48 局训练/16 局验证，帧数为 274939/97095。
+独立服务退出、停止与等待均为 0，临时前缀及游戏副本已清理。
+
+审核 `logs/diagnostics/address-learner-collection-audit-20261002/summary.json`，
+脚本/日志为工作区 `.dev/audit-address-learner-collection-20261002.{py,log}`。
+据此进入预先指定的 20 epoch 聚合拟合，尚无拟合结果或实战结论。
+
+## 采集推理成本的短测量
+
+另在空闲 GPU 6 上只读测量八个既有真实观测：逐个推理并复制概率到 CPU，
+平均 13.234 毫秒；一次批量八个为 1.636 毫秒。各预热 10 次、测量 100 次，
+模型参数前后哈希不变。输入预先放在 GPU，记忆为零，不含观测编码、传输、
+动作抽样、原神 AI、游戏推进或重置，因此不能声称端到端提速八倍。
+
+两方式的最大动作概率差为 0.00004044，argmax 相同，但并非逐位相同。
+当前采集未引入批量推理变更；后续如优化此路径，需要保留各局私有 RNG 和记忆，
+并单独验证完整轨迹。原始概率和计时见
+`logs/diagnostics/learner-collection-batching-profile-20261002/result.json`；
+脚本/日志 `.dev/profile-learner-batching-20261002.{py,log}`。
