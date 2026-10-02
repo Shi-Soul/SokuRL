@@ -1,5 +1,5 @@
 # @package algorithm
-# Fixed stochastic target for one curriculum stage; final evaluation uses god_target.
+# Frozen noisy target for controlled diagnostics. Training curricula use adaptive feedback.
 target:
   character: 0
   script: character
