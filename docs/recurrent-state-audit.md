@@ -40,3 +40,14 @@ CPU/CUDA 实际 PPO 对照共 **7 passed**，7.90 秒。两环境分别每 3/7 �
 bash scripts/linux.sh tools/diagnose_recurrent_state.py linux.cuda_devices=3 \
   output=logs/diagnostics/br-recurrent-state-audit-20261002
 ```
+
+全量回归在提交 `28d4f2d` 为 **1207 passed、12 skipped、1 deselected、26 warnings、
+2 subtests passed**，194.62 秒；日志 `.dev/pytest-recurrent-state-full-20261002.log`。
+配置已展开，通过共享 learner 工厂核对仅总预算和输出不同，初始参数哈希与原控制一致，
+空 Adam/零计数核对通过；证据 `logs/diagnostics/recurrent-state-audit-preflight-20261002`。
+实机诊断由同一提交在 GPU 3 启动，尚待结果，不把接口测试当作漂移大小的证据。
+
+时间统计注意：重放发生在 buffer.reset 内，早于原 EpisodeRecords 的 rollout-start 回调，
+因此普通 `timing.json` 可能把它计入前一轮 update 时间。
+`observer_seconds` 单独记录重放、检查和旁路前向的总耗时（不含报告文件写入）；
+本诊断不能用原采样/更新耗时字段直接评估 PPO 的正常效率。
