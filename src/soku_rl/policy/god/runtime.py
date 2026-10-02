@@ -6,8 +6,8 @@ from lupa.lua51 import LuaRuntime, LuaSyntaxError
 
 from soku_rl.env.encoding import encode_action
 from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
-from soku_rl.env.observation.privileged import decode_privileged
-from soku_rl.policy.base import PlayActor, RulePolicy
+from soku_rl.env.observation.privileged import PrivilegedObservation, decode_privileged
+from soku_rl.policy.base import PrivilegedPlayActor, RulePolicy
 from .api import ScriptAPI
 from .package import ScriptPackage
 from .random_logs import install_random_logs
@@ -92,7 +92,7 @@ class GodPolicy(RulePolicy):
 
     def spawn_play(self, seed):
         # The original host reloads on battle scene entry, not on each knockout.
-        return PlayActor(self.spawn(seed), False)
+        return PrivilegedPlayActor(self.spawn(seed), False)
 
 
 class GodActor:
@@ -123,6 +123,11 @@ class GodActor:
         if observation.shape != (expected,):
             raise ValueError("original script observation has incorrect shape")
         current = decode_privileged(observation[-PRIVILEGED_FEATURES:])
+        return self.act_observation(current)
+
+    def act_observation(self, current):
+        if not isinstance(current, PrivilegedObservation) or len(current.players) != 2:
+            raise TypeError("original scripts require a complete decoded observation")
         frame = int(current.world["frame"])
         if frame != self.last_frame + 1:
             raise ValueError("original scripts require every consecutive simulation frame")

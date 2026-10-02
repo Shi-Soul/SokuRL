@@ -30,7 +30,8 @@ session:
   timeout: 0.0
 runtime:
   command: [.venv/Scripts/python.exe, -u, tools/play_worker.py]
-output: logs/play/${opponent}-${now:%Y%m%d-%H%M%S}
+# Opponent names contain colons; keep them in config.yaml and result.json.
+output: logs/play/${now:%Y%m%d-%H%M%S}
 hydra:
   run:
     dir: logs/hydra/play-${now:%Y%m%d-%H%M%S}

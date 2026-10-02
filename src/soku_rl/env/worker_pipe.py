@@ -94,13 +94,16 @@ class WorkerConnection:
                 raise RuntimeError("worker is closed or failed")
             try:
                 send(self.process.stdin, (operation, payload))
-                response = self.replies.get(timeout=self.timeout)
+                response = self._read_response(operation)
                 if isinstance(response, BaseException):
                     raise response
                 return self._response_value(response)
             except BaseException:
                 self.broken = True
                 raise
+
+    def _read_response(self, operation):
+        return self.replies.get(timeout=self.timeout)
 
     def _response_value(self, response):
         if not response["ok"]:
