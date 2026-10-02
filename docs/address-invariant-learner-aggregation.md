@@ -110,3 +110,37 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 固定评分原始结果分别在 `logs/diagnostics/address-aggregate-{reference,candidate}-fit-20261002/`，
 数据划分/模型身份与按座位加权复核在同一训练审核目录的 `fixed-fit-audit.json`。
 脚本和完整日志保留在工作区 `.dev/audit-address-aggregate-{training,fit}-20261002.*`。
+
+## 完整神 AI 筛查：未采用
+
+`logs/benchmark/br-address-aggregate-20261002` 在 GPU 6 用预定两个世界种子 × 两座位
+完成四局，耗时 250.290 秒，**0 胜 4 负**。自身/对手平均掉血为
+10104.5/4100.5，双方符卡动作进入次数均值为 0.5/0。
+原 BC 同组是 1 胜 3 负、对手平均掉血 4834.25；本候选没有通过替换标准。
+四局样本不足以估计总体胜率，但足以说明本次未获得预定筛查上的改善；不延长该配置。
+
+检查点身份、双方种子、角色、原神 AI 指纹与基线配对一致；逐局战斗均值已重算。
+私有 worker `3a57fe6566d04c248dac5b8579018815` 退出/停止/等待均为 0，
+游戏和前缀已清理。审核见训练审核目录 `full_god_evaluations.json`，
+脚本/日志 `.dev/audit-address-aggregate-games-20261002.*`。
+
+本次状态标签拟合改善没有转化为这组实战提升。保留原 BC 作为比较基线；
+不能将该失败候选包装成已完成的强 PPO BR，也不能据此推断聚合方法一般无效。
+后续应直接诊断完整轨迹中的决策错误及价值/优势估计，再选择新的受控实验。
+
+## 与 remote 的 DQN 工作合并
+
+remote 在本项运行期间新增 DQN 集成；本项全部采集、拟合和筛查先在原启动源码上完成，
+随后以 merge `125340c` 保留双方历史。没有用 DQN 的弱对手结果替代本项 PPO 验收。
+合并后全量 Python 检查为 **1157 passed、12 skipped、1 deselected、2 subtests passed**，
+耗时 91.57 秒，7 条警告来自 ONNX 旧导出入口与 TorchRL/PettingZoo 版本提示。
+完整日志 `.dev/pytest-ppo-dqn-merge-20261002.log`。
+
+另用原 BC 与本次候选的历史配置/检查点分别验证新的共享 learner 工厂：
+权重初始化、空优化器和零 PPO 计数保留；两模型在同一真实轨迹前 64 帧上的
+概率及 actor LSTM 隐藏/单元状态与合并前逐位一致。
+证据 `logs/diagnostics/ppo-dqn-merge-compatibility-20261002/{before,after}.{json,pt}`；
+脚本 `.dev/check-ppo-merge-compatibility-20261002.py`，成功日志为
+`.dev/check-ppo-merge-{before-20261002-v2,after-20261002}.log`。
+首版诊断误用布尔 episode-start 张量，被 PyTorch 拒绝；修正为浮点后重新生成全部对照，
+失败日志保留，未改动模型或放宽比较精度。这段检查不声称穷尽所有旧 PPO 配置的兼容性。
