@@ -64,3 +64,38 @@ Python 调用，不直接测量 Wine 子进程内部或 CUDA kernel。CPU 等待
 可能记在同步调用上，累计父子时间不能任意相加。
 计划核对初始化与首轮 2048 步的全部参数/Adam 是否与主训练一致，再解释剖析数据。
 这不是新的强度候选，也不从一次有剖析开销的共享节点运行推算总体加速。
+
+### 剖析结果与存储瓶颈
+
+提交 `ff58405` 的诊断正常完成。实际配置仅预算/输出不同，初始权重及首轮 2048 步
+全部 policy 张量、全部 Adam 数值与主训练对应检查点逐位相同；首轮参数哈希
+`5c51c18d6a5b5f3d00cef5f91efd12a74aff1949fdc92dc822d32e13c630c7d4`。
+两个 rollout 共 4096 步，没有完整局，课程仍为零局、uniform=0。worker 正常退出并清理。
+
+训练入口计时 188.14 秒，其中采样 51.02 秒、更新 30.01 秒；cProfile 总计 194.21 秒，
+包含额外导入等外围调用。初始化 worker 为 50.22 秒、首次选角 reset 为 46.76 秒，
+不能把启动占比用于推断长训练中每步都有相同开销。
+
+| 选定调用 | 调用次数 | 累计秒数 |
+| --- | ---: | ---: |
+| RolloutBuffer.add | 512 | 16.36 |
+| RecurrentRolloutBuffer.get（含取批） | 30 | 23.31 |
+| 其中 _get_samples | 24 | 16.72 |
+| buffer swap_and_flatten | 28 | 6.56 |
+| worker step | 512 | 15.19 |
+| GodActor.act（含解码） | 4096 | 3.01 |
+| encode_privileged | 8208 | 3.99 |
+| health_potential | 8208 | 1.87 |
+| 学习观测拼接 | 8208 | 2.52 |
+| 对手环境 _stack | 513 | 1.12 |
+| 循环策略 forward | 512 | 2.44 |
+
+父子调用有重叠；forward 的 Python 耗时也不等于全部 CUDA 执行时间。
+当前循环模型仍用原始稠密 RecurrentRolloutBuffer，前馈模型已有的无损压缩存储并未自动
+用于循环模型。原实现写入全量观测、按环境展平及取批/填充时会处理大量零槽。
+这支持下一步单独检验循环 buffer 的无损存储/传输优化，而不是修改神 AI 战术或减少观测。
+
+证据 `logs/diagnostics/sampling-profile-address8-audit-20261002` 保存全部函数记录、
+累计/自身时间排序文本和审核；原始 pstats SHA256 为
+`5ba51f553b8c8d76920bfd75ac51ba569b16688a2adf049efd607cdc274721ae`。
+脚本/日志 `.dev/audit-sampling-profile-address8-20261002.*`。
