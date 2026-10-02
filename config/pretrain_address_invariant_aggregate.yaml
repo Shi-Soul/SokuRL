@@ -1,0 +1,20 @@
+defaults:
+  - pretrain_recurrent_address_invariant_demonstrations
+  - _self_
+
+rl:
+  cpu_threads: 1
+  ppo:
+    learning_rate: 0.0001
+pretraining:
+  dataset: logs/demonstrations/god-marisa-reimu-20261001
+  additional_datasets:
+    - logs/demonstrations/god-marisa-reimu-expanded-20261001
+    - logs/demonstrations/learner-address-invariant-marisa-reimu-20261002
+  initial_policy:
+    kind: weights
+    path: logs/pretraining/god-marisa-reimu-address-invariant-20261002/best.zip
+    training_config: logs/pretraining/god-marisa-reimu-address-invariant-20261002/config.yaml
+  # Learner returns are not teacher value targets. Retain original data splits.
+  value_coef: 0.0
+output: logs/pretraining/address-invariant-aggregate-${now:%Y%m%d-%H%M%S}
