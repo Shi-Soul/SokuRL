@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import gymnasium as gym
 from gymnasium import spaces
@@ -9,7 +10,7 @@ from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from soku_rl.rl.recurrent_state_diagnostics import attach_recurrent_state_diagnostic
+from soku_rl.rl.recurrent_state_diagnostics import attach_recurrent_state_diagnostic, minibatch_consistency
 
 
 class MemoryEnv(gym.Env):
@@ -91,12 +92,20 @@ def test_observer_preserves_actual_ppo_and_tracks_memory_drift(tmp_path, device)
     saved = json.loads((tmp_path / 'observed/recurrent-state-audit.json').read_text())
     assert saved['rollouts'] == observer.rollouts
     assert all(len(row['frames']) == 8 for row in saved['rollouts'])
+    for row in saved['rollouts']:
+        probe = row['first_minibatch']
+        assert probe['valid_samples'] == 8
+        assert probe['max_abs_log_ratio'] < 1e-5
+        assert probe['max_abs_value_delta'] < 1e-5
+        assert probe['ppo_n_updates_before'] == row['boundary']['ppo_n_updates']
+    assert any(row['first_minibatch']['padded_samples'] > 0 for row in saved['rollouts'])
     checkpoint = tmp_path / 'observed/model.zip'
     observed.save(checkpoint)
     loaded = RecurrentPPO.load(checkpoint, device=device)
     assert_tree_equal(loaded.policy.state_dict(), observed.policy.state_dict())
     assert_tree_equal(loaded.policy.optimizer.state_dict(), observed.policy.optimizer.state_dict())
     assert loaded.rollout_buffer.add.__self__ is loaded.rollout_buffer
+    assert loaded.policy.evaluate_actions.__self__ is loaded.policy
     control.env.close()
     observed.env.close()
 
@@ -107,6 +116,21 @@ def test_invalid_episode_bound(tmp_path, bound):
     with pytest.raises(ValueError, match='positive episode bound'):
         attach_recurrent_state_diagnostic(model, bound)
     model.env.close()
+
+
+def test_minibatch_probe_excludes_padding_and_uses_stable_kl():
+    values = torch.tensor([[.5], [999.]])
+    log_probs = torch.tensor([-.4, -999.])
+    batch = SimpleNamespace(mask=torch.tensor([1., 0.]), old_log_prob=torch.tensor([-.5, 123.]),
+        old_values=torch.tensor([.25, 123.]))
+    result = minibatch_consistency(values, log_probs, batch)
+    assert result['valid_samples'] == result['padded_samples'] == 1
+    assert result['max_abs_value_delta'] == .25
+    assert result['max_abs_log_ratio'] == pytest.approx(.1)
+    assert result['sample_approx_kl'] == pytest.approx(np.expm1(.1) - .1)
+    batch.mask.zero_()
+    with pytest.raises(ValueError, match='unpadded samples'):
+        minibatch_consistency(values, log_probs, batch)
 
 
 def test_rejects_duplicate_observer_and_missing_prefix(tmp_path):

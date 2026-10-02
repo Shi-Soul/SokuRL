@@ -16,6 +16,24 @@ from soku_rl.rl.sparse_transfer import restore_batch
 from soku_rl.rl.storage import PackedObservation
 
 
+def minibatch_consistency(values, log_prob, batch):
+    mask = batch.mask > 1e-8
+    if not mask.any():
+        raise ValueError('consistency probe requires unpadded samples')
+    log_ratio = log_prob.detach()[mask] - batch.old_log_prob[mask]
+    value_delta = values.detach().flatten()[mask] - batch.old_values[mask]
+    if not torch.isfinite(log_ratio).all() or not torch.isfinite(value_delta).all():
+        raise RuntimeError('non-finite unpadded minibatch consistency values')
+    stable = log_ratio.double()
+    return {'valid_samples': int(mask.sum()), 'padded_samples': int((~mask).sum()),
+        'mean_abs_log_ratio': float(log_ratio.abs().mean()),
+        'max_abs_log_ratio': float(log_ratio.abs().max()),
+        'mean_abs_value_delta': float(value_delta.abs().mean()),
+        'max_abs_value_delta': float(value_delta.abs().max()),
+        'sample_approx_kl': float((torch.expm1(stable) - stable).mean()),
+        'sb3_float32_approx_kl': float(((torch.exp(log_ratio) - 1) - log_ratio).mean())}
+
+
 def attach_recurrent_state_diagnostic(model, max_episode_steps):
     if type(model) is not RecurrentPPO:
         raise ValueError('memory diagnostic requires the unmodified shared RecurrentPPO')
@@ -27,12 +45,16 @@ def attach_recurrent_state_diagnostic(model, max_episode_steps):
         raise ValueError('memory diagnostic requires a positive episode bound')
     buffer = model.rollout_buffer
     if any(not hasattr(getattr(buffer, name), '__self__')
-            or getattr(buffer, name).__self__ is not buffer for name in ('add', 'reset')):
+            or getattr(buffer, name).__self__ is not buffer for name in ('add', 'reset', 'get')):
         raise ValueError('memory diagnostic requires an unwrapped rollout buffer')
+    if (not hasattr(model.policy.evaluate_actions, '__self__')
+            or model.policy.evaluate_actions.__self__ is not model.policy):
+        raise ValueError('memory diagnostic requires unwrapped action evaluation')
     observer = RecurrentStateDiagnostic(model, max_episode_steps)
-    # The upstream save format excludes rollout_buffer. No observer, episode
-    # history or bound method is added to model checkpoint attributes.
+    # Upstream excludes rollout_buffer and serializes only policy tensors, not
+    # instance methods. No observer or episode history enters the checkpoint.
     buffer.add, buffer.reset = observer.add, observer.reset
+    buffer.get, model.policy.evaluate_actions = observer.get, observer.evaluate_actions
     return observer
 
 
@@ -41,12 +63,50 @@ class RecurrentStateDiagnostic:
         self.model, self.max_episode_steps = model, max_episode_steps
         self.original_add = model.rollout_buffer.add
         self.original_reset = model.rollout_buffer.reset
+        self.original_get = model.rollout_buffer.get
+        self.original_evaluate_actions = model.policy.evaluate_actions
         self.active = [[] for _ in range(model.n_envs)]
         self.rollouts = []
         self.frames = []
         self.shadow = zero_states(model.policy, model.n_envs)
         self.boundary = {}
         self.observer_seconds = 0.
+
+    def get(self, batch_size):
+        for batch in self.original_get(batch_size):
+            self.current_batch = batch
+            try:
+                yield batch
+            finally:
+                del self.current_batch
+
+    def evaluate_actions(self, obs, actions, lstm_states, episode_starts):
+        result = self.original_evaluate_actions(obs, actions, lstm_states, episode_starts)
+        if not self.rollouts or not hasattr(self, 'current_batch'):
+            raise RuntimeError('consistency probe requires a completed rollout and its current minibatch')
+        row = self.rollouts[-1]
+        if 'first_minibatch' not in row:
+            batch = self.current_batch
+            if (obs is not batch.observations or lstm_states is not batch.lstm_states
+                    or episode_starts is not batch.episode_starts):
+                raise RuntimeError('action evaluation inputs differ from the sampled minibatch')
+            assert self.model._n_updates == row['boundary']['ppo_n_updates']
+            with torch.no_grad():
+                row['first_minibatch'] = minibatch_consistency(result[0], result[1], batch)
+            row['first_minibatch']['ppo_n_updates_before'] = self.model._n_updates
+            self._write_report()
+        # Return the original tensors and their computation graphs unchanged.
+        return result
+
+    def _write_report(self):
+        directory = self.model.logger.get_dir()
+        if not directory:
+            raise ValueError('memory diagnostic requires a persisted training logger directory')
+        path = Path(directory).parent / 'recurrent-state-audit.json'
+        path.write_text(json.dumps({'schema': 2,
+            'method': 'shadow replay and pre-update minibatch consistency; no replacement of online memory',
+            'source_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            'rollouts': self.rollouts}, indent=2))
 
     def _replay(self):
         model = self.model
@@ -151,11 +211,5 @@ class RecurrentStateDiagnostic:
             self.rollouts.append({'boundary': self.boundary, 'end_steps': model.num_timesteps,
                 'observer_seconds': self.observer_seconds, 'frames': self.frames})
             self.frames = []
-            directory = model.logger.get_dir()
-            if not directory:
-                raise ValueError('memory diagnostic requires a persisted training logger directory')
-            path = Path(directory).parent / 'recurrent-state-audit.json'
-            path.write_text(json.dumps({'schema': 1, 'method': 'shadow replay; no replacement of online memory',
-                'source_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                'rollouts': self.rollouts}, indent=2))
+            self._write_report()
         return result

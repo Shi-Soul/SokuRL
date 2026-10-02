@@ -89,3 +89,18 @@ ZIP 文件本身因配置/运行元数据不同而不同，不把参数等价写
 均值和观测最大值，CSV 保留全部 256 帧；最大值不是置信区间。
 来源哈希与 256 行聚合指标逐项复核，PNG 已查看，PDF 未另行渲染。
 仅一个训练种子、两个实际观测流，没有把相关边界当成独立多种子证据。
+
+## 更新前第一个 minibatch 的一致性检查
+
+记录器增加 `first_minibatch`：保留 SB3 原 `rollout_buffer.get()` 产出的 minibatch，
+原 `policy.evaluate_actions()` 计算完成后，只读比较有效帧上的新旧 sampled-action
+log probability 和价值。PPO 得到原返回张量及原计算图，不重算或替换训练输出。
+只测每轮第一次梯度更新前的第一个 minibatch；不把后续正常策略更新造成的概率变化
+称为误差，也不宣称已经比较完整动作分布或所有 minibatch 的新参数记忆重放。
+
+除 log probability/价值差外，保存稳定 double 精度的样本近似 KL 和 SB3 float32 原公式值，
+按原 mask 排除序列填充。报告 schema 增至 2，旧 schema 1 的实机结果原样保留。
+检查点不保存这些方法绑定；普通策略加载仍得到原 `evaluate_actions`。
+针对性 **8 passed**，23.02 秒，包含 CPU/CUDA 逐位一致对照、检查点重载及填充屏蔽，
+日志 `.dev/pytest-recurrent-minibatch-probe-20261002.log`。
+下一轮使用相同 4096 步配置和独立输出目录，仍须再次核对原控制参数/Adam，再解释数值差。
