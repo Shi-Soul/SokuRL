@@ -43,4 +43,26 @@ NLL 小幅下降，总准确率与变化帧准确率未提高。符卡标签子�
 `f826ef428331714d41b1eecee2b6e7d440898595d2babae3d956fb43ea5ff426`。
 记录与曲线在 `logs/diagnostics/address-lstm512-training-20261002`，
 脚本及日志 `.dev/audit-address-lstm512-training-20261002.{py,log}`。
-纯神 AI 四局筛查和三个固定验证集的独立重评分已经启动，结果尚待核对。
+该对照的验证曲线 PNG 已查看，PDF 未单独渲染。
+
+## 原神 AI 与独立重评分
+
+512 维模型在配对纯神 AI 筛查中为 0 胜 4 负，平均自身掉血 10000、对手掉血 2871.75，
+双方符卡动作进入次数均为 0。原 256 维初始化为 1 胜 3 负、对手掉血 4834.25。
+模型 SHA、世界/策略种子、角色、座位及原对手身份均核对一致；工作进程正常退出并清理。
+四局不足以判定总体强弱，但当前没有支持采用较宽模型的实战证据，暂不将其接入 PPO。
+核对在 `logs/diagnostics/address-lstm512-training-20261002/full_god_evaluations.json`，
+日志 `.dev/audit-address-lstm512-games-20261002.log`。
+
+固定原教师、扩充教师及旧 learner 集准确率分别为 94.622%、94.468%、51.210%。
+默认 CUDA 重评分在四个稀有按键浮点指标上未通过严格分座位加权容差，最大偏差为
+2.10e-5；没有放宽断言或改写原始结果。
+使用相同模型、相同数据关闭 matmul/cuDNN TF32 并启用确定性 cuDNN 后重新评分，
+原严格核对通过，三个数据集准确率均保持不变。此复算改变的是只读诊断的数值设置，
+没有重训模型或改变已完成的实战结果，也没有隔离这几项数值设置各自的影响。
+
+默认原始结果及失败日志分别在 `logs/diagnostics/address-lstm512-retention-20261002` 与
+`.dev/audit-address-lstm512-retention-20261002.log`；高精度结果、核对和比较在
+`logs/diagnostics/address-lstm512-retention-full-precision-20261002`。
+诊断入口 `.dev/evaluate-full-precision-20261002.py`，成功核对日志
+`.dev/audit-address-lstm512-retention-full-precision-20261002.log`。
