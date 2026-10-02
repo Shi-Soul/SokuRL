@@ -93,3 +93,28 @@ GPU 显存一次观测约 6.9 GB，不是峰值测量。审计快照为 6144 步
 `curves.png`、`combat.png`、`curriculum-dense8-1.png` 已目视检查；PDF 同源导出但未独立渲染。
 首个绘图命令因 Hydra 新字典键被拒绝而未执行分析；改为显式替换 runs 字典后成功，
 日志 `.dev/analyze-address-diverse-rollouts-live-20261002-v2.log`。
+
+## 262144 步训练完成
+
+预定预算成功完成，共 128 个采样更新周期、382 个 PPO epoch、1501 次 Adam 更新，
+耗时 4397.59 秒；累计采样 3597.55 秒、更新 688.11 秒。最终模型 SHA256 为
+`b54089e8c635a4377d6899259355146e7303a7b380079d72c0b381a835be020f`，参数哈希
+`94fa52ec4a077cfafcf4843eb07636e646fe6378060dc91961b4a9a9dc6a7bef`。
+源码 `cad6451`、完整配置、初始参数、优化器更新次数、检查点 sidecar、逐局课程反馈
+重放、最终统计和独立 worker 正常退出清理均核对通过。
+审计在 `logs/diagnostics/address-diverse-rollouts-audit-20261002/summary.json`。
+
+57 局训练为 **8 胜、47 负、2 超时**，完成局数按 1P/2P 为 22/35。
+平均自身/对手 HP 下降 9579.93 / 4804.35，自身/对手符卡动作进入 0.08772 / 0.21053 次每局。
+八个胜局实际 uniform 概率为 0.40、0.80、0.90 和五局 1.00，均不是完整神 AI 对局。
+课程最终长期 EMA 胜率 0.181433、下一局 uniform=1.00；控制器仍未达到目标死区，
+没有转回更高神 AI 比例。课程内伤害与胜率随对手难度变化，不能归因为策略对纯神 AI 变强。
+
+最终图和完整数据快照在 `logs/diagnostics/address-diverse-rollouts-final-curves-20261002`。
+源哈希、127 个实际优化日志点、全部 57 局反馈和战斗滑动平均逐项核对，末次优化日志
+尚未 dump，不补值。优化图、战斗图和八环境课程 PNG 已目视检查，PDF 未独立渲染。
+
+自动流程在训练进程退出及审计成功后，以提交 `0c7fdcf` 在空闲 GPU 0 启动最终模型的
+预定 16 局纯神 AI 验证，输出 `logs/benchmark/br-address-diverse-rollouts-final-20261002`。
+仍待完整评估，不因课程胜局追加预算。流程状态/日志在
+`.dev/finish-address-diverse-rollouts-20261002.*`，评估完成后继续自动核对配对结果及清理。
