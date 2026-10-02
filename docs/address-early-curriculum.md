@@ -44,3 +44,12 @@ Adam 为空，PPO 步数与更新计数为 0。
 这仅验证反馈规则，不预测真实游戏胜率。
 证据 `logs/diagnostics/address-warmup-preflight-20261002/summary.json`，
 脚本/日志 `.dev/check-address-warmup-20261002.*`。
+
+两组由提交 `54a1a11` 启动，实际源码逐文件对照该提交通过。
+实际 initial.zip 参数与预检一致，优化器为空、计数为零。
+首个 512 步 checkpoint 均完成 2 个 PPO epoch；更新后的完整参数哈希同为
+`43a8a786d149b371037a35b0fdcc6d165560d9dd9bb60841fe3f3b9ca4aa72c4`。
+配置、原神 AI 指纹、课程 sidecar 及已完成事件重算通过，证明初始化与首轮执行一致，
+不声称反馈后两条轨迹仍相同。证据为预检目录的 `actual-start.json`，
+脚本/日志 `.dev/audit-address-warmup-start-20261002.*`。
+审核时两组分别到 3072/3584 步，尚无完整对局，EMA 没有虚构数值；训练仍在进行。
