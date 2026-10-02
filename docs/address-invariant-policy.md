@@ -36,7 +36,14 @@
 
 初步相关检查 18 passed，覆盖任意地址重分配下输出和参数梯度逐位相同、地址输入梯度为零、
 其他字段完整、空对象、所有对象位置、动作历史及离线/在线合同一致。
-还需完成追加的检查点往返用例及全量回归。
+加入检查点往返用例后的全量回归为 1050 passed、12 skipped、1 deselected、
+2 subtests passed、3 条已有 TorchRL 警告，耗时 77.96 秒；日志
+`.dev/pytest-address-invariant-full-20261002.log`。
+
+实机固定观测验证额外把原数值 BC 的参数严格载入新编码器，仅用于本地诊断，未写入训练模型。
+上述 512 对观测的循环策略概率和采样动作全部逐位相同，参数哈希保持不变。
+该验证保留在 `logs/diagnostics/address-invariant-real-observations-20261002`；
+它验证地址不变性，不是闭环强度测评。
 
 ## 预定对照
 
@@ -56,3 +63,9 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=7 \
 
 普通组改用 `pretrain_recurrent_numeric_combat_demonstrations` 和独立输出目录。
 在完成真实对局前，不宣称新网络改善 BR。
+
+两组已由 `f2b593a` 启动。预检核对相同初始参数哈希
+`bc1fa4555303e85229122663019bcb719e1b5a9125da0af241cf4e02dda9a790`、
+空优化器、源码/依赖/数据身份，配置仅 feature class、track 和输出目录不同。
+实机对照 worker 的退出、专属服务停止/等待均为 0，前缀和游戏副本已清理。
+证据在 `logs/diagnostics/address-invariant-preflight-20261002/summary.json`。
