@@ -40,3 +40,10 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 报告固定原教师验证集与新增验证集的拟合，避免比较不同总体掩盖退化。
 若有改善，再扩展到原八个验证世界种子；保留独立 test 集用于定型后检验。
 本实验尚无训练或强度结果，不据数据收集本身宣称 BR 改善。
+
+采样已由提交 `d668970` 启动，8 个游戏实例，配置中 CUDA 可见设备为 0。
+真实 plan 已逐项重建；64 个独立世界种子与排除的 160 个种子完全分离，
+每座位 24 个训练局、8 个验证局，原规则身份及源码哈希均核对通过。
+记录在 `logs/diagnostics/address-teacher-expansion-plan-20261002/summary.json`，
+脚本和日志 `.dev/audit-address-teacher-expansion-plan-20261002.{py,log}`。
+此核对只覆盖计划与已启动的工作进程，完整数据收集及分片验证尚待完成。
