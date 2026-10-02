@@ -12,11 +12,13 @@ from soku_rl.env.observation.memory_schema import (
 from soku_rl.rl.features import PrivilegedFeatures, NumericPrivilegedFeatures
 from soku_rl.rl.combat_features import CombatPrivilegedFeatures, NumericCombatPrivilegedFeatures, FIGHTER_SCALES
 from soku_rl.rl.persistent_policy import ActionContextFeatures
+from soku_rl.rl.address_invariant_features import AddressInvariantCombatFeatures
 from soku_rl.env.observation.privileged import encode_values
 
 
 @pytest.mark.parametrize("encoder_type", [PrivilegedFeatures, NumericPrivilegedFeatures, CombatPrivilegedFeatures,
-                                         NumericCombatPrivilegedFeatures, ActionContextFeatures])
+                                         NumericCombatPrivilegedFeatures, ActionContextFeatures,
+                                         AddressInvariantCombatFeatures])
 def test_every_object_position_affects_features_and_padding_is_ignored(encoder_type):
     torch.set_num_threads(1)
     torch.manual_seed(17)
@@ -78,7 +80,8 @@ def test_combat_context_scales_health_and_facing_relative_geometry(encoder_type)
     assert encoder(tensor).shape == (2, 8)
 
 
-@pytest.mark.parametrize("encoder_type", [CombatPrivilegedFeatures, NumericCombatPrivilegedFeatures])
+@pytest.mark.parametrize("encoder_type", [CombatPrivilegedFeatures, NumericCombatPrivilegedFeatures,
+                                         AddressInvariantCombatFeatures])
 def test_combat_context_supports_history_and_checkpoint_roundtrip(tmp_path, encoder_type):
     space = spaces.Box(-np.inf, np.inf, (2 * PRIVILEGED_FEATURES + 8,), np.float32)
     encoder = encoder_type(space, 2, 4, 16, 8)
