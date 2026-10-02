@@ -1,0 +1,8 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+rl:
+  ppo:
+    ent_coef: 0.01
+output: logs/diagnostics/br-address-entropy-medium-${now:%Y%m%d-%H%M%S}

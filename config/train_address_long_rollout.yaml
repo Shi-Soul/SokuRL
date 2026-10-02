@@ -1,0 +1,8 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+rl:
+  ppo:
+    n_steps: 2048
+output: logs/diagnostics/br-address-long-rollout-${now:%Y%m%d-%H%M%S}
