@@ -2,6 +2,8 @@
 
 本页说明按帧随机动作替换。另有[按整局选择策略的自适应课程](episode-mixture-curriculum.md)，
 使用同一长期胜率反馈，但每局执行纯 uniform 或完整原策略。两者均没有固定 stage。
+另有[每局反馈的间隔对照](curriculum-feedback-frequency.md)，保留长期 EMA，
+检验默认反馈间隔与短训练预算之间的关系。
 
 训练仍使用 `src/soku_rl/rl` 中唯一的 PPO。课程只组织训练对手：每个决策帧，
 以概率 `p` 用完整动作空间的 uniform 动作替换原神 AI 的动作，否则执行原神 AI 动作。

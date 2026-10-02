@@ -50,3 +50,11 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=0 algorithm=br \
   'rl.rehearsal.datasets=[logs/demonstrations/god-marisa-reimu-20261001,logs/demonstrations/god-marisa-reimu-expanded-20261001]' \
   output=logs/training/br-reimu-numeric-rehearsal-frequent-feedback-20261002
 ```
+
+候选已由提交 `8db94e5` 在 GPU 0 启动。首轮完成 1024 步、2 个 PPO epoch，
+一次 256 帧复习、14788 帧前缀重放；采样 8.70 秒、更新 5.00 秒，其中复习 0.69 秒。
+初始模型和复习数据身份、实际参数更新、优化器状态、课程检查点哈希均核对通过。
+此时尚无完整对局，课程仍为 uniform=0.9，未虚构胜率或反馈。
+源码哈希与提交后的工作树一致，证据
+`logs/diagnostics/frequent-feedback-first-update-20261002/summary.json`，
+日志 `.dev/audit-frequent-feedback-launch-20261002.log`。
