@@ -3,6 +3,8 @@
 2026-10-02：魔理沙训练 16384 步后，独立 test 为 **64 胜、0 负、0 超时，
 两个座位各 32 胜**。初始策略在 validation 为 0 胜、16 场超时。
 这是弱对手、精简观测下共享 DQN / BR 训练流程的正向强度证据。
+交付使用这个早停模型；续训到 131072 步的模型贪心验证退化为 8 场超时，
+因此不能将这次验收解释为长训练稳定性已经解决。
 
 本实验使用现有 `rush` 决策树控制灵梦，将攻击脉冲间隔设为 120 游戏帧。
 它仍会靠近、近战、追随空中对手及擦弹；不是静止靶或原版神 AI。
@@ -35,6 +37,7 @@ bash scripts/linux.sh tools/train.py --config-name train_dqn_weak \
 | 完整特权观测，16384 步模型 | 8 胜 | 未做 |
 | 精简数值观测，初始模型 | 0 胜、16 超时 | 未做 |
 | 精简数值观测，16384 步模型 | 8 胜，左右各 4 胜 | **64 胜，左右各 32 胜** |
+| 精简数值观测，续训至 131072 步模型 | 0 胜、8 超时 | 未做 |
 
 训练后 validation 使用初始验证种子的前 4 个世界、交换座位。在这 8 个共同
 对局上，初始策略均超时、训练后均获胜。随后冻结模型，在不重叠的 32 个 test
@@ -97,3 +100,22 @@ bash scripts/linux.sh tools/benchmark_br.py \
 `logs/diagnostics/dqn-weak-selection-20261002/` 内的 `selection.json`、`audit.json`
 和 `capture-repair-comparison.json`。此验收采用精简观测和 90 动作，不能把成功
 全部归因于换对手，也不改变原神 AI 实验的零胜结论。
+
+## 续训验证与退化
+
+容量修复后，从完整复现的 16384 步模型及经验继续训练 114688 步，成功达到
+131072 步，DQN/Adam 均为 15872 次更新，耗时 944.48 秒。恢复起点的参数与
+优化器计数一致，最终参数和优化器有限、模型与经验 SHA256 校验通过，私有
+Wine 服务正常退出。原始目录为
+`logs/training/br-dqn-slow-rush-diagnostic-continued-20261002/`。
+
+该续训段含探索的 29 场完整训练局均获胜，但最终关闭探索的 validation
+为 8 场超时、0 胜，左右各 4 场；不能把探索阶段的胜率视为最终策略强度。
+第一场回放中，动作 38 占 7137/7200 步，显示贪心策略陷入重复动作；尚未
+严格定位造成该退化的学习动态。没有用最终模型替换已冻结并独立测试的早停模型。
+
+续训审计为 `logs/diagnostics/dqn-weak-selection-20261002/continuation-audit.json`，
+末尾验证和逐局回放为
+`logs/benchmark/br-dqn-slow-rush-diagnostic-continued-validation-20261002/`，
+验证审计为同诊断目录的 `continued-validation-audit.json`。短预算复现、
+弱对手获胜与保存恢复流程已验证；更长预算的策略稳定性仍是后续需要解决的问题。
