@@ -1,0 +1,15 @@
+defaults:
+  - train_address_diverse_rollouts
+  - _self_
+
+rl:
+  ppo:
+    action_factorization:
+      button_probability: 0.5
+    recurrent_storage: sparse
+algorithm:
+  initial_policy:
+    kind: weights
+    path: logs/pretraining/god-marisa-reimu-recurrent-factorized-address-20261002/best.zip
+    training_config: logs/pretraining/god-marisa-reimu-recurrent-factorized-address-20261002/config.yaml
+output: logs/training/br-recurrent-factorized-address-ppo-${now:%Y%m%d-%H%M%S}
