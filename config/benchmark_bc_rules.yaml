@@ -1,0 +1,176 @@
+defaults:
+- benchmark_br
+- override rules: default
+- _self_
+training_directory: ???
+deployment_directory: ???
+candidate:
+  kind: onnx
+  path: ${deployment_directory}/policy.json
+require_complete: false
+opponent_source: config
+device: cpu
+num_envs: 8
+algorithm:
+  opponents:
+  - name: rush
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: rush
+      rules: ${rules}
+  - name: zoning
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: zoning
+      rules: ${rules}
+  - name: counter
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: counter
+      rules: ${rules}
+  - name: community_combo
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: community_combo
+      rules: ${rules}
+  - name: community_guard
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: community_guard
+      rules: ${rules}
+  - name: pressure
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: pressure
+      rules: ${rules}
+  - name: footsies
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: footsies
+      rules: ${rules}
+  - name: anti_air
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: anti_air
+      rules: ${rules}
+  - name: air_rush
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: air_rush
+      rules: ${rules}
+  - name: bullet_wall
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: bullet_wall
+      rules: ${rules}
+  - name: graze_hunter
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: graze_hunter
+      rules: ${rules}
+  - name: hit_and_run
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: hit_and_run
+      rules: ${rules}
+  - name: corner_trap
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: corner_trap
+      rules: ${rules}
+  - name: spirit_siege
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: spirit_siege
+      rules: ${rules}
+  - name: skill_cycle
+    probability: 0.06666666666666667
+    setup:
+      character: 0
+      palette: 0
+      deck: 0
+    policy:
+      kind: rule
+      name: skill_cycle
+      rules: ${rules}
+benchmark:
+  world_seeds:
+  - 918042743
+  - 1897077702
+  - 244381756
+  - 3884668474
+  - 1067982671
+  - 3435502516
+  - 2494848888
+  - 749036788
+output: logs/benchmark/bc-onnx-rules-${now:%Y%m%d-%H%M%S}

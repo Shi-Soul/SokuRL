@@ -12,6 +12,10 @@ from omegaconf import OmegaConf
 
 def candidate_specification(config, source, algorithm):
     candidate = config["candidate"]
+    if set(candidate) == {"kind", "path"} and candidate["kind"] == "onnx":
+        manifest = Path(candidate["path"]).resolve(strict=True)
+        return "learned-br:onnx", {"kind": "onnx", "path": str(manifest)}, {
+            "deployment_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest()}
     greedy = candidate == {"kind": "checkpoint", "inference": "greedy"}
     if candidate == {"kind": "checkpoint"} or greedy:
         model = (source / config["checkpoint"]).resolve(strict=True)
@@ -28,7 +32,7 @@ def candidate_specification(config, source, algorithm):
         if not isinstance(candidate["name"], str) or not candidate["name"]:
             raise ValueError("rule reference requires a rule name")
         return f"rule-br:{candidate['name']}", dict(candidate), {}
-    raise ValueError("BR candidate must be a checkpoint or an explicit rule reference")
+    raise ValueError("BR candidate must be a checkpoint, ONNX deployment or an explicit rule reference")
 
 
 @hydra.main(version_base="1.3", config_path="../config", config_name="benchmark_br")

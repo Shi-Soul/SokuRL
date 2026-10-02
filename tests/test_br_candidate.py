@@ -11,6 +11,18 @@ import pytest
 specification = runpy.run_path(str(Path(__file__).parents[1] / "tools/benchmark_br.py"))["candidate_specification"]
 
 
+def test_onnx_candidate_retains_deployment_identity_without_native_checkpoint(tmp_path):
+    manifest = tmp_path / "policy.json"
+    manifest.write_text('{"format": "sokurl-recurrent-onnx-v1"}')
+    name, spec, metadata = specification({"candidate": {"kind": "onnx", "path": str(manifest)}},
+        tmp_path, {})
+    assert name == "learned-br:onnx"
+    assert spec == {"kind": "onnx", "path": str(manifest)}
+    assert metadata == {"deployment_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest()}
+    with pytest.raises(FileNotFoundError):
+        specification({"candidate": {"kind": "onnx", "path": str(tmp_path / "missing.json")}}, tmp_path, {})
+
+
 def test_god_reference_does_not_require_or_hash_a_checkpoint(tmp_path):
     with initialize_config_dir(config_dir=str(Path(__file__).parents[1] / "config"), version_base="1.3"):
         cfg = compose(config_name="benchmark_br", overrides=["+br_candidate=god"])
@@ -60,7 +72,8 @@ def test_greedy_candidate_preserves_checkpoint_identity_and_labels_inference(tmp
         specification({"candidate": candidate, "checkpoint": "../best.zip"}, nested, {"policy_type": policy_type})
 
 
-@pytest.mark.parametrize("candidate", [{"kind": "uniform"}, {"kind": "checkpoint", "extra": 1},
+@pytest.mark.parametrize("candidate", [{"kind": "uniform"}, {"kind": "onnx"},
+    {"kind": "onnx", "path": "policy.json", "extra": 1}, {"kind": "checkpoint", "extra": 1},
     {"kind": "checkpoint", "inference": "unknown"},
     {"kind": "rule", "name": "" , "rules": {}}, {"kind": "rule", "name": "god"}])
 def test_invalid_candidate_is_rejected(candidate, tmp_path):
