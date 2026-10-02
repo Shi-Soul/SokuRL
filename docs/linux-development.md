@@ -37,6 +37,13 @@ bash scripts/linux.sh tools/linux.py operation=check
 不修改共享的本机配置或其他运行进程。先检查目标卡资源；BR 测评的 `result.json`
 记录实际 `CUDA_VISIBLE_DEVICES`、逻辑设备和 GPU 名称。
 
+只负责等待进程和调度子任务的观察器，使用任务目录中的 `.venv-linux/bin/python -B`
+运行；其启动的每个训练、评分或测评仍必须调用 `scripts/linux.sh`。
+不要先把观察器本身放进该入口再启动 CUDA 子任务：Landlock 的 `/proc/self/task`
+权限对应创建限制时的进程路径，继承限制可能使子任务 CUDA 初始化失败（已观察到
+Error 304）。这不需要放宽文件系统规则或绕过 GPU 作业入口；保留失败记录，确认
+子任务未启动游戏，再从外层调度器接续。调度器本身也只能在任务目录内保存文件。
+
 ## 构建、测试与部署
 
 ```bash

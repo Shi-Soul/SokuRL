@@ -165,7 +165,7 @@ def plot_curriculum(labels, output):
         names = list(points)
         for offset in range(0, len(names), 4):
             selected = names[offset:offset + 4]
-            figure, axes = plt.subplots(len(selected), 2, figsize=(12, 3.2 * len(selected) + 1),
+            figure, axes = plt.subplots(len(selected), 2, figsize=(12, 4.3 * len(selected) + 1.5),
                 squeeze=False, layout="constrained")
             for row, name in enumerate(selected):
                 probability, performance = axes[row]
@@ -196,7 +196,9 @@ def plot_curriculum(labels, output):
                 performance.axhline(target, color="#444444", linestyle=":", linewidth=1)
                 probability.set_title(f"{name} — uniform probability", fontsize=10)
                 performance.set_title(f"EMA win rate — {len(events)} completed games in this run", fontsize=10)
-                probability.legend(fontsize=8, loc="lower left")
+                # Keep uniform/original branch markers at 0/1 visible.
+                probability.legend(fontsize=8, loc="upper left",
+                                   bbox_to_anchor=(0, -.24), borderaxespad=0)
                 for axis in (probability, performance):
                     margin = (end - start) / 1000 * .015
                     axis.set_xlim(start / 1000 - margin, end / 1000 + margin)
@@ -211,8 +213,8 @@ def plot_curriculum(labels, output):
                 "Episode points are placed at completion; training win rate is not full god-AI evaluation",
                 fontsize=11)
             stem = f"curriculum-{label}-{offset // 4 + 1}"
-            figure.savefig(output / f"{stem}.png", dpi=150)
-            figure.savefig(output / f"{stem}.pdf")
+            figure.savefig(output / f"{stem}.png", dpi=150, bbox_inches="tight")
+            figure.savefig(output / f"{stem}.pdf", bbox_inches="tight")
             plt.close(figure)
     if series:
         (output / "curriculum_series.json").write_text(json.dumps(series, indent=2))
