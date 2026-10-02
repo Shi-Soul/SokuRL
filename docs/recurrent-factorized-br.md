@@ -119,3 +119,10 @@ uniform 未来概率已升至 .60，已完成对局实际概率最高 .40；两�
 均值核对通过；worker 正常退出且游戏/Wine 副本已清理。
 证据 `logs/diagnostics/recurrent-factorized-br-audit-20261002/summary.json`。
 自动流程已从 `e1b9ca7` 在 GPU 0 启动最终 16 局纯神 AI 评估，结果尚待完成。
+
+最终 16 局现已全部结束并核对：双座位各 8 负，平均自身/对手掉血
+10068.31/1094.13，双方符卡动作进入 .4375/.0625，耗时 571.24 秒。
+最终模型、全部配对角色/种子、原对手身份、战斗均值和 worker 清理检查通过，
+证据为 `logs/diagnostics/recurrent-factorized-br-audit-20261002/final-games.json`。
+本轮从 BC、65536 到 262144 步都为 0/16，没有获得有用的 BR；按预定预算关闭，
+不延长这一配置。这不证明所有方向/按键参数化无效。

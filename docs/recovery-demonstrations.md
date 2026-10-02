@@ -78,3 +78,22 @@ CPU/CUDA 独立逐帧计算核对后缀指标与完整记忆，修改被忽略�
 实际启动记录在预检目录的 `actual-start.json`，日志
 `.dev/audit-address-recovery-start-20261002.log` 和 `.dev/collect-address-recovery-20261002.log`。
 这是启动核对；完整数据、监督后缀及 worker 清理仍待采集结束后检查，尚未开始拟合。
+
+首批 8 个真实完整分片已检查 SHA256、schema 3、逐帧监督掩码、后缀执行动作等于
+教师标签，以及第 1/1023/1024/1025/末帧的实际输入历史。共 53241 个环境帧，
+45049 个监督帧、8192 个未监督前缀帧；3 个 1P、5 个 2P，这是中途快照。
+证据为采集预检目录 `first-shards.json`，日志
+`.dev/audit-address-recovery-first-shards-20261002.log`，不以此替代完整 16 局数据验收。
+
+拟合前真实共享工厂预检也通过：原 BC 参数哈希
+`2cd1875312d06aee209beda08847c70ca613bf6a59cbcf1c17ff7648e4f03550`、空 Adam、零 PPO
+步数、平面 576 动作头、完整输入和既定训练参数一致。
+与旧 address-aggregate 的配置比较仅替换了第三组数据，另有旧产物缺少的 learner=ppo
+和空 dqn 配置元数据。轨迹分布、世界与有效监督帧数仍不同，不能宣称等帧数单因素对照。
+预检 `logs/diagnostics/address-recovery-pretraining-preflight-20261002/summary.json`。
+
+后续按既定预算自动衔接：等待本次采集进程退出，严格核对全部分片/种子/清理与聚合
+兼容性，再执行 20 epoch 拟合、独立重算有效分块更新次数、核对模型及数据身份，最后
+运行完整 16 局纯神 AI 评估。每次启动前等待工作区干净和 GPU 2 空闲；任一步失败
+立即停止后续步骤、保留证据，不重启或终止其他任务。流程脚本和状态为
+`.dev/finish-address-recovery-20261002.*`。逐数据集固定状态评分仍单独执行。
