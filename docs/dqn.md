@@ -294,3 +294,65 @@ DQN 的更新后、最终和中断检查点均保存回放与课程状态；PPO 
 `logs/benchmark/br-dqn-main-merge-validation-20261002/`，审计为 `merge-audit.json`。
 已知的长预算贪心策略退化仍按 `docs/dqn-weak-opponent.md` 保留，不属于此次
 合并修复范围。
+
+## 共享流程与人机 play（2026-10-02）
+
+`rl=dqn` 选择共享 Double DQN；博弈组织方式仍由 `algorithm` 选择。
+本次补齐外围入口，使 DQN 检查点能沿用 PPO 的训练后流程。
+
+| 流程 | DQN 支持方式 |
+| --- | --- |
+| 固定对手、BR、IPPO、NFSP、PSRO | 共享 learner 工厂；NFSP 平均策略仍为分类器，PSRO 成员可为 DQN |
+| 续训、权重初始化、中断恢复 | 续训恢复模型、优化器、回放及课程；权重初始化使用新优化器和新回放 |
+| 自适应课程、训练曲线、检查点评测 | 按真实 DQN 计数对齐；评测关闭 epsilon 探索 |
+| 示范采样 | `behavior.kind=sb3_dqn`；教师只标注，记录实际执行动作 |
+| 示范预训练、固定数据集评估 | `tools/pretrain_demonstrations.py rl=dqn`；同一保存合同可供 BR、评测、play 加载 |
+| GPU 更新耗时诊断 | `tools/profile_ppo.py rl=dqn`；使用 DQN 采样频率并单列回放预热周期 |
+| 人机本机、建房、加入 | `tools/play.py --config-name play_dqn`；两个座位、原角色选择和实时按键通道 |
+| CPU 导出与推理测速 | `tools/export_policy.py --config-name export_dqn`；`onnx_dqn` 类型供测速及 play 使用 |
+
+监督初始化将在线 Q 值作为 softmax 排序损失的 logits，选中教师动作的 Q 值可
+拟合教师轨迹回报；这不是 PPO 的状态价值函数。每个监督 epoch 后同步目标网络，
+导出的预训练模型以 `kind: weights` 进入 DQN 在线训练，不能将没有回放的预训练
+ZIP 当作续训检查点。学习者采样、教师标注的数据必须设置 `pretraining.value_coef=0`，
+因为该轨迹回报不属于教师。离线 softmax 指标只衡量标签拟合，实际 DQN 推理始终贪心。
+
+PPO 特有的 LSTM、动作分解头、rehearsal 和 online_anchor 不变成 DQN 的学习目标；
+共享 DQN 当前使用前馈网络和帧历史。公开状态及精简状态支持 ONNX 导出；完整状态
+模型可使用原生检查点进行 play。图像实时传输仍是 PPO/DQN 共同的未完成事项。
+
+原生 play 使用 `play_dqn` 配置，指定 `training_directory`、`checkpoint` 和
+`ai_character`；CPU 部署使用 `play_dqn_onnx`，指定 `deployment_directory` 和
+`ai_character`。观测、动作词表、历史、决策频率及延迟均从保存合同读取，不能
+临时覆盖。公开状态选 `track=human`，精简/完整状态选 `track=superhuman`。
+角色和可用模式登记可复制到 `config/local/play.yaml`，统一菜单会列出模型。
+操作命令见 [人机 play](local-play.md#dqn-对手)。
+
+代码 `eda9d78` 的全量回归为 **1149 passed、12 skipped、1 deselected、2 subtests passed**，
+见 `logs/pytest-dqn-workflows-full-20261002.txt`。新增测试覆盖两个座位的合同加载与
+贪心推理、精简观测的回合时钟/历史/命令一致性、不可变实时快照的物体溢出读取、
+公开/精简状态 ONNX 一致性与损坏拒绝，以及示范初始化、离线评估、权重迁移后 BR 更新。
+GPU 合成更新诊断成功完成两次 DQN 梯度更新，记录在
+`logs/diagnostics/dqn-profile-workflow-20261002/`；它不代表策略强度。
+
+原 16384 步模型已导出到 `logs/deployment/dqn-play-20261002/`，512 个验证输入的
+贪心动作全部一致，Q 值最大绝对误差为 `2.98e-7`。CPU 2048 次完整决策的 P99
+为 `0.0866 ms`，确认未导入 PyTorch，原始结果见 `logs/inference/dqn-play-20261002/`。
+
+同提交在 Linux 虚拟显示中通过两种真实双引擎 play：ONNX DQN 控制 1P，完成
+一场 2:0；原生 DQN 控制 2P，完成一场 0:2。两次分别有 8794、7275 个连续
+对战帧，各经历两次开局，策略只控制自己的座位。玩家端仅自动确认菜单，战斗
+输入全部为零；这验证流程，不是对真人的胜率。输出目录分别为
+`logs/play/dqn-onnx-linux-20261002/`、`logs/play/dqn-native-linux-20261002/`，
+每个目录保存运行身份、完整事件、结果和 `audit.json`。
+
+ONNX / 原生整条策略处理的 P99 分别为 1.060 / 1.704 ms；提交时通道忙碌
+分别为 17 / 15 次，状态事件中分别记录 9 / 14 次过期。零延迟模型依然可能错过
+实时输入期限，没有把提交成功全部算作引擎执行。两个私有 Wine 服务均以 0
+退出，游戏及前缀副本已删除；清理审计为 `logs/play/dqn-workflows-cleanup-20261002.json`。
+Windows 带画面、真人键盘操作及独立远端再战的已有待办继续保留。
+
+最终保留 PPO 原有的单次 `evaluate_actions` 监督更新路径后，相关 40 项回归
+通过，见 `logs/pytest-dqn-workflows-final-20261002.txt`。本 worktree 的忽略提交
+机器配置已登记 `dqn-weak`、`dqn-weak-cpu`，并指向 Linux 私有 play worker；
+两项均通过 `tools/play.py operation=check opponent=<名称>` 的无游戏检查。

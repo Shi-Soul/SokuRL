@@ -1,4 +1,4 @@
-"""Compare frozen shared-PPO models on separate, hashed demonstration validation sets."""
+"""Compare frozen shared learners on separate, hashed demonstration validation sets."""
 import hashlib
 from importlib.metadata import version
 import io

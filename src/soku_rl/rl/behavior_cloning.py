@@ -229,8 +229,11 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
             for first in range(0, len(order), config["batch_size"]):
                 batch = [samples["train"][int(i)] for i in order[first:first + config["batch_size"]]]
                 observations, actions, returns = sample_tensors(model, batch)
-                distribution, values = supervised_predictions(model, observations, actions)
-                log_probs = distribution.log_prob(actions)
+                if isinstance(model, DoubleDQN):
+                    distribution, values = supervised_predictions(model, observations, actions)
+                    log_probs = distribution.log_prob(actions)
+                else:
+                    values, log_probs, _ = model.policy.evaluate_actions(observations, actions)
                 changed = torch.as_tensor([row[3] == 1 for row in batch], device=model.device)
                 loss = weighted_action_loss(-log_probs, changed, torch.ones_like(changed), config["action_change_weight"])
                 loss = loss + config["value_coef"] * ((values.flatten() - returns) ** 2).mean()
