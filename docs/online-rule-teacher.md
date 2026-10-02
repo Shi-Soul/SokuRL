@@ -70,3 +70,10 @@ SGD，学习率 .01、8 个至多 64 帧窗口；这是首个待检验预算，�
 `logs/diagnostics/online-teacher-final-preflight-20261002/summary.json`，日志
 `.dev/check-online-teacher-final-20261002.log`。这不含游戏或强度验证；最后全量回归及
 提交后的 GPU 对照仍待完成。
+
+提交 `2566ccd` 的最终全量回归为 1293 passed、12 skipped、1 deselected、27 warnings、
+2 subtests passed（122.63 秒），日志 `.dev/pytest-online-teacher-final-full-20261002.log`。
+先前全量检查也通过；补充教师逐局查询记录及计时分项后，重新运行了针对性和全量检查。
+实际 GPU 对照将使用空闲 GPU 3/6；每条训练由精确 PID 观察器在首轮更新和完整结束时
+核对，再在空闲 GPU 0/2 执行各自预定的完整 16 局评估。观察器只调度，实际 GPU 作业
+仍经 scripts/linux.sh；不会因观察超时停止或重启训练。
