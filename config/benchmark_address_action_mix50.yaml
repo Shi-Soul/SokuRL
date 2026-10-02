@@ -1,0 +1,33 @@
+defaults:
+  - benchmark_br
+  - _self_
+
+training_directory: logs/pretraining/god-marisa-reimu-address-invariant-20261002
+checkpoint: best.zip
+require_complete: true
+opponent_source: config
+num_envs: 8
+rl:
+  cpu_threads: 1
+algorithm:
+  opponents:
+    # Retain the logical role name so common_roles reproduces baseline actor seeds.
+    - name: god:0:character
+      probability: 1.0
+      setup: {character: 0, palette: 0, deck: 0}
+      policy:
+        kind: action_noise
+        random_probability: 0.5
+        policy:
+          kind: rule
+          name: god
+          rules:
+            roster: [god]
+            god:
+              package: ${rules.god.package}
+              api_source: ${rules.god.api_source}
+              script: character
+benchmark:
+  world_seeds: [918042743, 1897077702, 244381756, 3884668474, 1067982671, 3435502516, 2494848888, 749036788]
+  policy_seed: 728341
+output: logs/diagnostics/frozen-address-action-mix50-${now:%Y%m%d-%H%M%S}

@@ -76,3 +76,27 @@ policy_seed=728341、common_roles，不因前四局无胜而截断。不向测�
 状态为 `.dev/finish-address-{action,episode}-mix50-20261002.json`。
 核对脚本额外重放 EMA 和整局分支选择随机流，分别记录座位与实际分支战斗指标。
 当前只确认训练启动和真实首轮更新，未得到新策略强度结果。
+
+## 冻结初始化的难度参照
+
+为区分起始对手难度与 PPO 收益，补充原 BC 对固定 .5 按帧噪声和纯 uniform 的
+各 16 局评估，使用相同八世界、双座位、角色和 policy_seed=728341。预设为
+`benchmark_address_action_mix50`、`benchmark_address_uniform`；原 BC 对完整神 AI
+的 16 局已有结果，直接复用，不重复模拟。两项只读评估不改变训练课程或预算。
+
+两种诊断保留逻辑对手名称 `god:0:character`，因为 common_roles 的角色随机种子
+包含该名称；实际对手类型和不同指纹完整保存在配置/结果中，不能将名称解释为纯神 AI。
+按帧组使用与训练一致的 ActionNoisePolicy(.5)；uniform 使用与整局课程一致的
+UniformPolicy，不能以 action-noise(p=1) 替代，后者的动作随机流不同。
+
+完整后将核对世界、双方角色 seed、模型/游戏/实际对手身份及战斗分组。
+只有配对条件一致，才能按整局课程的独立分支选择随机流，从 uniform 与原神 AI 的
+固定结果构造该 16 局的 .5 整局混合参照；若这样汇总，明确标记为离线选择已有分支结果，
+不冒充另跑了一次组合策略。起始难度成绩不作为新增纯神 AI 胜局。
+
+两项 Hydra 配置和真实 CPU 策略加载预检通过，实际生成的全部 16 局计划与原完整神 AI
+参照逐项匹配世界、角色、双方随机种子及换边。按帧 .5 对手指纹为
+`18eb21d2a87628feba99a65d3abb18b943e9e022155dde76e10d0d81c8cfa420`，uniform 为
+`uniform-576-v1`；学习者仍为原 BC。证据
+`logs/diagnostics/frozen-address-mixtures-preflight-20261002/summary.json`，日志
+`.dev/check-frozen-address-mixtures-20261002.log`。预检没有运行游戏，正式评估使用 GPU。

@@ -1,0 +1,11 @@
+defaults:
+  - benchmark_address_action_mix50
+  - _self_
+
+algorithm:
+  opponents:
+    - name: god:0:character
+      probability: 1.0
+      setup: {character: 0, palette: 0, deck: 0}
+      policy: {kind: uniform}
+output: logs/diagnostics/frozen-address-uniform-${now:%Y%m%d-%H%M%S}
