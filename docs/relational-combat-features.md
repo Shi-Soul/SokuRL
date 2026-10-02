@@ -60,4 +60,20 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 候选初始参数哈希与前述 GPU 检查相同：
 `30510f833637bfd358e0c0f42ad03bfd596c7d5f5b8dbfcadbac08d74e8d431d`。
 核对在 `logs/diagnostics/relational-initialization-20261002/summary.json`，脚本及日志
-`../.dev/audit-relational-initialization-20261002.{py,log}`。训练和实战结果尚待完成。
+`../.dev/audit-relational-initialization-20261002.{py,log}`。
+
+20 轮拟合现已成功结束，20273 次监督更新、PPO 0 步，耗时 594.97 秒；原版为 524.64 秒。
+数据量、更新预算、源码身份、初始/最佳/最终模型及 best 选择规则均核对通过。
+记录在 `logs/diagnostics/relational-training-20261002/summary.json`，脚本及日志
+`../.dev/audit-relational-training-20261002.{py,log}`。
+
+| 编码器 | best epoch | 验证 NLL | 总准确率 | 动作变化帧准确率 | 符卡标签完整命令准确率 |
+| --- | --- | --- | --- | --- | --- |
+| 地址不变原版 | 18 | 0.214957 | 94.556% | 65.558% | 64.035% |
+| 物体关系注意力 | 19 | 0.212401 | 94.685% | 65.711% | 70.614% |
+
+教师拟合只有小幅改善；符卡子集只有 228 帧。这些标签统计不能证明实际符卡使用或胜率提高。
+候选 best SHA256 为 `15dc5b80a14a74d3d7b83bfbed42365f43ddc2a48080cb65666ea43acf048b77`。
+配对原神 AI 评测已在 GPU 6 启动，实战结果尚待完成。另在 GPU 4 对两个 best 模型分别
+重评固定原教师、扩充教师和旧学习者验证集，使用关闭 TF32、确定性 cuDNN 的只读诊断，
+避免此前稀有标签分座位浮点聚合问题；不改变模型、原拟合或实战推断设置。
