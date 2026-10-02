@@ -91,3 +91,16 @@ SHA256 `a141098b149a3778042e3a41fa168363cbc6414e3d369e12a3af7901d7120fb0`，
 `logs/diagnostics/recurrent-factorized-mid-actions-20261002/summary.json`，入口日志
 `.dev/analyze-recurrent-factorized-mid-actions-20261002.log`。继续完成原定 262144 步及
 最终 16 局，暂不追加预算或因课程内胜局宣称有效。
+
+## 133120 步过程快照
+
+`logs/diagnostics/recurrent-factorized-br-live-curves-20261002` 固化了 65 个完整采样/更新
+周期、64 条已写出优化日志及 31 个负局，没有虚构尚未写出的最后一轮 scalar。
+逐局重放 EMA 与反馈事件、核对源快照 SHA256、真实更新编号对齐和全部战斗滚动均值均通过。
+uniform 未来概率已升至 .60，已完成对局实际概率最高 .40；两者差异来自并行局开局时冻结。
+最近 10 局平均自身/对手掉血 10000/297.70，双方符卡动作进入 0/.50。
+
+采样累计 1549.31 秒，更新 68.48 秒，完整周期吞吐 82.28 步/秒；这是当前配置和负载下的
+单次运行快照，不能据此隔离动作头或存储的速度贡献。三张 PNG（训练、战斗、课程）已
+目视检查，PDF 同源导出但未另行渲染。复核日志为
+`.dev/audit-recurrent-factorized-br-live-curves-20261002.log`，目录中保留 `audit.json`。
