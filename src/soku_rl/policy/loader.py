@@ -4,8 +4,10 @@ def load_policy(name, spec, interface, device):
     if kind == "greedy":
         from soku_rl.policy.greedy import GreedyPPOPolicy
         if (set(spec) != {"kind", "policy"} or not isinstance(spec["policy"], dict)
-                or spec["policy"].get("kind") not in {"sb3", "sb3_recurrent"}):
-            raise ValueError("greedy requires an sb3 or sb3_recurrent policy")
+                or spec["policy"].get("kind") not in {"sb3", "sb3_recurrent", "sb3_dqn"}):
+            raise ValueError("greedy requires an sb3, sb3_recurrent or sb3_dqn policy")
+        if spec["policy"]["kind"] == "sb3_dqn":
+            return load_policy(name, spec["policy"], interface, device)
         return GreedyPPOPolicy(name, load_policy(name, spec["policy"], interface, device))
     if kind == "action_noise":
         from soku_rl.policy.action_noise import ActionNoisePolicy
@@ -29,6 +31,11 @@ def load_policy(name, spec, interface, device):
         if str(device) != "cpu":
             raise ValueError("the deployment model requires device=cpu")
         return OnnxPolicy(name, spec["path"], interface)
+    if kind == "onnx_dqn":
+        from soku_rl.policy.onnx_dqn import OnnxDQNPolicy
+        if str(device) != "cpu":
+            raise ValueError("the deployment model requires device=cpu")
+        return OnnxDQNPolicy(name, spec["path"], interface)
     if kind in {"sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo"}:
         from soku_rl.policy.checkpoint import load_checkpoint
         return load_checkpoint(name, spec, interface, device)

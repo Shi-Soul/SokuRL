@@ -1,0 +1,15 @@
+defaults:
+  - play
+  - _self_
+
+deployment_directory: ???
+ai_character: ???
+opponent: learned-dqn
+checkpoints:
+  learned-dqn:
+    label: DQN (CPU ONNX)
+    characters: ["${ai_character}"]
+    tracks: [human, superhuman]
+    policy:
+      kind: onnx_dqn
+      path: ${deployment_directory}/policy.json

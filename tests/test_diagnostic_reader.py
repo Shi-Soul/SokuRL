@@ -64,6 +64,20 @@ def test_effect_overflow_reads_projectile_after_the_bridge_capacity():
         assert result.player.hp == (raw.p1, raw.p2)[seat].hp
 
 
+@pytest.mark.parametrize("count,active", [(5, {0, 3}), (66, {0, 65})])
+def test_immutable_realtime_snapshot_matches_paused_observations(count, active):
+    from game_runtime.snapshot_memory import SnapshotMemory
+    memory, raw, bridge = scene(count, active)
+    regions, content = [], bytearray()
+    for address, data in memory.regions.items():
+        for offset in range(0, len(data), 65536):
+            block = data[offset:offset + 65536]
+            regions.append((address + offset, len(block), len(content)))
+            content.extend(block)
+    snapshot = SnapshotMemory(regions, bytes(content))
+    assert DiagnosticReader(snapshot).observe_snapshot(raw) == DiagnosticReader(memory).observe(raw, bridge)
+
+
 def test_real_projectile_capacity_overflow_is_not_truncated():
     memory, raw, bridge = scene(65, set(range(65)))
     with pytest.raises(RuntimeError, match="active projectile observation exceeds"):

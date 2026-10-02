@@ -57,5 +57,12 @@ class DiagnosticReader:
             raise RuntimeError("game advanced during diagnostic observation")
         return tuple(observe_projectiles(raw, seat, projectiles[1 - seat]) for seat in (0, 1))
 
+    def observe_snapshot(self, raw):
+        """Decode immutable realtime capture memory, never the advancing process."""
+        if not (raw.p1ObjectOverflow or raw.p2ObjectOverflow):
+            return tuple(observe(raw, seat) for seat in (0, 1))
+        projectiles = tuple(self.projectiles(seat) for seat in (0, 1))
+        return tuple(observe_projectiles(raw, seat, projectiles[1 - seat]) for seat in (0, 1))
+
     def close(self):
         self.memory.close()

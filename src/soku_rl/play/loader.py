@@ -15,7 +15,7 @@ from soku_rl.policy.population import MixturePolicy
 
 
 def checkpoint_training(spec):
-    if spec["kind"] == "onnx_recurrent":
+    if spec["kind"] in {"onnx_recurrent", "onnx_dqn"}:
         path = Path(spec["path"]).resolve(strict=True)
         manifest = json.loads(path.read_text(encoding="utf-8"))
         training_path = path.parent / manifest["training_config"]
@@ -39,9 +39,9 @@ def play_interface(candidate, episode, wrappers, track, overrides):
             "action_set": "full", "relative_features": False, "action_history": 0, "health_potential_scale": 0.}
     interface = LearningInterface(EpisodeConfig.from_dict(episode), LearningConfig(**wrappers))
     mode = interface.episode.observation_mode
-    if mode not in {"state", "privileged_state"}:
-        raise ValueError("realtime play currently supports state and privileged_state observations")
-    if track != ("superhuman" if mode == "privileged_state" else "human"):
+    if mode not in {"state", "privileged_state", "diagnostic_state"}:
+        raise ValueError("realtime play currently supports state, privileged_state and diagnostic_state observations")
+    if track != ("superhuman" if mode in {"privileged_state", "diagnostic_state"} else "human"):
         raise ValueError("opponent observation contract differs from the selected track")
     return interface
 
@@ -83,9 +83,9 @@ def load_play_policy(candidate, interface, rules, device, seat):
         raise ValueError("policy seat must be 0 or 1")
     if spec["kind"] == "rule":
         spec = spec | {"rules": rules}
-    if spec["kind"] in {"sb3", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo", "onnx_recurrent"}:
+    if spec["kind"] in {"sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo", "onnx_recurrent", "onnx_dqn"}:
         interface = checkpoint_interface(spec, interface)
-    if spec["kind"] in {"sb3", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo"}:
+    if spec["kind"] in {"sb3", "sb3_dqn", "sb3_recurrent", "nfsp_average", "psro_mixture", "benchmarl_ippo"}:
         import torch
         torch.set_num_threads(1)
     return load_policy(candidate["name"], spec, interface, device)

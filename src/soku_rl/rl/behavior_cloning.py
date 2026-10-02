@@ -1,4 +1,4 @@
-"""Supervised initialization of the shared PPO policy and finite-horizon critic."""
+"""Supervised initialization of shared PPO actors or DQN online action values."""
 import hashlib
 import json
 import math
@@ -10,7 +10,8 @@ import numpy as np
 import torch
 
 from soku_rl.policy.contract import read_training_contract
-from soku_rl.rl.ppo import create_ppo, parameter_hash
+from soku_rl.rl.learner import create_learner, learner_kind, parameter_hash
+from soku_rl.rl.dqn import DoubleDQN
 from soku_rl.rl.sparse_transfer import restore_batch
 from soku_rl.rl.storage import PackedObservation
 from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
@@ -109,6 +110,16 @@ def load_demonstrations(source, interface):
     return samples, manifest, contract, hashlib.sha256(manifest_bytes).hexdigest()
 
 
+def supervised_predictions(model, observations, actions):
+    if isinstance(model, DoubleDQN):
+        from stable_baselines3.common.distributions import CategoricalDistribution
+        q_values = model.q_net(observations)
+        # Softmax is a supervised ranking loss, never DQN's deployed policy.
+        distribution = CategoricalDistribution(model.action_space.n).proba_distribution(q_values)
+        return distribution, q_values.gather(1, actions[:, None]).flatten()
+    return model.policy.get_distribution(observations), model.policy.predict_values(observations).flatten()
+
+
 def score_samples(model, samples, batch_size):
     model.policy.set_training_mode(False)
     totals = dict(nll=0., accuracy=0., value_mse=0., entropy=0.)
@@ -118,8 +129,7 @@ def score_samples(model, samples, batch_size):
         for first in range(0, len(samples), batch_size):
             batch = samples[first:first + batch_size]
             observations, actions, returns = sample_tensors(model, batch)
-            distribution = model.policy.get_distribution(observations)
-            values = model.policy.predict_values(observations).flatten()
+            distribution, values = supervised_predictions(model, observations, actions)
             nll = -distribution.log_prob(actions)
             correct = distribution.mode() == actions
             totals["nll"] += float(nll.sum())
@@ -152,13 +162,14 @@ def sample_tensors(model, samples):
 
 
 def fit_demonstrations(interface, algorithm, samples, config, device, seed, directory):
+    kind = learner_kind(algorithm)
     for key in ("epochs", "batch_size"):
         if type(config[key]) is not int or config[key] < 1:
             raise ValueError(f"pretraining {key} must be a positive integer")
     if (type(config["value_coef"]) not in (int, float) or not math.isfinite(config["value_coef"])
             or config["value_coef"] < 0 or algorithm["policy_type"] not in {"mlp", "lstm"}
-            or algorithm["ppo"]["gamma"] != 1. or any(not rows for rows in samples.values())):
-        raise ValueError("pretraining requires nonempty numeric samples, shared PPO and gamma=1")
+            or algorithm[kind]["gamma"] != 1. or any(not rows for rows in samples.values())):
+        raise ValueError("pretraining requires nonempty numeric samples, a shared learner and gamma=1")
     recurrent = algorithm["policy_type"] == "lstm"
     validate_change_weight(config["action_change_weight"])
     if recurrent:
@@ -172,7 +183,7 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
     view = ObservationContractEnv(interface)
     if config["initial_policy"]["kind"] not in {"fresh", "weights"}:
         raise ValueError("supervised initialization requires fresh or weights with a fresh optimizer")
-    model, source = create_ppo(view, interface, algorithm, config["initial_policy"], device, seed)
+    model, source = create_learner(view, interface, algorithm, config["initial_policy"], device, seed)
     initial = parameter_hash(model.policy)
     rng = np.random.default_rng(seed)
     label_counts = {split: np.bincount([int(row[1]) for row in rows],
@@ -218,7 +229,8 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
             for first in range(0, len(order), config["batch_size"]):
                 batch = [samples["train"][int(i)] for i in order[first:first + config["batch_size"]]]
                 observations, actions, returns = sample_tensors(model, batch)
-                values, log_probs, _ = model.policy.evaluate_actions(observations, actions)
+                distribution, values = supervised_predictions(model, observations, actions)
+                log_probs = distribution.log_prob(actions)
                 changed = torch.as_tensor([row[3] == 1 for row in batch], device=model.device)
                 loss = weighted_action_loss(-log_probs, changed, torch.ones_like(changed), config["action_change_weight"])
                 loss = loss + config["value_coef"] * ((values.flatten() - returns) ** 2).mean()
@@ -231,6 +243,8 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
                 updates += 1
                 total_loss += float(loss.detach()) * len(batch)
             train_loss = total_loss / len(order)
+        if isinstance(model, DoubleDQN):
+            model.q_net_target.load_state_dict(model.q_net.state_dict())
         validation = validation_score()
         if validation["weighted_nll"] < best:
             best, best_epoch = validation["weighted_nll"], epoch
@@ -246,7 +260,10 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         raise RuntimeError("behavior cloning did not update the policy")
     model.save(directory / "final.zip")
     return {"checkpoint": str(directory / "best.zip"), "final_checkpoint": str(directory / "final.zip"),
-        "ppo_steps": model.num_timesteps, "supervised_updates": updates, "best_epoch": best_epoch,
+        "learner": kind, "learner_steps": model.num_timesteps,
+        **({"ppo_steps": model.num_timesteps} if kind == "ppo" else
+           {"supervision": "softmax_q_action_ranking_and_teacher_action_return", "inference": "greedy_online_q"}),
+        "supervised_updates": updates, "best_epoch": best_epoch,
         "initialization": source,
         "selection": {"metric": "weighted_nll", "action_change_weight": config["action_change_weight"]},
         "initial_policy_hash": initial, "final_policy_hash": final,
