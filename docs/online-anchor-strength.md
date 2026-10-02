@@ -47,4 +47,34 @@ bash scripts/linux.sh tools/diagnose_online_anchor.py linux.cuda_devices=4 \
 针对性测试 28 passed，日志 `.dev/pytest-anchor-diagnostics-20261002.log`；
 覆盖只读参数不变、相同策略零距离、逐帧汇总和零前缀记忆控制。全量检查为
 1100 passed、12 skipped、1 deselected、3 warnings、2 subtests passed，72.50 秒，
-日志 `.dev/pytest-anchor-diagnostics-full-20261002.log`。诊断尚未运行。
+日志 `.dev/pytest-anchor-diagnostics-full-20261002.log`。
+
+## 校准结果与下一项实机对照
+
+源码 `e8acc8d`，GPU 4，42.277 秒完成。两划分各有 7 个窗口、448 帧，
+验证初始 KL=0.05409764、TV=0.04027598；三组初始参数和所有初始分数相同。
+PPO 仍为 16384 步、88 epoch 计数，参考和私有价值参数不变。
+
+| 辅助学习率 | 1 次后验证 KL | 4 次后验证 KL | 16 次后验证 KL |
+| --- | --- | --- | --- |
+| 0.01 | 0.053304 | 0.051180 | 0.041677 |
+| 0.1 | 0.046088 | 0.031520 | 0.029527 |
+| 1.0 | 1.187485 | 0.177421 | 0.114422 |
+
+0.1 × 4 的验证 KL 比初始下降约 41.7%，辅助耗时 2.358 秒；0.1 × 16 为
+9.830 秒，验证 KL 仅进一步下降约 6.3%。学习率 1.0 显著过冲，不能作为候选。
+这些是冻结轨迹上的校准结果，不涉及后续新状态分布或实际收益提升。
+参考记忆替换在验证的 5 个非零偏移窗口中，首帧/64 帧平均/末帧 TV 为
+0.03182184/0.00446325/0.00000998，最大 0.27405889；零偏移均逐位一致。
+当前证据未支持把重算在线记忆作为下一项首要改动。
+
+原始结果 `logs/diagnostics/online-anchor-strength-20261002/result.json`，
+逐帧汇总、每组 16 次抽样 RNG、窗口长度和前缀计数的独立重放审核在
+同目录 `summary-audit.json`。脚本/日志 `.dev/audit-online-anchor-strength-20261002.{py,log}`。
+
+下一项实机使用原 BC 初始化、原 2 环境、16384 步、seed=1732、uniform 起点 0.1，
+只改辅助学习率 0.01→0.1、每轮辅助次数 1→4；不改原神 AI、PPO、角色或课程控制器。
+配置已完整展开，并与上一组逐项比较；证据 `.dev/online-anchor-lr01-u4-config-20261002.yaml`
+及 `.dev/check-online-anchor-lr01-u4-config-20261002.log`。
+输出目录为 `logs/diagnostics/br-online-anchor-lr01-u4-runtime-20261002`；
+最终仍需相同两种子 × 两座位的纯神 AI 筛查，不能用 KL 下降作为成功标准。
