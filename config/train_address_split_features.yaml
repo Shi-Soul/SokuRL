@@ -1,0 +1,14 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+rl:
+  ppo:
+    policy_kwargs:
+      share_features_extractor: false
+algorithm:
+  initial_policy:
+    kind: weights
+    path: logs/pretraining/god-marisa-reimu-feature-split-20261002/final.zip
+    training_config: logs/pretraining/god-marisa-reimu-feature-split-20261002/config.yaml
+output: logs/diagnostics/br-address-split-features-${now:%Y%m%d-%H%M%S}
