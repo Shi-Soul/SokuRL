@@ -136,3 +136,12 @@ actor/critic 特征已分化。预检证据目录
 `logs/diagnostics/address-split-calibrated-preflight-20261002` 保存
 `summary.json`、`conversion-audit.json`、`actor-adapter.json` 和 `actual-start.json`。
 此记录只确认已启动并更新，不代表训练完成或实战提升。
+
+该组合随后完成 16384 步、32 次 rollout、87 个 PPO epoch，4 个训练局均败
+（1P 一局、2P 三局）。平均自身/对手掉血为 10060.5/2449.25，双方符卡动作进入
+均值为 0/0.25；累计掉血可能因治疗超过初始生命值，不等同于直接命中伤害。
+课程累计 4 局，仍处于统计预热，uniform=0。总耗时 391.07 秒，采样 251.28 秒、更新 41.95 秒。
+最终模型 SHA256 为 `18363877928cfc239e94e0af7353e0851302b7ef8fd3bca7a4a99a73aa326301`。
+完整配置、初始/最终权重、PPO 计数、课程事件、战斗均值和 worker 清理核对通过，
+证据 `logs/diagnostics/address-split-calibrated-audit-20261002/summary.json`。
+最终模型的四局纯神 AI 评估和固定轨迹检查已启动，结果待回收。
