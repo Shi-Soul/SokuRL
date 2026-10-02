@@ -1,0 +1,12 @@
+checkpoint: logs/pretraining/god-marisa-reimu-address-invariant-20261002/best.zip
+training_config: logs/pretraining/god-marisa-reimu-address-invariant-20261002/config.yaml
+device: cuda:0
+cpu_threads: 1
+seed: 1732
+output: logs/pretraining/split-ppo-features-${now:%Y%m%d-%H%M%S}
+hydra:
+  run:
+    dir: logs/hydra/split-ppo-features-${now:%Y%m%d-%H%M%S}
+  output_subdir: null
+  job:
+    chdir: false

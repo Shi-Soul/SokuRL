@@ -39,3 +39,31 @@ bash scripts/linux.sh tools/train.py --config-name train_address_narrow_clip \
 首个 512 步 checkpoint 的真实更新和 clip=0.02 均核对通过。
 证据为预检目录 `actual-start.json`，脚本/日志 `.dev/audit-address-narrow-clip-start-20261002.*`。
 训练尚在进行，尚未得到完整神 AI 对局结果。
+
+## 筛查结果：不继续本分支
+
+完成 16384 步、32 次 rollout、89 个 PPO epoch，耗时 389.78 秒。
+训练完成 3 局均败，平均自身/对手掉血 10000/2544.67；课程仍在预热、uniform=0。
+最终 checkpoint SHA256 为
+`d6209fbebf519eae6548bbd063cea671d608a17d56e50afd7bce2d9fbadb5f47`。
+训练与课程逐局重算、初始化和源码身份、完整预算、worker 清理通过审核：
+`logs/diagnostics/address-narrow-clip-audit-20261002/summary.json`。
+
+纯神 AI 四局为 **0 胜 4 负**，平均自身/对手掉血 10048.5/1662.75，
+双方符卡动作进入均值均为 0，耗时 240.24 秒。
+相同配对条件的原 clip=0.2 控制为 1 胜 3 负、平均对手掉血 4619。
+本候选未保住原有收益，不继续追加预算或扩展验证；不能据四局排除所有裁剪配置。
+原始 `logs/benchmark/br-address-narrow-clip-20261002`，审核目录 `full-god-evaluations.json`。
+评测身份、双座位/种子/角色/原对手、战斗均值和正常清理均已核对。
+
+固定教师标签验证：原教师 NLL=0.23622、准确率 93.91%，扩充教师 0.24224/94.03%，
+原 BC 自身轨迹 3.06087/53.98%，其中需改动作准确率 7.93%。
+这高于原裁剪 PPO 的教师拟合（88.68%/88.62%），但没有实战收益；
+这些固定旧轨迹也不代表本候选当前访问的状态分布。
+原始 `logs/diagnostics/address-narrow-clip-fixed-fit-20261002`，
+审核目录 `fixed-fit.json` 核对关闭 TF32、模型/数据身份、验证划分和分座位加权结果。
+
+更新曲线 `logs/diagnostics/address-narrow-clip-curves-20261002` 含 PNG/PDF、62 行 CSV、源哈希。
+横轴按实际 n_updates 对齐，每组仅展示有 scalar 记录的 31/32 次更新。
+更窄裁剪的训练 KL 仍有峰值，裁剪范围不是 KL 硬约束；价值 loss 是训练指标。
+PNG 已目视检查，PDF 未独立渲染，脚本/日志 `.dev/plot-address-narrow-clip-20261002.*`。
