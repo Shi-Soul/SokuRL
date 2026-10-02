@@ -1,0 +1,16 @@
+device: cuda:0
+cpu_threads: 1
+checkpoint: logs/diagnostics/br-online-anchor-runtime-20261002/final.zip
+training_config: logs/diagnostics/br-online-anchor-runtime-20261002/config.yaml
+dataset: logs/demonstrations/learner-online-anchor-marisa-reimu-20261002
+learning_rates: [0.01, 0.1, 1.0]
+update_counts: [1, 4, 16]
+offsets: [0, 256, 1024, 2048]
+sequence_length: 64
+output: logs/diagnostics/online-anchor-strength-${now:%Y%m%d-%H%M%S}
+hydra:
+  run:
+    dir: ${output}/hydra
+  output_subdir: null
+  job:
+    chdir: false

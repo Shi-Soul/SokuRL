@@ -1,0 +1,27 @@
+defaults:
+  - collect_learner_demonstrations
+  - br_opponents: god_target
+  - override rl: recurrent_ppo
+  - override track: superhuman_address_invariant
+  - _self_
+
+seed: 6139873
+num_envs: 8
+rl:
+  cpu_threads: 1
+collection:
+  episodes_per_seat: 8
+  validation_per_seat: 2
+behavior:
+  kind: sb3_recurrent
+  path: logs/pretraining/god-marisa-reimu-address-invariant-20261002/best.zip
+  training_config: logs/pretraining/god-marisa-reimu-address-invariant-20261002/config.yaml
+excluded_datasets:
+  - logs/demonstrations/god-marisa-reimu-20261001
+  - logs/demonstrations/god-marisa-reimu-expanded-20261001
+  - logs/demonstrations/god-marisa-reimu-expansion64-20261002
+  - logs/demonstrations/learner-marisa-reimu-20261001
+  - logs/demonstrations/learner-marisa-reimu-iteration2-20261001
+  - logs/demonstrations/learner-recurrent-marisa-reimu-20261001
+  - logs/demonstrations/learner-online-anchor-marisa-reimu-20261002
+output: logs/demonstrations/learner-address-invariant-${now:%Y%m%d-%H%M%S}
