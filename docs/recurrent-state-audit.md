@@ -107,9 +107,32 @@ log probability 和价值。PPO 得到原返回张量及原计算图，不重算
 
 提交 `694dba9` 的全量回归为 **1208 passed、12 skipped、1 deselected、26 warnings、
 2 subtests passed**，138.66 秒，日志 `.dev/pytest-recurrent-minibatch-full-20261002.log`。
-同版本实机诊断在 GPU 7 启动，输出
+同版本实机诊断在 GPU 7 完成，输出
 `logs/diagnostics/br-recurrent-minibatch-audit-20261002`；没有覆盖上一轮 schema 1 的数据。
-前四轮的第一次 minibatch 近似 KL 为 6.37e-9 至 6.17e-8，
-均远低于 target_kl=.015；这只是中间结果，最终完整核对仍待完成。
+4096 步、八轮 rollout、21 个 PPO epoch，耗时 173.38 秒；没有完整对局结束。
+512/4096 步的全部模型张量及 Adam 数值，再次与原控制对应检查点逐位相同。
+最终参数哈希仍为 `ed0fcb6ed269d5166be5cadc0f30c8866fd8877f990145de992563d13636343b`，
+checkpoint SHA256 为 `796dadd86354d4c1d161fc8065cd77a009e93ed52f49ad137196be9cf44e506f`。
+源码、配置、初始化、课程 sidecar、记录和 worker 清理均核对通过。
+
+每轮首个 minibatch 都有 128 个有效样本；序列填充不计入下表：
+
+| 累计步数 | 填充样本数 | 样本近似 KL | 最大绝对 log probability 差 | 最大绝对价值差 |
+| --- | ---: | ---: | ---: | ---: |
+| 512 | 0 | 6.37e-9 | 0.000630 | 0.0000390 |
+| 1024 | 88 | 9.29e-9 | 0.001243 | 0.0000738 |
+| 1536 | 0 | 2.20e-8 | 0.001873 | 0.0000417 |
+| 2048 | 110 | 6.17e-8 | 0.003273 | 0.0000294 |
+| 2560 | 0 | 5.34e-9 | 0.000771 | 0.0000826 |
+| 3072 | 84 | 3.35e-9 | 0.000509 | 0.0000899 |
+| 3584 | 0 | 8.21e-9 | 0.000608 | 0.0000601 |
+| 4096 | 74 | 1.82e-8 | 0.001142 | 0.0003132 |
+
+近似 KL 全部远低于 target_kl=.015。该单种子早期片段没有发现足以直接解释训练退化的
+更新前概率不一致，不据此修改原 PPO。它不覆盖每轮后续 minibatch，也不是完整动作分布
+或当前参数下全历史重放的一致性证明。采样旁路的 3584 帧汇总与上一轮结果一致。
+证据 `logs/diagnostics/recurrent-minibatch-runtime-audit-20261002/summary.json`，
+脚本和日志 `.dev/audit-recurrent-minibatch-runtime-20261002.*`。
+
 schema 2 的 `observer_seconds` 延续记录重放/旁路采样计算，不包含新增 minibatch
-统计和报告写入；本轮总耗时也不用于替代普通 PPO 的效率测量。
+统计和报告写入，本轮为 34.53 秒；总耗时也不用于替代普通 PPO 的效率测量。
