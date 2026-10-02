@@ -237,3 +237,16 @@ worker 正常退出并清理。证据为上述 audit 目录内的 `mid_games.jso
 `logs/diagnostics/address-episode-mix50-audit-20261002/final_games.json`。
 按局组从原 BC 的 3777.00 对手掉血、中期 2747.69 继续下降到 401.81，未获得完整
 神 AI 胜率改善；本候选按约定结束，不续训，也不据 uniform 胜局选作更强 BR。
+
+## 按帧组训练结束
+
+按帧组亦已正常完成原定 262144 步、128 个采样周期、384 个 PPO epoch、1513 次
+Adam。58 个完整训练局为 26 胜、32 负，座位分别 23/35 局；自身/对手平均掉血
+8637.10/7976.41，符卡动作进入 .18966/.34483。最终 EMA=.394889、uniform=.197250，
+这是带课程的训练分布结果，不能替代完整原神 AI 对局。
+
+全部训练身份、模型计数、EMA 事件、sidecar 和 worker 清理核对通过，证据
+`logs/diagnostics/address-action-mix50-audit-20261002/final.json`。总用时 3964.89 秒，
+采样 3646.84 秒、更新 150.04 秒；最终模型 SHA256
+`93617201f5afda2a18240ea84fef23a93dc213ded64afdf905eadf0db1fb17f8`。
+预定的最终 16 局完整神 AI 评估已启动；未追加训练预算，结果尚待完成。
