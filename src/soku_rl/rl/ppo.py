@@ -52,10 +52,17 @@ def parameter_hash(policy):
 
 
 def initialize_ppo(algorithm, policy_type, env, interface, config, source, device, seed):
+    from soku_rl.rl.recurrent_storage import attach_requested_storage
     validate_payoff(interface, config)
     if "online_anchor" in config and "rehearsal" in config:
         raise ValueError("select online_anchor or rehearsal; combining auxiliary objectives is not supported")
     parameters = dict(config["ppo"])
+    if "recurrent_storage" in parameters:
+        from sb3_contrib import RecurrentPPO
+        storage = parameters.pop("recurrent_storage")
+        if (algorithm is not RecurrentPPO or storage != "sparse"
+                or "rollout_buffer_class" in parameters):
+            raise ValueError("recurrent_storage requires recurrent PPO, sparse mode and no other buffer override")
     if "action_factorization" in parameters:
         from soku_rl.rl.factorized_policy import FactorizedActorCriticPolicy
         factorization = parameters.pop("action_factorization")
@@ -99,7 +106,7 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         model = algorithm(policy_type, env, seed=seed, device=device, **parameters)
         if "initial_action_prior" in config["ppo"]:
             initialize_action_bias(model, prior_logits)
-        return model, source
+        return attach_requested_storage(model, config), source
     if set(source) != {"kind", "path", "training_config"} or source["kind"] not in {"checkpoint", "weights"}:
         raise ValueError("initial policy must be fresh, a training checkpoint, or policy weights")
     training = read_training_contract(source["training_config"], interface)
@@ -128,5 +135,5 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         model = algorithm.load(path, env=env, device=device)
         model.set_random_seed(seed)
         source_steps = model.num_timesteps
-    return model, source | {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    return attach_requested_storage(model, config), source | {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                             "source_steps": source_steps}

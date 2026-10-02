@@ -1,0 +1,10 @@
+defaults:
+  - train_address_diverse_rollouts
+  - _self_
+
+rl:
+  ppo:
+    recurrent_storage: sparse
+algorithm:
+  timesteps: 4096
+output: logs/diagnostics/br-recurrent-sparse-profile-${now:%Y%m%d-%H%M%S}

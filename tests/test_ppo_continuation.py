@@ -15,8 +15,8 @@ from soku_rl.rl.training import initialize_ppo, parameter_hash
 from test_policy_artifacts import interface
 
 
-@pytest.mark.parametrize("policy_type", ["mlp", "lstm"])
-def test_continuation_restores_optimizer_and_supports_new_vector_size(tmp_path, policy_type):
+@pytest.mark.parametrize("policy_type,sparse", [("mlp", False), ("lstm", False), ("lstm", True)])
+def test_continuation_restores_optimizer_and_supports_new_vector_size(tmp_path, policy_type, sparse):
     if policy_type == "lstm":
         from sb3_contrib import RecurrentPPO
         algorithm, policy = RecurrentPPO, "MlpLstmPolicy"
@@ -32,6 +32,8 @@ def test_continuation_restores_optimizer_and_supports_new_vector_size(tmp_path, 
 
     config = {"name": "ppo", "policy_type": policy_type, "timeout_payoff": "zero_at_horizon",
               "ppo": {"n_steps": 2, "batch_size": 2, "gamma": 1., "policy_kwargs": architecture}}
+    if sparse:
+        config["ppo"]["recurrent_storage"] = "sparse"
     with pytest.raises(ValueError, match="requires gamma=1"):
         initialize_ppo(algorithm, policy, make_env(), contract,
             config | {"ppo": config["ppo"] | {"gamma": .9}}, {"kind": "fresh"}, "cpu", 7)
@@ -51,6 +53,10 @@ def test_continuation_restores_optimizer_and_supports_new_vector_size(tmp_path, 
     env = DummyVecEnv([make_env, make_env])
     try:
         loaded, metadata = initialize_ppo(algorithm, policy, env, contract, config, spec, "cpu", 19)
+        if sparse:
+            from soku_rl.rl.recurrent_storage import SparseRecurrentRolloutBuffer
+            assert isinstance(initial.rollout_buffer, SparseRecurrentRolloutBuffer)
+            assert isinstance(loaded.rollout_buffer, SparseRecurrentRolloutBuffer)
         assert loaded.num_timesteps == 64 and loaded.n_envs == 2
         assert loaded._last_obs is None
         assert parameter_hash(loaded.policy) == parameter_hash(initial.policy)
@@ -70,6 +76,8 @@ def test_continuation_restores_optimizer_and_supports_new_vector_size(tmp_path, 
         tuning = config | {"ppo": config["ppo"] | {"gae_lambda": .995, "learning_rate": .0001}}
         weights = spec | {"kind": "weights"}
         initialized, metadata = initialize_ppo(algorithm, policy, env, contract, tuning, weights, "cpu", 19)
+        if sparse:
+            assert isinstance(initialized.rollout_buffer, SparseRecurrentRolloutBuffer)
         assert parameter_hash(initialized.policy) == parameter_hash(initial.policy)
         assert initialized.num_timesteps == 0 and metadata["source_steps"] == 64
         assert initialized.policy.optimizer.state_dict()["state"] == {}
