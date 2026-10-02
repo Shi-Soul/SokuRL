@@ -6,7 +6,6 @@ Windows 入口是 `scripts/play.cmd`。双击后依次选择连接方式、拟�
 由另一位玩家使用原游戏连接。联网仍使用原游戏协议和三局两胜赛制。
 
 `tools/play.py` 是所有连接方式共用的 Python 入口，配置统一使用 `config/play.yaml`。
-旧的 `scripts/play-local.cmd` 已转到这个入口。旧版 Python 入口的历史测试不代表新版通过验收。
 
 ## 选择对手
 
