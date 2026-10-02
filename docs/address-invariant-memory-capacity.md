@@ -30,4 +30,17 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 参数量为 3761489 → 5993809；不声称参数初始化相同。
 初始化核对位于 `logs/diagnostics/address-lstm512-initialization-20261002/summary.json`，
 脚本及日志 `.dev/audit-address-lstm512-initialization-20261002.{py,log}`。
-已观察到第 3 轮拟合完成；完整训练、固定验证和原神 AI 表现尚待评估。
+20 轮拟合现已正常完成，20273 次监督更新，耗时 569.29 秒（原 256 维为 524.64 秒）。
+共享节点负载限制了两次耗时的直接比较。两组数据身份、更新预算、模型步数及 best 选择已核对。
+
+| LSTM 宽度 | best epoch | 验证 NLL | 总准确率 | 动作变化帧准确率 | 符卡标签完整命令准确率 |
+| --- | --- | --- | --- | --- | --- |
+| 256 | 18 | 0.214957 | 94.556% | 65.558% | 64.035% |
+| 512 | 13 | 0.212118 | 94.524% | 64.967% | 72.807% |
+
+NLL 小幅下降，总准确率与变化帧准确率未提高。符卡标签子集仅有 228 帧，不由该指标
+推断实际符卡使用或胜率改善。best SHA 为
+`f826ef428331714d41b1eecee2b6e7d440898595d2babae3d956fb43ea5ff426`。
+记录与曲线在 `logs/diagnostics/address-lstm512-training-20261002`，
+脚本及日志 `.dev/audit-address-lstm512-training-20261002.{py,log}`。
+纯神 AI 四局筛查和三个固定验证集的独立重评分已经启动，结果尚待核对。
