@@ -48,6 +48,9 @@ def train_response(env, config, opponents, probabilities, device, seed, director
         model.set_logger(configure(str(directory / "scalars"), ["csv", "stdout"]))
         initial = parameter_hash(model.policy)
         start_steps = model.num_timesteps
+        # Keep the exact pre-training policy for paired strength comparisons.
+        # This inference artifact intentionally has no replay/continuation bundle.
+        model.save(directory / "initial.zip")
         callbacks = [
             EpisodeRecords(directory, config["checkpoint_every"]),
             CheckpointCallback(save_freq=config["checkpoint_every"] // env.num_envs,
