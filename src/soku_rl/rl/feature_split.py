@@ -60,9 +60,23 @@ def copy_split_feature_weights(source, destination):
             original[key].shape != target[key].shape or original[key].dtype != target[key].dtype
             for key in original):
         raise ValueError('feature splitting must retain every policy tensor and buffer')
+    original_buffers = dict(old.named_buffers(remove_duplicate=False))
+    target_buffers = dict(new.named_buffers(remove_duplicate=False))
+    if original_buffers.keys() != target_buffers.keys() or any(
+            value.shape != target_buffers[key].shape or value.dtype != target_buffers[key].dtype
+            for key, value in original_buffers.items()):
+        raise ValueError('feature splitting must preserve all buffer layouts')
+    # Nonpersistent buffers are reconstructed by the policy constructor on load.
+    # Copying changed runtime values would falsely promise a faithful export.
+    if any(not torch.equal(value.cpu(), target_buffers[key].cpu())
+            for key, value in original_buffers.items() if key not in original):
+        raise ValueError('feature splitting cannot export changed nonpersistent buffers')
     new.load_state_dict(original, strict=True)
     if any(not torch.equal(tensor.cpu(), original[key].cpu()) for key, tensor in new.state_dict().items()):
         raise RuntimeError('feature splitting failed exact tensor preservation')
+    if any(not torch.equal(value.cpu(), original_buffers[key].cpu())
+            for key, value in new.named_buffers(remove_duplicate=False)):
+        raise RuntimeError('feature splitting failed exact buffer preservation')
     return {'method': 'split_ppo_features_weights_only', 'source_steps': source.num_timesteps,
         'source_ppo_n_updates': source._n_updates, 'destination_steps': 0, 'destination_ppo_n_updates': 0,
         'source_parameters': sum(p.numel() for p in old.parameters()),

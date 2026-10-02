@@ -18,9 +18,10 @@ class SplitFeatureFixture(BaseFeaturesExtractor):
         super().__init__(observation_space, 8)
         self.network = torch.nn.Sequential(torch.nn.Linear(int(np.prod(observation_space.shape)), 8),
             torch.nn.BatchNorm1d(8), torch.nn.Tanh())
+        self.register_buffer('scale', torch.tensor(1.), persistent=False)
 
     def forward(self, observations):
-        return self.network(observations.flatten(1))
+        return self.network(observations.flatten(1)) * self.scale
 
 
 def predictions(model, observations, starts):
@@ -132,7 +133,8 @@ def test_invalid_feature_conversion_config_rejected(change):
         split_feature_config({'rl': shared, 'algorithm': config})
 
 
-@pytest.mark.parametrize('change', ['destination_steps', 'destination_updates', 'architecture', 'aliased_storage'])
+@pytest.mark.parametrize('change', ['destination_steps', 'destination_updates', 'architecture',
+    'aliased_storage', 'nonpersistent_buffer'])
 def test_unsafe_weight_copy_rejected(change):
     env = fixture_env()
     config = fixture_config('mlp')
@@ -151,6 +153,8 @@ def test_unsafe_weight_copy_rejected(change):
         a = destination.policy.pi_features_extractor.network[0]
         b = destination.policy.vf_features_extractor.network[0]
         b.weight.data = a.weight.data
+    elif change == 'nonpersistent_buffer':
+        source.policy.pi_features_extractor.scale.fill_(2.)
     with pytest.raises(ValueError):
         copy_split_feature_weights(source, destination)
     env.close()
