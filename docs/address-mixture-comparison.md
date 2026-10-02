@@ -52,3 +52,27 @@ policy_seed=728341、common_roles，不因前四局无胜而截断。不向测�
 输出不同。证据 `logs/diagnostics/address-mixtures-preflight-20261002/summary.json`，
 日志 `.dev/check-address-mixtures-20261002.log`。本次只新增配置和实验约定，复用已经
 通过全量回归的算法实现；CPU 预检没有游戏或优化更新，长训练尚待启动。
+
+## 实际启动与首轮更新
+
+提交 `d84708b` 后确认 GPU 3/4 空闲、可用内存约 243 GiB、NAS 可用 20 TiB，分别启动
+按帧/按局两组。输出为 `logs/training/br-address-{action,episode}-mix50-20261002`，
+启动日志 `.dev/train-address-{action,episode}-mix50-20261002.log`。
+实际配置、源码逐文件哈希、GPU 身份、初始权重和空优化器均与预检一致。
+
+两个首轮 2048 步检查点均已实际更新，按帧组为 3 个 PPO epoch、12 次 Adam；
+按局组因 KL 停止为 2 个 epoch、5 次 Adam。参数均不同于共同初始化；首轮没有完成局，
+课程仍为 .5，没有填造 EMA 胜率。首轮 checkpoint SHA256 分别为
+`288e9c8f4610c1aa4ff11022825a3564490da3ea36bc8f54d8af9dd45eff2daa` 和
+`9c707c52814ca33e00c4a698df1090e2cd441bc886ed432cfddfd8228414366d`。
+证据 `logs/diagnostics/address-{action,episode}-mix50-audit-20261002/start.json`。
+核对时训练已分别到 18432/20480 步，保存了进度快照；首轮统计只读取 2048 步检查点，
+没有把之后的完整局混入首轮结果。
+
+`.dev/finish-address-mixture-20261002.py` 的两个观察进程分别核对本次精确训练 PID，
+等待完整检查点和哈希匹配 sidecar。65536 步核对后，按帧/按局组分别在空闲 GPU 0/2
+执行预定 16 局；训练正常结束并通过完整核对后再评估最终模型。每次启动等待工作区
+干净及对应 GPU 空闲，步骤失败停止后续流程并保留日志，不终止或重启训练。
+状态为 `.dev/finish-address-{action,episode}-mix50-20261002.json`。
+核对脚本额外重放 EMA 和整局分支选择随机流，分别记录座位与实际分支战斗指标。
+当前只确认训练启动和真实首轮更新，未得到新策略强度结果。
