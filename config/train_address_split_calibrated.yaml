@@ -1,0 +1,10 @@
+defaults:
+  - train_address_split_features
+  - _self_
+
+algorithm:
+  initial_policy:
+    kind: weights
+    path: logs/pretraining/god-marisa-reimu-split-calibrated-20261002/final.zip
+    training_config: logs/pretraining/god-marisa-reimu-split-calibrated-20261002/config.yaml
+output: logs/diagnostics/br-address-split-calibrated-${now:%Y%m%d-%H%M%S}

@@ -96,4 +96,27 @@ PPO 和优化器没有更新；源权重和训练契约指纹、转换源码也�
 证据 `logs/diagnostics/address-feature-split-audit-20261002/summary.json`，
 脚本/日志 `.dev/audit-address-feature-split-training-20261002.*`。
 
-最终模型纯神 AI 四局评估已在 GPU 7 启动，尚待完整结果；此处不宣称拆分已改善实战。
+最终模型纯神 AI 四局评估在 GPU 7 完成，**0 胜 4 负**，平均自身/对手掉血
+10000/3851.5，双方符卡动作进入均为 0，耗时 204.70 秒。
+原两世界种子 × 双座位、策略种子、原对手和完整对局状态均核对一致，worker 正常退出并清理。
+证据为审计目录的 `full-god-evaluations.json`，脚本/日志
+`.dev/audit-address-feature-split-games-20261002.*`。单独分离特征不进入扩展验证或更长训练。
+
+全精度固定轨迹验证也未显示更好地保住教师拟合：原教师 28800 帧的 NLL/准确率为
+0.397286/87.9410%，扩展教师 49744 帧为 0.413685/87.0316%；
+BC 自身验证轨迹 18551 帧为 3.208572/49.9488%，变化标签准确率 7.9996%。
+原共享特征控制对应的教师准确率为 88.6840%/88.6157%，自身轨迹准确率 51.9433%。
+同源模型、数据划分和按帧加权统计已核对，证据 `fixed-fit.json` 与
+`logs/diagnostics/address-feature-split-fixed-fit-20261002`。
+
+## 待验证组合：校准 critic 与独立特征
+
+原 critic + 共享特征的控制在配对 16 局中为 2 胜；校准 critic + 共享特征和
+原 critic + 独立特征均在四局筛查中无胜局。仍缺校准 critic + 独立特征这一组合。
+它检验初始价值偏差修正和价值梯度隔离是否需要同时具备，不预设会提高胜率。
+
+复用 `god-marisa-reimu-critic-calibrated-v2-20261002/best.zip`，通过同一转换器复制出
+独立特征。原校准仅改变私有 critic 循环/价值网络，actor 和特征未改，
+详见[critic 校准](critic-calibration.md)。训练用 `train_address_split_calibrated`，
+除初始化 critic 外与本页独立特征训练配置一致，重新开始 Adam/PPO/课程计数。
+预算仍为 16384 步，先验证四局；结果未出前不把组合当作更强模型。
