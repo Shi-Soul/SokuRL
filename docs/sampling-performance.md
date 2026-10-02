@@ -46,3 +46,21 @@ worker step 为 32.01 → 32.67 秒。局部开销降低，但整轮改善很小
 两次初始网络参数哈希相同，最终参数哈希不同；这不是逐帧轨迹相等性证明。
 奖励等值依据是上述同状态解码核对与测试。
 原始复测 pstats/text 和提取结果 `.dev/compare-sampling-health-20261001.json` 均保留。
+
+## 地址不变循环 PPO、8 环境的采样剖析方案
+
+当前[并行采样实验](address-diverse-rollouts.md)已使用地址不变循环模型、8 环境、
+batch=512 与最多 3 epoch。上面的旧前馈模型计时不代表当前配置。
+在独立 GPU 上运行同配置 4096 步短诊断，只改预算和输出；不向正在运行的主训练附加记录器。
+
+```bash
+bash scripts/linux.sh -m cProfile -o ../.dev/br-sampling-profile-address8-20261002.pstats \
+  tools/train.py --config-name train_address_diverse_rollouts linux.cuda_devices=3 \
+  algorithm.timesteps=4096 output=logs/diagnostics/br-sampling-profile-address8-20261002
+```
+
+该诊断保留每帧控制、完整观测/动作、原神 AI 和原课程；cProfile 仅记录 Linux 主线程
+Python 调用，不直接测量 Wine 子进程内部或 CUDA kernel。CPU 等待 GPU/工作进程的时间
+可能记在同步调用上，累计父子时间不能任意相加。
+计划核对初始化与首轮 2048 步的全部参数/Adam 是否与主训练一致，再解释剖析数据。
+这不是新的强度候选，也不从一次有剖析开销的共享节点运行推算总体加速。
