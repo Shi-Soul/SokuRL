@@ -1,0 +1,9 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+# Fresh, uninterrupted comparison from the same BC actor and critic.
+algorithm:
+  timesteps: 65536
+  checkpoint_every: 16384
+output: logs/training/br-address-warmup-control-${now:%Y%m%d-%H%M%S}

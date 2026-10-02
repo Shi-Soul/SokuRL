@@ -1,0 +1,9 @@
+defaults:
+  - train_address_warmup_control
+  - _self_
+
+# Change only the minimum evidence before feedback; retain long-term EMA.
+algorithm:
+  curriculum:
+    warmup_episodes: 4
+output: logs/training/br-address-warmup-early-${now:%Y%m%d-%H%M%S}
