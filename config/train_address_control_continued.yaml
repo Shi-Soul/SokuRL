@@ -1,0 +1,14 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+# Resume optimizer and EMA; games restart under a new explicit sampling seed.
+seed: 893177
+algorithm:
+  timesteps: 49152
+  checkpoint_every: 16384
+  initial_policy:
+    kind: checkpoint
+    path: logs/diagnostics/br-critic-control-20261002/final.zip
+    training_config: logs/diagnostics/br-critic-control-20261002/config.yaml
+output: logs/training/br-address-control-continued-${now:%Y%m%d-%H%M%S}
