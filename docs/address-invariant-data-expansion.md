@@ -71,4 +71,19 @@ LSTM、576 动作、PPO 0 步、空优化器。共同初始参数哈希为
 新数据身份与上述完整核对一致，源码哈希通过核验。
 记录在 `logs/diagnostics/address-expansion-initialization-20261002/summary.json`，脚本及日志
 `../.dev/audit-address-expansion-initialization-20261002.{py,log}`。
-拟合仍在进行，尚无新模型实战结果。
+拟合现已成功完成：20 轮、47350 次监督更新、PPO 0 步，耗时 1218.43 秒。
+按每局长度、seed=341729 的逐轮随机分组独立重算更新次数，并核对 best/final 优化器
+实际计数，均与记录一致。原 48 局实验为 20273 次更新，不能视为相同计算预算。
+来源身份、全部模型及 best 选择规则均通过核对；结果在
+`logs/diagnostics/address-expansion-training-20261002/summary.json`，入口及日志
+`../.dev/audit-address-expansion-training-20261002.{py,log}`。
+
+best 为第 14 轮，SHA256 为 `504cf5ffc03f87cf60e9bbb38e9b293f842f7b2295607855416278d4d18b94da`。
+在 182428 帧合并验证集上，NLL 为 0.163239、总准确率 95.465%、变化帧准确率 70.649%，
+549 个符卡标签帧的完整命令准确率 66.485%。这些分母不同于原 48 局实验，不能直接据此
+宣称模型更强；已启动相同原教师/新教师/旧学习者验证集重评分和完整神 AI 双座位评测。
+尚无新模型实战结果。
+
+学习曲线位于 `logs/diagnostics/action-id-and-expansion-curves-20261002`，右列单独显示本次
+验证总体，并标注 47350 次更新与原实验 20273 次的差别。60 条逐轮数据均与原始快照核对一致；
+PNG 已检查，PDF 未单独渲染。第 14 轮后 NLL 未持续下降，暂不继续增加本次拟合预算。
