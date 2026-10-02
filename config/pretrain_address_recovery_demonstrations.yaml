@@ -1,0 +1,11 @@
+defaults:
+  - pretrain_address_invariant_aggregate
+  - _self_
+
+pretraining:
+  additional_datasets:
+    - logs/demonstrations/god-marisa-reimu-expanded-20261001
+    - logs/demonstrations/address-recovery-marisa-reimu-20261002
+  # Only executed teacher suffixes train; complete prefixes still advance LSTM.
+  value_coef: 0.0
+output: logs/pretraining/address-recovery-${now:%Y%m%d-%H%M%S}

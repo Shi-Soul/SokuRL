@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 
 from soku_rl.rl.behavior_cloning import load_demonstrations
+from soku_rl.rl.demonstration_supervision import supervision_mask
 
 
 def load_demonstration_sets(sources, interface, value_coef):
@@ -16,7 +17,7 @@ def load_demonstration_sets(sources, interface, value_coef):
     for path in paths:
         rows, manifest, contract, digest = load_demonstrations(path, interface)
         control = "teacher" if manifest["schema"] == 1 else manifest["control"]
-        if control == "learner" and value_coef != 0:
+        if control in {"learner", "teacher_takeover"} and value_coef != 0:
             raise ValueError("learner-controlled teacher labels require value_coef=0; returns belong to the behavior policy")
         current = {row["world_seed"] for row in manifest["episodes"]}
         if current & worlds:
@@ -42,4 +43,7 @@ def load_demonstration_sets(sources, interface, value_coef):
             "frames": {split: len(rows[split]) for split in samples},
             "worlds": {split: [row["world_seed"] for row in manifest["episodes"] if row["split"] == split]
                 for split in samples}})
+        if manifest["schema"] == 3:
+            identities[-1]["supervised_frames"] = {
+                split: int(supervision_mask(rows[split]).sum()) for split in samples}
     return samples, training, identities

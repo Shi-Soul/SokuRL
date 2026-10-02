@@ -6,6 +6,7 @@ from sb3_contrib.common.recurrent.type_aliases import RNNStates
 from soku_rl.rl.sparse_transfer import restore_batch
 from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
 from soku_rl.rl.demonstration_loss import validate_change_weight, weighted_action_loss
+from soku_rl.rl.demonstration_supervision import supervision_mask
 
 
 def demonstration_episodes(samples):
@@ -69,11 +70,15 @@ def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_co
             observations = restore_batch([row[0] for row in rows], model.device)
             actions = torch.as_tensor(np.asarray([row[1] for row in rows]), device=model.device)
             returns = torch.as_tensor(np.asarray([row[2] for row in rows], dtype=np.float32), device=model.device)
-            valid = torch.as_tensor(chunk["valid"], device=model.device)
+            valid = torch.as_tensor(np.asarray(chunk["valid"]) & supervision_mask(rows), device=model.device)
             # Every new episode column is explicitly zeroed above; no resets
             # occur inside a chunk. SB3 can therefore use its batched LSTM path.
             starts = torch.zeros(len(rows), device=model.device)
-            predicted, values, _, next_states = model.policy(observations, states, starts, deterministic=True)
+            with torch.set_grad_enabled(training and bool(valid.any())):
+                predicted, values, _, next_states = model.policy(observations, states, starts, deterministic=True)
+            if not valid.any():
+                states = RNNStates(*(tuple(value.detach() for value in pair) for pair in next_states))
+                continue
             # forward() populated the same SB3 action distribution used online.
             distribution = model.policy.action_dist
             nll = -distribution.log_prob(actions)
@@ -95,7 +100,7 @@ def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_co
             # Carry memory, but truncate gradients at chunk boundaries. Training
             # states precede the latest parameter update, as in online TBPTT.
             states = RNNStates(*(tuple(value.detach() for value in pair) for pair in next_states))
-            size = sum(chunk["valid"])
+            size = int(valid.sum())
             count += size
             total_loss += float(loss.detach()) * size
             correct = predicted == actions
@@ -111,6 +116,8 @@ def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_co
                 diagnostics = command_group_totals(distribution, actions, valid)
                 for key, value in diagnostics.items():
                     command_totals[key] = command_totals.get(key, 0) + value
+    if not count:
+        raise ValueError("sequence scoring requires supervised demonstration frames")
     result = {key: value / count for key, value in totals.items()}
     result["changed_samples"] = changed_count
     if changed_count:

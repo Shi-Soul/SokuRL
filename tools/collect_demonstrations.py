@@ -46,13 +46,13 @@ def main(cfg):
     teacher = load_policy("teacher", config["teacher"], interface, config["device"])
     if config["behavior"] == {"kind": "teacher"}:
         behavior = teacher
-    elif config["behavior"]["kind"] in {"sb3", "sb3_recurrent", "sb3_dqn"}:
+    elif config["behavior"]["kind"] in {"sb3", "sb3_recurrent", "sb3_dqn", "teacher_takeover"}:
         import torch
         if str(config["device"]).startswith("cuda") and not torch.cuda.is_available():
             raise RuntimeError("CUDA requested for learner-controlled collection but unavailable")
         behavior = load_policy("behavior", config["behavior"], interface, config["device"])
     else:
-        raise ValueError("collection behavior must be the teacher or an explicit learned checkpoint")
+        raise ValueError("collection behavior must be teacher, learned checkpoint or explicit teacher_takeover")
     opponents = [load_policy(entry["name"], entry["policy"],
         opponent_interface(interface, learner, entry), config["device"]) for entry in population]
     destination = Path(config["output"]).resolve()
@@ -61,12 +61,14 @@ def main(cfg):
     root = Path(__file__).resolve().parents[1]
     identity = {"source_hashes": {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
         for folder in (root / "src/soku_rl", root / "tools") for p in sorted(folder.rglob("*.py"))},
-        "sampling": "teacher controls" if behavior is teacher else "learner controls; teacher only labels",
+        "sampling": ("teacher controls" if behavior is teacher else
+            "learner prefix then same shadow teacher controls; supervise executed suffix" if
+            config["behavior"]["kind"] == "teacher_takeover" else "learner controls; teacher only labels"),
         "behavior_fingerprint": behavior.fingerprint, "excluded_plans": prior_plans,
         "device": config["device"], "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "packages": {name: version(name) for name in ["torch", "numpy", "gymnasium", "lupa",
             *(["stable-baselines3"] if behavior is not teacher else []),
-            *(["sb3-contrib"] if config["behavior"]["kind"] == "sb3_recurrent" else [])]}}
+            *(["sb3-contrib"] if config["behavior"]["kind"] in {"sb3_recurrent", "teacher_takeover"} else [])]}}
     (destination / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
     report = {"success": False, "method": "rule_demonstrations"}
     started = time.perf_counter()

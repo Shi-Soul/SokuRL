@@ -63,4 +63,25 @@ bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=2 rl.cpu_threads=
 
 真实 16 局诊断已由提交 `3fe5721` 在确认空闲的 GPU 2 启动；完整测试先结束，
 没有与其共用 GPU。启动日志 `.dev/benchmark-teacher-takeover-20261002.log`，
-输出 `logs/benchmark/br-address-teacher-takeover-20261002`。当前尚无核对后的完整结果。
+输出 `logs/benchmark/br-address-teacher-takeover-20261002`，完整结果见下一节。
+
+## 完整 16 局结果
+
+该诊断已正常结束，耗时 952.62 秒。全部 16 局的前 1024 帧双方联合动作与原 BC
+回放逐项相同，角色、世界/策略种子、游戏身份、原教师与学习者 checkpoint 哈希、
+战斗均值及 worker 清理均核对通过。组合指纹为
+`064474e5473e6bbba72d49c21ba0b5eaa89be82977f924439e8a56f9499b1f1d`。
+
+| 控制器 | 胜 / 负 / 超时 | 自身 / 对手平均掉血 | 双方符卡动作进入均值 |
+| --- | --- | --- | --- |
+| 原 BC 全局控制 | 1 / 15 / 0 | 9970.94 / 3777.00 | .125 / .0625 |
+| BC 前缀、影子神 AI 接管 | 5 / 4 / 7 | 6898.81 / 7715.25 | .1875 / .125 |
+| 原神 AI 全局控制 | 5 / 2 / 9 | 5641.25 / 8794.63 | .25 / .125 |
+
+接管组 1P 为 2 胜、2 负、4 超时，2P 为 3 胜、2 负、3 超时。它只说明原教师在
+本组学习者轨迹上接管后能产生有用控制，不证明任意单帧标签正确、不等同于训练所得
+PPO 战力，也不证明组合控制器与纯教师强弱相同。尤其当前回放没有逐帧完整观测，
+只验证了共同种子和动作前缀。
+原始与回放哈希、逐局前后结果在 `logs/diagnostics/teacher-takeover-audit-20261002/summary.json`，
+核对日志 `.dev/audit-teacher-takeover-20261002.log`。后续独立训练方案见
+[恢复示范](recovery-demonstrations.md)。

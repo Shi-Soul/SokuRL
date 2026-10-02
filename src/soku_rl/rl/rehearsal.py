@@ -10,6 +10,7 @@ from sb3_contrib import RecurrentPPO
 
 from soku_rl.rl.recurrent_cloning import demonstration_episodes, zero_states
 from soku_rl.rl.sparse_transfer import restore_batch
+from soku_rl.rl.demonstration_supervision import supervision_mask
 
 
 def validate_rehearsal(config):
@@ -74,7 +75,13 @@ def window_distribution(model, episode, offset, length):
 class DemonstrationRehearsal:
     def __init__(self, samples, config):
         self.episodes = demonstration_episodes(samples)
-        self.ends = np.cumsum([len(episode) for episode in self.episodes])
+        self.positions = [np.flatnonzero(supervision_mask(episode)) for episode in self.episodes]
+        if any(len(indices) and not np.array_equal(indices, np.arange(indices[0], len(episode)))
+               for indices, episode in zip(self.positions, self.episodes, strict=True)):
+            raise ValueError("rehearsal supervision must be a contiguous suffix of each episode")
+        self.ends = np.cumsum([len(indices) for indices in self.positions])
+        if not self.ends[-1]:
+            raise ValueError("rehearsal requires supervised demonstration frames")
         self.config = copy.deepcopy(config)
 
     def update(self, model):
@@ -96,7 +103,8 @@ class DemonstrationRehearsal:
                 windows = []
                 for index in rng.integers(int(self.ends[-1]), size=config["sequences"]):
                     episode_index = int(np.searchsorted(self.ends, index, side="right"))
-                    offset = int(index - (0 if episode_index == 0 else self.ends[episode_index - 1]))
+                    position = int(index - (0 if episode_index == 0 else self.ends[episode_index - 1]))
+                    offset = int(self.positions[episode_index][position])
                     episode = self.episodes[episode_index]
                     size = min(config["sequence_length"], len(episode) - offset)
                     windows.append((episode, offset, size))

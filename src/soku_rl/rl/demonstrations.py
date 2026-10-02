@@ -10,6 +10,7 @@ import torch
 from soku_rl.env.encoding import AGENTS
 from soku_rl.env.match import MatchConfig, PlayerSetup
 from soku_rl.rl.storage import PackedObservation
+from soku_rl.policy.takeover import TeacherTakeoverPolicy
 
 
 def demonstration_plan(config, population, seed, excluded_worlds):
@@ -41,6 +42,10 @@ def demonstration_plan(config, population, seed, excluded_worlds):
 
 
 def collect_demonstrations(env, plan, learner, population, teacher, opponents, behavior, directory):
+    takeover = isinstance(behavior, TeacherTakeoverPolicy)
+    if takeover and (behavior.teacher.fingerprint != teacher.fingerprint
+            or env.interface.episode.decision_frames != 1 or env.interface.episode.latency_frames != 0):
+        raise ValueError("recovery collection requires the declared teacher and every-frame zero-latency control")
     if env.single_observation_space.shape is None or len(env.single_observation_space.shape) != 1:
         raise ValueError("demonstrations currently require flat numeric observations")
     if (not plan or len(opponents) != len(population)
@@ -51,14 +56,18 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
         raise ValueError("invalid or overlapping demonstration plan")
     directory.mkdir(parents=True, exist_ok=False)
     (directory / "plan.json").write_text(json.dumps(plan, indent=2), encoding="utf-8")
-    metadata = {"schema": 2, "complete": False, "teacher_fingerprint": teacher.fingerprint,
-        "control": "teacher" if behavior is teacher else "learner",
+    metadata = {"schema": 3 if takeover else 2, "complete": False, "teacher_fingerprint": teacher.fingerprint,
+        "control": "teacher_takeover" if takeover else "teacher" if behavior is teacher else "learner",
         "behavior_fingerprint": behavior.fingerprint,
         "opponent_fingerprints": {entry["name"]: p.fingerprint
             for entry, p in zip(population, opponents, strict=True)},
         "observation_shape": list(env.single_observation_space.shape),
         "observation_dtype": env.single_observation_space.dtype.str,
         "num_actions": int(env.single_action_space.n), "episodes": [], "successful_env_steps": 0}
+    if takeover:
+        metadata.update(after_frames=behavior.after_frames,
+            learner_fingerprint=behavior.learner.fingerprint,
+            supervision="executed_teacher_suffix_with_complete_unsupervised_prefix")
     started = time.perf_counter()
     pending = {}
     try:
@@ -70,10 +79,11 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
                 other = PlayerSetup(**population[job["opponent_index"]]["setup"])
                 pair = (own, other) if job["learner_seat"] == 0 else (other, own)
                 matches[slot] = MatchConfig(*pair)
-                label_actor = teacher.spawn(job["teacher_seed"])
+                label_actor = (behavior.spawn_with_seeds(job["behavior_seed"], job["teacher_seed"])
+                    if takeover else teacher.spawn(job["teacher_seed"]))
                 actors[slot] = (label_actor,
                     opponents[job["opponent_index"]].spawn(job["opponent_seed"]),
-                    label_actor if behavior is teacher else behavior.spawn(job["behavior_seed"]))
+                    label_actor if behavior is teacher or takeover else behavior.spawn(job["behavior_seed"]))
             observations, _ = env.reset_matchups({s: j["world_seed"] for s, j in jobs.items()}, matches)
             pending = {s: {"job": j, "observations": [], "actions": [], "executed_actions": [],
                 "rewards": []} for s, j in jobs.items()}
@@ -82,10 +92,14 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
                 for slot, record in pending.items():
                     seat = record["job"]["learner_seat"]
                     own, other = AGENTS[seat], AGENTS[1 - seat]
-                    action = int(actors[slot][0].act(observations[slot][own]))
+                    if takeover:
+                        label, executed = actors[slot][0].act_labelled(observations[slot][own])
+                        action, executed = int(label), int(executed)
+                    else:
+                        action = int(actors[slot][0].act(observations[slot][own]))
+                        executed = action if behavior is teacher else int(actors[slot][2].act(observations[slot][own]))
                     if not env.single_action_space.contains(action):
                         raise ValueError("teacher action is outside the learning vocabulary")
-                    executed = action if behavior is teacher else int(actors[slot][2].act(observations[slot][own]))
                     if not env.single_action_space.contains(executed):
                         raise ValueError("behavior action is outside the learning vocabulary")
                     record["observations"].append(PackedObservation.pack(observations[slot][own]))
@@ -107,10 +121,13 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
                     reward_array = np.asarray(record["rewards"], dtype=np.float32)
                     # Undiscounted finite-horizon targets match the current shared PPO payoff.
                     returns = np.cumsum(reward_array[::-1], dtype=np.float64)[::-1].copy().astype(np.float32)
-                    torch.save({"schema": 2, "observations": record["observations"],
+                    data = {"schema": metadata["schema"], "observations": record["observations"],
                         "actions": np.asarray(record["actions"], dtype=np.int64),
                         "executed_actions": np.asarray(record["executed_actions"], dtype=np.int64),
-                        "rewards": reward_array, "returns": returns}, directory / name)
+                        "rewards": reward_array, "returns": returns}
+                    if takeover:
+                        data["supervised"] = np.arange(len(reward_array)) >= behavior.after_frames
+                    torch.save(data, directory / name)
                     with (directory / name).open("rb") as stream:
                         digest = hashlib.file_digest(stream, "sha256").hexdigest()
                     row = job | {"path": name, "sha256": digest, "steps": len(reward_array),
@@ -120,6 +137,8 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
                             np.asarray(record["actions"]) != np.asarray(record["executed_actions"])))}
                     if "combat_metrics" in info:
                         row["combat_metrics"] = info["combat_metrics"]
+                    if takeover:
+                        row["supervised_steps"] = int(data["supervised"].sum())
                     metadata["episodes"].append(row)
                     del pending[slot]
                     (directory / "manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")

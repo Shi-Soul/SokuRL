@@ -16,6 +16,7 @@ from soku_rl.rl.sparse_transfer import restore_batch
 from soku_rl.rl.storage import PackedObservation
 from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
 from soku_rl.rl.demonstration_loss import validate_change_weight, weighted_action_loss, weighted_validation_nll
+from soku_rl.rl.demonstration_supervision import supervised_samples
 
 
 class ObservationContractEnv(Env):
@@ -39,7 +40,7 @@ def load_demonstrations(source, interface):
     manifest_bytes = path.read_bytes()
     manifest = json.loads(manifest_bytes)
     if (report["success"] is not True or report["method"] != "rule_demonstrations"
-            or manifest["complete"] is not True or manifest["schema"] not in (1, 2)
+            or manifest["complete"] is not True or manifest["schema"] not in (1, 2, 3)
             or manifest != report["result"] or manifest["incomplete_episodes"]):
         raise ValueError("demonstrations require a successful complete collection and matching manifest")
     if manifest["schema"] == 2 and (manifest["control"] not in {"teacher", "learner"}
@@ -47,6 +48,19 @@ def load_demonstrations(source, interface):
             or (manifest["control"] == "teacher"
                 and manifest["behavior_fingerprint"] != manifest["teacher_fingerprint"])):
         raise ValueError("invalid demonstration behavior identity")
+    if manifest["schema"] == 3:
+        after = manifest["after_frames"]
+        if (manifest["control"] != "teacher_takeover" or type(after) is not int or after < 0
+                or not isinstance(manifest["learner_fingerprint"], str) or not manifest["learner_fingerprint"]
+                or manifest["supervision"] != "executed_teacher_suffix_with_complete_unsupervised_prefix"):
+            raise ValueError("invalid recovery demonstration identity or supervision")
+        identity = ["teacher-takeover-v1", manifest["learner_fingerprint"], manifest["teacher_fingerprint"], after]
+        if hashlib.sha256(json.dumps(identity).encode()).hexdigest() != manifest["behavior_fingerprint"]:
+            raise ValueError("recovery demonstration composite fingerprint differs")
+        behavior = contract["behavior"]
+        if (behavior["kind"] != "teacher_takeover" or behavior["after_frames"] != after
+                or behavior["teacher"] != contract["teacher"]):
+            raise ValueError("recovery demonstration behavior contract differs")
     if (manifest["observation_shape"] != list(interface.observation_space.shape)
             or manifest["observation_dtype"] != interface.observation_space.dtype.str
             or manifest["num_actions"] != interface.action_space.n):
@@ -83,13 +97,20 @@ def load_demonstrations(source, interface):
                 or not np.isfinite(data["rewards"]).all() or not np.isfinite(data["returns"]).all()):
             raise ValueError("invalid demonstration sample arrays")
         executed = data["actions"]
-        if data["schema"] == 2:
+        if data["schema"] >= 2:
             executed = data["executed_actions"]
             if (executed.shape != (count,) or executed.dtype != np.int64 or (executed < 0).any()
                     or (executed >= interface.action_space.n).any()
                     or np.count_nonzero(executed != data["actions"]) != row["teacher_behavior_disagreements"]
                     or (manifest["control"] == "teacher" and not np.array_equal(executed, data["actions"]))):
                 raise ValueError("invalid demonstration executed actions or teacher agreement")
+        if data["schema"] == 3:
+            mask = data["supervised"]
+            if (mask.dtype != np.bool_ or mask.shape != (count,)
+                    or not np.array_equal(mask, np.arange(count) >= manifest["after_frames"])
+                    or type(row["supervised_steps"]) is not int or int(mask.sum()) != row["supervised_steps"]
+                    or not np.array_equal(executed[mask], data["actions"][mask])):
+                raise ValueError("invalid recovery supervision mask or executed teacher suffix")
         expected = np.cumsum(data["rewards"][::-1], dtype=np.float64)[::-1].astype(np.float32)
         if not np.array_equal(expected, data["returns"]):
             raise ValueError("demonstration return targets do not match episode rewards")
@@ -101,7 +122,10 @@ def load_demonstrations(source, interface):
         # On learner trajectories the copy baseline uses the actual preceding input,
         # not an unexecuted teacher label that would be unavailable to the learner.
         changes = np.concatenate(([-1], np.not_equal(data["actions"][1:], executed[:-1]).astype(int)))
-        samples[row["split"]].extend(zip(data["observations"], data["actions"], data["returns"], changes, strict=True))
+        arrays = (data["observations"], data["actions"], data["returns"], changes)
+        if data["schema"] == 3:
+            arrays += (data["supervised"],)
+        samples[row["split"]].extend(zip(*arrays, strict=True))
         seats[row["split"]].add(row["learner_seat"])
     if any(value != {0, 1} for value in seats.values()):
         raise ValueError("both demonstration splits must cover both learner seats")
@@ -121,6 +145,9 @@ def supervised_predictions(model, observations, actions):
 
 
 def score_samples(model, samples, batch_size):
+    samples = supervised_samples(samples)
+    if not samples:
+        raise ValueError("scoring requires supervised demonstration frames")
     model.policy.set_training_mode(False)
     totals = dict(nll=0., accuracy=0., value_mse=0., entropy=0.)
     changed_count, changed_correct, changed_nll = 0, 0., 0.
@@ -171,6 +198,11 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
             or algorithm[kind]["gamma"] != 1. or any(not rows for rows in samples.values())):
         raise ValueError("pretraining requires nonempty numeric samples, a shared learner and gamma=1")
     recurrent = algorithm["policy_type"] == "lstm"
+    labelled = {split: supervised_samples(rows) for split, rows in samples.items()}
+    if any(not rows for rows in labelled.values()):
+        raise ValueError("each demonstration split requires supervised frames")
+    if config["value_coef"] and any(len(labelled[split]) != len(rows) for split, rows in samples.items()):
+        raise ValueError("masked recovery demonstrations require value_coef=0")
     validate_change_weight(config["action_change_weight"])
     if recurrent:
         from soku_rl.rl.recurrent_cloning import demonstration_episodes, sequence_epoch
@@ -187,14 +219,14 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
     initial = parameter_hash(model.policy)
     rng = np.random.default_rng(seed)
     label_counts = {split: np.bincount([int(row[1]) for row in rows],
-        minlength=interface.action_space.n) for split, rows in samples.items()}
+        minlength=interface.action_space.n) for split, rows in labelled.items()}
     majority = int(label_counts["train"].argmax())
     baseline = {"train_majority_action": majority,
-        "train_majority_fraction": float(label_counts["train"][majority] / len(samples["train"])),
-        "validation_accuracy": float(label_counts["validation"][majority] / len(samples["validation"])),
+        "train_majority_fraction": float(label_counts["train"][majority] / len(labelled["train"])),
+        "validation_accuracy": float(label_counts["validation"][majority] / len(labelled["validation"])),
         "label_counts": {split: counts.tolist() for split, counts in label_counts.items()}}
     repeat_baselines = {}
-    for split, rows in samples.items():
+    for split, rows in labelled.items():
         transitions = sum(row[3] >= 0 for row in rows)
         repeat_baselines[split] = {"transitions": int(transitions)}
         if transitions:
@@ -206,7 +238,7 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
                 config["action_change_weight"])[0]
         else:
             metrics = score_samples(model, samples["validation"], config["batch_size"])
-        metrics["weighted_nll"] = weighted_validation_nll(metrics, len(samples["validation"]), config["action_change_weight"])
+        metrics["weighted_nll"] = weighted_validation_nll(metrics, len(labelled["validation"]), config["action_change_weight"])
         return metrics
 
     validation = validation_score()
@@ -225,9 +257,9 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         else:
             model.policy.set_training_mode(True)
             total_loss = 0.
-            order = rng.permutation(len(samples["train"]))
+            order = rng.permutation(len(labelled["train"]))
             for first in range(0, len(order), config["batch_size"]):
-                batch = [samples["train"][int(i)] for i in order[first:first + config["batch_size"]]]
+                batch = [labelled["train"][int(i)] for i in order[first:first + config["batch_size"]]]
                 observations, actions, returns = sample_tensors(model, batch)
                 if isinstance(model, DoubleDQN):
                     distribution, values = supervised_predictions(model, observations, actions)
@@ -275,4 +307,5 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         **({"sequence_training": {"sequence_length": config["sequence_length"],
             "episodes_per_batch": config["batch_size"] // config["sequence_length"],
             "state_reset": "each_episode", "gradient_truncation": "each_chunk"}} if recurrent else {}),
-        "train_frames": len(samples["train"]), "validation_frames": len(samples["validation"]), "history": history}
+        "train_frames": len(samples["train"]), "validation_frames": len(samples["validation"]),
+        "supervised_frames": {split: len(rows) for split, rows in labelled.items()}, "history": history}
