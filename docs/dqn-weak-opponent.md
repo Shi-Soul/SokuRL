@@ -20,3 +20,9 @@ bash scripts/linux.sh tools/train.py --config-name train_dqn_weak \
 两座位均有多数胜局；超时不算胜。未达到时继续诊断，不能将跑通流程算成功。
 
 本文件将在实际训练和评测完成后补充结果；目前尚无通过声明。
+
+另用 `--config-name train_dqn_weak_diagnostic` 并行诊断精简数值观测：
+现有 `diagnostic_state`、4 帧历史、逐帧决策、同一 `rush` 决策树和 90 动作。
+网络为共享 PPO/DQN 的默认双 256 MLP，不使用完整特权观测的物体编码器。
+该实验验证共享训练流程的可学习性，不能证明完整观测编码器的强度。
+两组的初始模型和训练结果独立报告，不混合胜率。
