@@ -41,7 +41,7 @@ bash scripts/linux.sh tools/train.py --config-name train_address_split_features 
 原控制在 16384 步的参数与 Adam 已被近期连续控制精确复现，因此复用原配对验证。
 结束后仍先做原两世界种子 × 双座位纯神 AI 四局，有胜局再扩展验证，不自动追加训练预算。
 
-最新全量回归为 1194 passed、12 skipped、1 deselected、8 warnings、2 subtests passed，
+缓冲区补丁回归为 1194 passed、12 skipped、1 deselected、8 warnings、2 subtests passed，
 耗时 96.62 秒，日志 `.dev/pytest-feature-split-buffers-full-20261002.log`。
 
 
@@ -63,3 +63,24 @@ PPO 和优化器没有更新；源权重和训练契约指纹、转换源码也�
 证据 `logs/diagnostics/address-feature-split-preflight-20261002` 中
 `summary.json`、`conversion-audit.json`；脚本/日志 `.dev/check-address-feature-split-20261002.*`、
 `.dev/audit-address-feature-conversion-20261002.*`。
+
+
+## 实际加载与首轮训练
+
+实际策略加载器和 RecurrentEpisode 采样器额外重放四局各 64 帧（合计 256 帧），
+使用相同私有策略种子 728341，采样动作及循环状态全部相同。
+证据 `actor-adapter.json`，脚本/日志 `.dev/check-address-feature-split-actors-20261002.*`。
+
+短训练由提交 `b42e9e3` 在 GPU 0 启动，初始化参数哈希为
+`9345b40c9ab5335d13838ce550787d93dfb8f95b3f50dcda4c9b8a2548a5c173`。
+首个 512 步 checkpoint 完成 2 个 PPO epoch，完整参数已更新，actor/critic 特征权重也已分化。
+实际配置、空初始化优化器/零计数、首轮更新、原神 AI 与课程 sidecar、源码逐文件核对通过。
+审核快照为 4608 步；产物目录 `logs/diagnostics/br-address-split-features-20261002`。
+预检目录的 `actual-start.json` 及 `.dev/audit-address-feature-split-start-20261002.*` 保存证据。
+此时训练尚未完成，不能报告最终纯神 AI 表现。
+
+期间另一个工作流并入 ONNX 游玩部署（`9cc6aee`），新增 loader 的 ONNX 分支，
+原 SB3 分支和 BR PPO 更新实现未改。已在实际训练启动版本 `b42e9e3` 补跑全量回归：
+**1200 passed、12 skipped、1 deselected、26 warnings、2 subtests passed**，123.35 秒。
+日志 `.dev/pytest-feature-split-merged-play-20261002.log`，版本记录为同名前缀 `-source.txt`。
+转换生成版本 `09d23f5` 与训练启动版本分别保留，未混用来源记录。
