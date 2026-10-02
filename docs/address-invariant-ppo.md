@@ -45,3 +45,20 @@ bash scripts/linux.sh tools/train.py linux.cuda_devices=3 algorithm=br \
 初始化检查点 SHA 及公共观测/动作合同核对通过。保存配置及证据为
 `logs/diagnostics/address-ppo-preflight-20261002`，脚本和日志
 `.dev/check-address-ppo-config-20261002.{py,log}`。这一步尚未启动 PPO 更新。
+
+## 实际启动与首轮更新
+
+两组由提交 `fb81b2a` 在 GPU 3/7 启动，均通过首个 1024 步检查点核对。
+实际保存配置与预检配置一致，源码哈希、初始化 SHA、教师训练划分身份匹配。
+参数确实改变，优化器已有状态；每组完成一次 256 帧教师复习，重放 14788 帧前缀。
+
+| 起始 uniform | 首轮 PPO epoch 计数 | 采样秒 | 更新秒（含复习） | 其中复习秒 |
+| --- | --- | --- | --- | --- |
+| 0.9 | 2 | 8.988 | 3.241 | 0.651 |
+| 0.1 | 1 | 8.602 | 4.226 | 0.719 |
+
+PPO 根据 KL 阈值提前结束，epoch 计数不是完整 minibatch 遍历次数的保证。
+首轮尚无完整对局，课程局数为 0，比例分别仍为 0.9/0.1；没有从该检查点虚构胜率。
+证据为 `logs/diagnostics/address-ppo-first-update-20261002/summary.json`，
+核对日志 `.dev/audit-address-ppo-first-update-20261002.log`。
+此时两组仍在训练，尚无这轮 PPO 的纯神 AI 强度结果。
