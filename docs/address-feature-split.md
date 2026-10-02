@@ -84,3 +84,16 @@ PPO 和优化器没有更新；源权重和训练契约指纹、转换源码也�
 **1200 passed、12 skipped、1 deselected、26 warnings、2 subtests passed**，123.35 秒。
 日志 `.dev/pytest-feature-split-merged-play-20261002.log`，版本记录为同名前缀 `-source.txt`。
 转换生成版本 `09d23f5` 与训练启动版本分别保留，未混用来源记录。
+
+## 首轮 16384 步训练完成
+
+按预算完成 32 次 rollout、92 个 PPO epoch，4 个完整训练局均败（1P 一局、2P 三局）。
+平均自身/对手掉血 10000/2299.25，双方符卡动作进入均为 0；课程未过预热，uniform=0。
+完整耗时 383.46 秒，采样 237.26 秒、更新 55.10 秒。
+最终 checkpoint SHA256 为
+`1c5171cf1f2a1aa4a7446bd43e32f20462e69d8874d849f63c384b5be6549e0a`。
+完整配置/源码/初始化、最终参数与计数、课程事件重算、战斗均值和独立 worker 清理均核对通过，
+证据 `logs/diagnostics/address-feature-split-audit-20261002/summary.json`，
+脚本/日志 `.dev/audit-address-feature-split-training-20261002.*`。
+
+最终模型纯神 AI 四局评估已在 GPU 7 启动，尚待完整结果；此处不宣称拆分已改善实战。
