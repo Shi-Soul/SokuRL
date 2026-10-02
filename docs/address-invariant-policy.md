@@ -105,7 +105,10 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=7 \
 `br-reimu-address-invariant-zero-shot-20261002`，
 核对汇总为 `logs/diagnostics/address-invariant-training-20261002/full_god_evaluations.json`。
 
-四局不足以证明稳定胜率。正在以同一 GPU、同模型、同种子和独立游戏实例重复新模型的四局，
-用于检查完整动作轨迹复现，不算新的独立强度样本。
+四局不足以证明稳定胜率。以同一 GPU、同模型、同种子和独立游戏实例重复新模型的四局已完成：
+全部联合动作、每局结果、局长及战斗统计完全相同，包括世界种子 1897077702、2P 的胜局。
+首次/重复评测分别耗时 279.08/271.74 秒；原始重复结果为
+`br-reimu-address-invariant-repeat-20261002`，核对为训练诊断目录中的 `repeated_games.json`。
+两个独立 worker 均正常退出并清理。这是完整动作轨迹复现，不算新的独立强度样本。
 同时扩展到验证集接下来的六个世界种子、每个两座位，共 12 局；保持测试集未用于本轮筛查。
 扩展输出 `br-reimu-address-invariant-expanded-20261002`。未见结果前不宣称已经获得通用 BR。
