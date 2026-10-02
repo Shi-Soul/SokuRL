@@ -29,3 +29,27 @@ gamma=1、GAE=.95、ent_coef=.001，以及固定魔理沙、随机座位、原�
 bash scripts/linux.sh tools/train.py --config-name train_recurrent_factorized_address \
   linux.cuda_devices=7 output=logs/training/br-recurrent-factorized-address-ppo-20261002
 ```
+
+## 实际启动与首轮更新
+
+两组前序完整评估均已核对：方向/按键 BC 为 0/16，平面八环境 PPO 的最终模型也为 0/16。
+新对照由提交 `386d655` 在空闲 GPU 7 启动，当时主机可用内存约 247 GiB、NAS 可用
+20 TiB，没有停止其他任务。完整配置比较仅存在声明的动作头、初始权重、存储和输出差异。
+共享工厂预检确认实际使用 DirectionButtonHead 与 SparseRecurrentRolloutBuffer，
+初始权重为新 BC best、Adam 为空、PPO 步数为零。
+
+实际保存的 initial.zip 参数与预检及 BC best 相同，参数哈希
+`09bb9e6b3a6fa2f6abc6ce0fada2ee1c905601b3138e29d92b5be60250eb5a32`。
+首个 2048 步检查点确认实际 n_envs=8、n_steps=256、batch=512；KL 提前停止后完成
+2 个 PPO epoch、5 次 Adam 更新，而平面控制首轮为 3 个 epoch、12 次 Adam 更新。
+不同实际更新量必须随结果报告，不能仅按配置 epoch 数推算。
+首轮 checkpoint SHA256 为
+`5716df8dbfb17039a21a0e81eccf1aa2b4c03d60902ac421e8fb4c7fad785ebb`，参数哈希
+`35547e65a7e6e243d2d09a9b46088fa305d7ced1b69afdc7658195af9a262033`。
+
+源码身份、初始/更新后模型、原神 AI 指纹、课程 sidecar 与逐局反馈重放均核对通过。
+审计快照为 20480 步、1 个完整负局、uniform=0，尚未达到课程统计预热。
+这些是启动和更新机制证据，强度仍待两个预定检查点的完整评估。
+预检/核对位于 `logs/diagnostics/recurrent-factorized-br-preflight-20261002`，
+脚本/日志 `.dev/check-recurrent-factorized-br-20261002.*`、
+`.dev/audit-recurrent-factorized-br-start-20261002.*`。
