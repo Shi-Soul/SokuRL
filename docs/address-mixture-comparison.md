@@ -145,3 +145,18 @@ GPU 作业经原 scripts/linux.sh 进入各自限制后，两个评估已正常�
 `.dev/pytest-mixture-curve-layout-20261002.log`。
 首次绘图命令仅因 Hydra 字典替换方式错误而未启动绘图，修正为先删除再新增 runs 后完成；
 失败命令日志仍保留，源训练数据未修改。
+
+## 首次自适应反馈
+
+按帧组第 20 局于全局 112288 步结束，EMA=.694266，uniform 从 .5 降至 .471147；
+按局组第 20 局于 125272 步结束，EMA=.358002，uniform 从 .5 升至 .518400。
+此前 19 局均仅积累统计，没有按训练步数切换 stage。核对快照分别为 129024/139264
+步、25/21 个完整局，全部 EMA 事件和按局分支随机选择逐项重放一致，证据为
+`logs/diagnostics/address-{action,episode}-mix50-audit-20261002/feedback.json` 及对应
+`feedback-progress.json`，日志 `.dev/audit-address-mixtures-feedback-20261002.log`。
+这只确认反馈按设计实际发生，不证明两种课程已提高完整神 AI 胜率。
+
+按局组恢复后的观察进程随后以 143 退出，原因未确认；检查发现其原中期评估进程
+2337420 仍正常存活，已有 8 局结果，因此没有重启或重复评估。新观察器按精确 PID
+和完整命令接管等待，成功结束后继续原定核对与最终评估；状态和日志使用
+`.dev/finish-address-episode-mix50-adopted-20261002.*`。按帧组观察器及两条训练未中断。
