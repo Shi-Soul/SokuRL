@@ -35,8 +35,9 @@ def play_menu(catalog, settings, read, write):
         write("进入 SokuRL - Player 窗口后，自行选择角色和卡组。")
     else:
         if connection == "join":
-            address = read("房主的 IPv4 地址：").strip()
-            overrides.append("play.network.address="+json.dumps(address))
+            address = read(f"房主的 IPv4 地址（回车使用 {settings['network']['address']}）：").strip()
+            if address:
+                overrides.append("play.network.address="+json.dumps(address))
         port = read(f"房间端口（回车使用 {settings['network']['port']}）：").strip()
         if port:
             if not port.isdecimal():
