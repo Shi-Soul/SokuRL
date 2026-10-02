@@ -69,3 +69,43 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py linux.cuda_devices=7 \
 空优化器、源码/依赖/数据身份，配置仅 feature class、track 和输出目录不同。
 实机对照 worker 的退出、专属服务停止/等待均为 0，前缀和游戏副本已清理。
 证据在 `logs/diagnostics/address-invariant-preflight-20261002/summary.json`。
+
+## 20 轮预训练和四局筛查
+
+两组各完成 20273 次监督更新，PPO 步数仍为 0，均按验证 NLL 选中 epoch 18。
+普通组耗时 545.00 秒，新组 524.64 秒；不同 GPU 的单次耗时不能作为可靠加速比。
+训练预算、预选规则、源码和模型参数身份核对通过。
+
+| 验证指标 | 同期数值控制组 | 屏蔽地址 |
+| --- | --- | --- |
+| 教师 NLL | 0.220119 | 0.214957 |
+| 教师总准确率 | 94.333% | 94.556% |
+| 动作变化帧准确率 | 64.712% | 65.558% |
+| 攻击标签精确准确率 | 76.501% | 78.939% |
+| 符卡标签精确准确率 | 63.596% | 64.035% |
+| 旧学习者状态 NLL | 2.933314 | 3.061487 |
+| 旧学习者状态准确率 | 51.776% | 51.701% |
+
+教师拟合有小幅改善，但旧学习者状态的误差仍大，尚未解决偏离专家轨迹后的恢复问题。
+固定验证数据身份和分座位加权指标已核对；旧学习者数据并非当前新模型采样。
+完整验证在 `logs/diagnostics/address-invariant-retention-20261002`。
+训练曲线、CSV 和模型哈希在 `logs/diagnostics/address-invariant-training-20261002`；
+`validation-curves.png` 已目视检查，标记按预定验证 NLL 选择的 epoch，PDF 同源导出但未另行渲染。
+
+| 同一四局纯神 AI 筛查 | 胜 / 负 | 自身 / 对手平均 HP 下降 | 自身 / 对手符卡动作进入每局 |
+| --- | --- | --- | --- |
+| 同期数值控制组 | 0 / 4 | 10000 / 3509.25 | 0 / 0 |
+| 屏蔽地址 | 1 / 3 | 9543.50 / 4834.25 | 0.25 / 0 |
+
+这是模仿初始化的胜局，不是 PPO 更新的收益。模型 SHA、双方角色/策略种子、
+完整原神 AI 指纹、双方座位覆盖、每局指标及 worker 清理核对通过。
+新模型 best SHA256 为
+`5a3ba7e04f95bff4b68be91e936d331f51ba8b58845fb48b07380aed1f630876`。
+原始结果分别在 `br-reimu-numeric-control-zero-shot-20261002` 和
+`br-reimu-address-invariant-zero-shot-20261002`，
+核对汇总为 `logs/diagnostics/address-invariant-training-20261002/full_god_evaluations.json`。
+
+四局不足以证明稳定胜率。正在以同一 GPU、同模型、同种子和独立游戏实例重复新模型的四局，
+用于检查完整动作轨迹复现，不算新的独立强度样本。
+同时扩展到验证集接下来的六个世界种子、每个两座位，共 12 局；保持测试集未用于本轮筛查。
+扩展输出 `br-reimu-address-invariant-expanded-20261002`。未见结果前不宣称已经获得通用 BR。
