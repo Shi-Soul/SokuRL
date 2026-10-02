@@ -143,4 +143,29 @@ PPO epoch 累计计数从 88 到 360。完整耗时 959.26 秒，采样 700.95 �
 源码、完整初始化、计数、96 次采样、从历史状态重算的 EMA、战斗均值与正常清理均通过核对；
 证据 `logs/diagnostics/address-control-continuation-audit-20261002/summary.json`，
 原始训练 `logs/training/br-address-control-continued-20261002`。
-已启动固定四局、纯原神 AI、双座位评估，结果待回收；没有追加训练预算。
+固定四局、纯原神 AI、双座位评估已完成，结果如下；没有追加训练预算。
+
+
+## 续训筛查未通过
+
+65536 步模型在固定四局为 **0 胜 4 负**，平均自身/对手掉血 10000/1019.25，
+双方符卡动作进入均值均为 0；耗时 194.05 秒。
+同一组对局的 16384 步源模型为 1 胜 3 负、平均对手掉血 4619。
+延长训练没有保持已有表现，停止本分支，不替换 16384 步候选。
+四局筛查不能证明所有场景都退化；也不将本次未触发调节的课程当成自适应训练失败。
+原始 `logs/benchmark/br-address-control-continued-20261002`，
+审核 `logs/diagnostics/address-control-continuation-audit-20261002/full-god-evaluations.json`；
+模型身份、配对种子/座位/角色/原神 AI、战斗均值及 worker 正常清理核对通过。
+评估启动源码为 `1143c23`，与训练启动 `b114307` 分别保留。
+
+续训曲线 `logs/diagnostics/address-control-continuation-curves-20261002` 包含训练、战斗及课程
+PNG/PDF、源快照和数值序列。三个 PNG 已目视检查，PDF 未独立渲染；
+源哈希、最近 5 局战斗均值、课程逐局事件、全局更新步数核对通过（`audit.json`）。
+96 次更新中有 95 次 scalar 记录，末次缺失不补造。
+采样占采样加更新时间约 85.5%，训练后段对手掉血增加未转化为固定验证收益。
+第一次绘图命令因 Hydra 严格映射拒绝新键而未运行分析；删除默认 run 键后重试成功，
+日志 `.dev/plot-address-control-continuation-20261002-v2.log`。
+
+当前保留候选仍是原学习率 16384 步模型（固定 16 局 2 胜），尚不满足强通用 BR 目标。
+后续若检验早期自适应反馈，需显式区分预热门槛变化与学习率/预算变化，
+不能在恢复旧课程 sidecar 时静默改参数，也不能把历史混合难度 EMA 当成纯神 AI 胜率。
