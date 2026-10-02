@@ -60,3 +60,7 @@ bash scripts/linux.sh tools/benchmark_br.py linux.cuda_devices=2 rl.cpu_threads=
 核对脚本 `.dev/audit-teacher-takeover-20261002.py` 要求全部 16 局完成、双方种子/角色/
 游戏身份一致、接管前联合动作与原 BC 回放逐项相同，并重算战斗均值和检查 worker 清理。
 回放只有动作和种子，不能声称已经逐位核对接管前完整观测或游戏内存。
+
+真实 16 局诊断已由提交 `3fe5721` 在确认空闲的 GPU 2 启动；完整测试先结束，
+没有与其共用 GPU。启动日志 `.dev/benchmark-teacher-takeover-20261002.log`，
+输出 `logs/benchmark/br-address-teacher-takeover-20261002`。当前尚无核对后的完整结果。

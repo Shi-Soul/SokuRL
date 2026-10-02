@@ -61,3 +61,33 @@ bash scripts/linux.sh tools/train.py --config-name train_recurrent_factorized_ad
 状态/脚本/日志为 `.dev/finish-recurrent-factorized-br-20261002.*`，
 输出分别为 `br-recurrent-factorized-ppo-mid-20261002` 和
 `br-recurrent-factorized-ppo-final-20261002` 两个 benchmark 目录。
+
+## 65536 步结果：尚无收益
+
+检查点实际完成 95 个 PPO epoch、373 次 Adam 更新；平面控制相同步数为 96/380。
+SHA256 `a141098b149a3778042e3a41fa168363cbc6414e3d369e12a3af7901d7120fb0`，
+参数哈希 `fbef977079f817c6e6dc15434b071180104f439cd5b724513614da447df3936a`。
+此时 13 个完整训练局均负，EMA=0、uniform=0，尚未满 20 局统计预热。
+
+提交 `aa0b78b`、GPU 0 的完整 16 局纯神 AI 验证也全部负，每座位 8 负。
+自身平均掉血 10000、对手 103.50，双方符卡动作进入均值 0/.1875，耗时 631.38 秒。
+核对双方角色/种子、原对手指纹、checkpoint、所有战斗均值及 worker 清理均通过；
+证据 `logs/diagnostics/recurrent-factorized-br-preflight-20261002/midpoint.json` 和
+`mid-games.json`。这次已完成评估没有显示新头的学习收益：
+
+| 策略 | 纯神 AI 胜局/16 | 对手平均掉血 |
+| --- | ---: | ---: |
+| 方向/按键 BC 初始化 | 0 | 1235.56 |
+| 方向/按键 PPO 65536 | 0 | 103.50 |
+| 平面 PPO 65536 | 0 | 2470.38 |
+
+同组回放的指令统计显示，方向/按键头的学习者 A/B/C 按住比例分别从 BC 的
+.812%/1.003%/.163% 降为 .105%/.139%/.128%；相邻命令重复比例从 89.40% 升至
+95.39%，平均同命令连续长度从 9.41 帧升至 21.55 帧。无按键的逻辑命令 512
+占 32481/52439 个决策。这里只能说明提交的输入更单一，不能把按键比例当作实际出招、
+命中或因果解释。统计按总决策数加权，跨局边界不计算转移；包含双方完整 576 项直方图。
+
+可复核源文件和回放 SHA256 位于
+`logs/diagnostics/recurrent-factorized-mid-actions-20261002/summary.json`，入口日志
+`.dev/analyze-recurrent-factorized-mid-actions-20261002.log`。继续完成原定 262144 步及
+最终 16 局，暂不追加预算或因课程内胜局宣称有效。
