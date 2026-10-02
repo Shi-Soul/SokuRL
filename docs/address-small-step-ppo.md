@@ -25,7 +25,7 @@ bash scripts/linux.sh tools/train.py --config-name train_address_small_step \
 外应逐字段相同。按结果再决定是否扩大验证，不自动增加训练预算。
 
 完整 Hydra 配置与已运行控制组逐字段比较通过，只差学习率及输出目录；
-共享工厂实际初始化参数哈希为 `2cd18753…35550`，与原 BC 完全相同，
+共享工厂实际初始化参数哈希为 `2cd18753…03550`，与原 BC 完全相同，
 优化器为空、步数/更新计数为零，各参数组学习率均为 1e-5。
 预检 `logs/diagnostics/address-small-step-preflight-20261002/summary.json`，
 脚本/日志 `.dev/check-address-small-step-20261002.*`。仅新增配置及文档，
