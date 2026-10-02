@@ -48,7 +48,7 @@ bash scripts/linux.sh tools/collect_demonstrations.py --config-name collect_addr
   linux.cuda_devices=2 output=logs/demonstrations/address-recovery-marisa-reimu-20261002
 ```
 
-以上为当前计划，真实采集、拟合和独立模型评估完成前不记作已验证的强 BR。
+采集与拟合结果见下文；独立模型对局尚未完成，当前不记作已验证的强 BR。
 
 ## 实现验证
 
@@ -77,7 +77,7 @@ CPU/CUDA 独立逐帧计算核对后缀指标与完整记忆，修改被忽略�
 `064474e5473e6bbba72d49c21ba0b5eaa89be82977f924439e8a56f9499b1f1d`。
 实际启动记录在预检目录的 `actual-start.json`，日志
 `.dev/audit-address-recovery-start-20261002.log` 和 `.dev/collect-address-recovery-20261002.log`。
-这是启动核对；完整数据、监督后缀及 worker 清理仍待采集结束后检查，尚未开始拟合。
+这是启动时记录；随后完整数据、监督后缀及 worker 清理的检查结果见下文。
 
 首批 8 个真实完整分片已检查 SHA256、schema 3、逐帧监督掩码、后缀执行动作等于
 教师标签，以及第 1/1023/1024/1025/末帧的实际输入历史。共 53241 个环境帧，
@@ -140,3 +140,41 @@ CPU/CUDA 独立逐帧计算核对后缀指标与完整记忆，修改被忽略�
 各区间按有效帧加权后与整体 NLL/准确率/熵一致，变化帧数也完全分解；模型参数未变。
 原始结果、配置和脚本哈希在 `logs/diagnostics/address-recovery-baseline-windows-20261002`，
 脚本 `.dev/evaluate-recovery-windows-20261002.py` 复用共享序列评分，不复制策略 forward。
+
+## 20 轮拟合完成与分组验证
+
+训练完成全部 20 轮，累计 26917 次监督更新、零 PPO 步数，耗时 696.04 秒。
+按既定验证 NLL 选择第 1 轮、1347 次更新的模型；后续轮次未超过它。
+总体验证 NLL 从 .215724 降至 .199117，精确动作准确率从 94.5404% 升至 94.9173%，
+变化标签准确率从 65.6051% 升至 66.6884%。这些不是游戏胜率。
+
+best checkpoint SHA256 为
+`06e6b711bbbc3b2d8423d348fc62f9e90be213cf87b7f1768f9372abb0215a78`，参数哈希为
+`3703354f9b5649f8a90e15bef5ce05e79ecd4aaf3e140e0a989fbd42abef8348`。
+全部 20 轮按固定 shuffle 和有效监督分块独立重算的 Adam 次数、初始/最佳/最终模型、
+数据身份及源码 `685fec0` 均核对通过，证据
+`logs/diagnostics/address-recovery-pretraining-audit-20261002/summary.json`。
+
+另外在 GPU 3/4 完成只读 float32 评分，关闭 matmul/cuDNN TF32，保持完整循环记忆。
+与原 BC 比较使用完全相同的固定验证局，三个数据集均有小幅拟合改善：
+
+| 数据 | 有效监督帧 | 原 BC → 恢复 BC NLL | 原 BC → 恢复 BC 精确准确率 |
+| --- | ---: | --- | --- |
+| 原教师 | 28800 | .20752 → .19052 | 94.5556% → 95.0590% |
+| 扩展教师 | 49744 | .21927 → .20337 | 94.5541% → 94.8657% |
+| 恢复后缀 | 19100 | .21887 → .20101 | 94.4817% → 94.8377% |
+
+恢复后缀的变化标签准确率从 65.7905% 升至 67.5293%。但接管后的首 256 帧略有退化：
+NLL .20428 → .20615、准确率 95.3125% → 94.8242%；其余三个时间窗均改善。
+因此整体拟合改善不能证明最初恢复动作更好，更不能替代独立控制下的实战评估。
+恢复数据的 23196 个验证环境帧中仅 19100 帧参与监督；座位及时间窗聚合均以有效
+监督帧加权，变化标签指标另以变化帧加权，未用未监督前缀稀释分母。
+
+模型/数据/验证局身份、完整记忆评分、参数不变和上述加权核对通过，结果及源哈希见
+`logs/diagnostics/address-recovery-fit-audit-20261002/summary.json`，日志
+`.dev/audit-address-recovery-fit-20261002.log`。原始评分位于
+`logs/diagnostics/address-recovery-fixed-fit-20261002` 和
+`logs/diagnostics/address-recovery-trained-windows-20261002`。
+
+最佳模型已由源码 `6355b5d` 在 GPU 2 启动预定的 16 局纯神 AI 评估，输出
+`logs/benchmark/br-address-recovery-20261002`。评估完成并核对前不据此追加 PPO 预算。
