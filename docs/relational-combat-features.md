@@ -54,4 +54,10 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
   output=logs/pretraining/god-marisa-reimu-relational-20261002
 ```
 
-运行前检查卡上其他任务。配置和源码须先提交，再启动正式拟合；训练结果尚待完成。
+正式拟合已由提交 `8a75789` 在 GPU 6 启动。初始化核对确认仅特征编码器类、注意力参数和
+输出目录不同；数据身份、包版本、教师身份及训练参数相同，源码哈希通过核验。
+两个初始模型均为 PPO 0 步、空优化器，actor/critic LSTM 都是 256 维、动作头都是 576。
+候选初始参数哈希与前述 GPU 检查相同：
+`30510f833637bfd358e0c0f42ad03bfd596c7d5f5b8dbfcadbac08d74e8d431d`。
+核对在 `logs/diagnostics/relational-initialization-20261002/summary.json`，脚本及日志
+`../.dev/audit-relational-initialization-20261002.{py,log}`。训练和实战结果尚待完成。
