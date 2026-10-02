@@ -60,6 +60,15 @@ bash scripts/linux.sh tools/pretrain_demonstrations.py \
 `logs/diagnostics/address-teacher-expansion-complete-20261002/summary.json`，脚本及日志
 `../.dev/audit-address-teacher-expansion-complete-20261002.{py,log}`。
 
-下一步按上面的原网络、20 epoch 方案在已检查空闲的 GPU 7 拟合。该方案与较小关系网络
+已由提交 `fa71a76` 按上面的原网络、20 epoch 方案在已检查空闲的 GPU 7 启动拟合。该方案与较小关系网络
 对照分开；后者已完成 0 胜 4 负的原神 AI 筛查，暂不继续 PPO，详见
 [关系编码结果](relational-combat-features.md)。
+
+初始化核对通过：实际配置只增加第三批数据并更改输出目录；原数据身份、包版本、
+训练参数及全部初始模型参数保持相同。两模型均有 3761489 个参数、256 维 actor/critic
+LSTM、576 动作、PPO 0 步、空优化器。共同初始参数哈希为
+`bc1fa4555303e85229122663019bcb719e1b5a9125da0af241cf4e02dda9a790`。
+新数据身份与上述完整核对一致，源码哈希通过核验。
+记录在 `logs/diagnostics/address-expansion-initialization-20261002/summary.json`，脚本及日志
+`../.dev/audit-address-expansion-initialization-20261002.{py,log}`。
+拟合仍在进行，尚无新模型实战结果。
