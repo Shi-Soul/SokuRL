@@ -104,3 +104,12 @@ log probability 和价值。PPO 得到原返回张量及原计算图，不重算
 针对性 **8 passed**，23.02 秒，包含 CPU/CUDA 逐位一致对照、检查点重载及填充屏蔽，
 日志 `.dev/pytest-recurrent-minibatch-probe-20261002.log`。
 下一轮使用相同 4096 步配置和独立输出目录，仍须再次核对原控制参数/Adam，再解释数值差。
+
+提交 `694dba9` 的全量回归为 **1208 passed、12 skipped、1 deselected、26 warnings、
+2 subtests passed**，138.66 秒，日志 `.dev/pytest-recurrent-minibatch-full-20261002.log`。
+同版本实机诊断在 GPU 7 启动，输出
+`logs/diagnostics/br-recurrent-minibatch-audit-20261002`；没有覆盖上一轮 schema 1 的数据。
+前四轮的第一次 minibatch 近似 KL 为 6.37e-9 至 6.17e-8，
+均远低于 target_kl=.015；这只是中间结果，最终完整核对仍待完成。
+schema 2 的 `observer_seconds` 延续记录重放/旁路采样计算，不包含新增 minibatch
+统计和报告写入；本轮总耗时也不用于替代普通 PPO 的效率测量。
