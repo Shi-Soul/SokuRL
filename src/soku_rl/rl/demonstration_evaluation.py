@@ -31,7 +31,7 @@ def score_validation(model, samples, manifest, batch_size, sequence_length):
         if isinstance(model, RecurrentPPO):
             episodes = demonstration_episodes(rows)
             metrics, _, updates = sequence_epoch(model, episodes, np.arange(len(episodes)),
-                batch_size, sequence_length, 0., False)
+                batch_size, sequence_length, 0., False, 1.)
             assert updates == 0
         else:
             metrics = score_samples(model, rows, batch_size)

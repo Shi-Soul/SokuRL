@@ -62,7 +62,7 @@ def test_real_policy_validation_counts_command_groups_without_padding_or_updates
     episodes = [[(packed, action, 0., -1 if index == 0 else 1) for index, action in enumerate(actions)]
         for actions in ([65, 272, 544], [256])]
     if kind == 'lstm':
-        scores, _, updates = sequence_epoch(model, episodes, [0, 1], 4, 2, 0., False)
+        scores, _, updates = sequence_epoch(model, episodes, [0, 1], 4, 2, 0., False, 1.)
         assert updates == 0
     else:
         scores = score_samples(model, sum(episodes, []), 4)

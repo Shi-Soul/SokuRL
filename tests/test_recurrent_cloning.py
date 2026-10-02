@@ -53,7 +53,7 @@ def test_sequence_scoring_matches_framewise_online_memory_and_resets():
     before = parameter_hash(model.policy)
     for length, batch in [(1, 1), (2, 4), (4, 12), (16, 32)]:
         for order in ([0, 1, 2], [2, 0, 1]):
-            actual, loss, updates = sequence_epoch(model, episodes, order, batch, length, .5, False)
+            actual, loss, updates = sequence_epoch(model, episodes, order, batch, length, .5, False, 1.)
             assert actual == pytest.approx(expected, abs=1e-6)
             assert loss == pytest.approx(expected["nll"] + .5 * expected["value_mse"], abs=1e-6)
             assert updates == 0
@@ -72,7 +72,7 @@ def test_recurrent_fit_loads_as_shared_ppo_and_continues_online(dataset, shared_
     output = directory / "recurrent-fit"
     output.mkdir()
     result = fit_demonstrations(interface, config, samples, {"epochs": 10, "batch_size": 4,
-        "sequence_length": 2, "value_coef": .5, "initial_policy": {"kind": "fresh"}}, "cpu", 7, output)
+        "sequence_length": 2, "value_coef": .5, "action_change_weight": 1., "initial_policy": {"kind": "fresh"}}, "cpu", 7, output)
     assert result["ppo_steps"] == 0 and result["supervised_updates"] == 20
     assert result["history"][-1]["validation"]["nll"] < result["history"][0]["validation"]["nll"]
     model = RecurrentPPO.load(result["final_checkpoint"], device="cpu")
@@ -113,5 +113,5 @@ def test_bad_sequence_configuration_fails_before_fitting(dataset, length, batch)
     samples, _, _, _ = load_demonstrations(directory, interface)
     with pytest.raises(ValueError, match="sequence_length"):
         fit_demonstrations(interface, fixture_config("lstm"), samples, {"epochs": 1,
-            "batch_size": batch, "sequence_length": length, "value_coef": .5,
+            "batch_size": batch, "sequence_length": length, "value_coef": .5, "action_change_weight": 1.,
             "initial_policy": {"kind": "fresh"}}, "cpu", 7, directory)

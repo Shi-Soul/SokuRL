@@ -14,6 +14,7 @@ from soku_rl.rl.ppo import create_ppo, parameter_hash
 from soku_rl.rl.sparse_transfer import restore_batch
 from soku_rl.rl.storage import PackedObservation
 from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
+from soku_rl.rl.demonstration_loss import validate_change_weight, weighted_action_loss, weighted_validation_nll
 
 
 class ObservationContractEnv(Env):
@@ -159,6 +160,7 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
             or algorithm["ppo"]["gamma"] != 1. or any(not rows for rows in samples.values())):
         raise ValueError("pretraining requires nonempty numeric samples, shared PPO and gamma=1")
     recurrent = algorithm["policy_type"] == "lstm"
+    validate_change_weight(config["action_change_weight"])
     if recurrent:
         from soku_rl.rl.recurrent_cloning import demonstration_episodes, sequence_epoch
         if ("sequence_length" not in config or type(config["sequence_length"]) is not int
@@ -188,13 +190,17 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
             repeat_baselines[split]["accuracy"] = float(sum(row[3] == 0 for row in rows) / transitions)
     def validation_score():
         if recurrent:
-            return sequence_epoch(model, episodes["validation"], np.arange(len(episodes["validation"])),
-                config["batch_size"], config["sequence_length"], config["value_coef"], False)[0]
-        return score_samples(model, samples["validation"], config["batch_size"])
+            metrics = sequence_epoch(model, episodes["validation"], np.arange(len(episodes["validation"])),
+                config["batch_size"], config["sequence_length"], config["value_coef"], False,
+                config["action_change_weight"])[0]
+        else:
+            metrics = score_samples(model, samples["validation"], config["batch_size"])
+        metrics["weighted_nll"] = weighted_validation_nll(metrics, len(samples["validation"]), config["action_change_weight"])
+        return metrics
 
     validation = validation_score()
     history = [{"epoch": 0, "validation": validation}]
-    best, best_epoch = validation["nll"], 0
+    best, best_epoch = validation["weighted_nll"], 0
     model.save(directory / "initial.zip")
     model.save(directory / "best.zip")
     started = time.perf_counter()
@@ -203,7 +209,7 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
         if recurrent:
             _, train_loss, epoch_updates = sequence_epoch(model, episodes["train"],
                 rng.permutation(len(episodes["train"])), config["batch_size"], config["sequence_length"],
-                config["value_coef"], True)
+                config["value_coef"], True, config["action_change_weight"])
             updates += epoch_updates
         else:
             model.policy.set_training_mode(True)
@@ -213,7 +219,9 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
                 batch = [samples["train"][int(i)] for i in order[first:first + config["batch_size"]]]
                 observations, actions, returns = sample_tensors(model, batch)
                 values, log_probs, _ = model.policy.evaluate_actions(observations, actions)
-                loss = -log_probs.mean() + config["value_coef"] * ((values.flatten() - returns) ** 2).mean()
+                changed = torch.as_tensor([row[3] == 1 for row in batch], device=model.device)
+                loss = weighted_action_loss(-log_probs, changed, torch.ones_like(changed), config["action_change_weight"])
+                loss = loss + config["value_coef"] * ((values.flatten() - returns) ** 2).mean()
                 if not torch.isfinite(loss):
                     raise RuntimeError("non-finite behavior-cloning loss")
                 model.policy.optimizer.zero_grad()
@@ -224,8 +232,8 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
                 total_loss += float(loss.detach()) * len(batch)
             train_loss = total_loss / len(order)
         validation = validation_score()
-        if validation["nll"] < best:
-            best, best_epoch = validation["nll"], epoch
+        if validation["weighted_nll"] < best:
+            best, best_epoch = validation["weighted_nll"], epoch
             model.save(directory / "best.zip")
         row = {"epoch": epoch, "train_loss": train_loss, "validation": validation,
             "updates": updates, "seconds": time.perf_counter() - started}
@@ -240,6 +248,7 @@ def fit_demonstrations(interface, algorithm, samples, config, device, seed, dire
     return {"checkpoint": str(directory / "best.zip"), "final_checkpoint": str(directory / "final.zip"),
         "ppo_steps": model.num_timesteps, "supervised_updates": updates, "best_epoch": best_epoch,
         "initialization": source,
+        "selection": {"metric": "weighted_nll", "action_change_weight": config["action_change_weight"]},
         "initial_policy_hash": initial, "final_policy_hash": final,
         "constant_action_baseline": baseline,
         "copy_previous_action_baseline": repeat_baselines,

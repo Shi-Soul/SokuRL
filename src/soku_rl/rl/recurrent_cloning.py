@@ -5,6 +5,7 @@ from sb3_contrib.common.recurrent.type_aliases import RNNStates
 
 from soku_rl.rl.sparse_transfer import restore_batch
 from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
+from soku_rl.rl.demonstration_loss import validate_change_weight, weighted_action_loss
 
 
 def demonstration_episodes(samples):
@@ -48,7 +49,8 @@ def zero_states(policy, sequences):
     return RNNStates(*(tuple(torch.zeros(shape, device=policy.device) for _ in range(2)) for _ in range(2)))
 
 
-def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_coef, training):
+def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_coef, training, action_change_weight):
+    validate_change_weight(action_change_weight)
     if (type(batch_size) is not int or type(sequence_length) is not int or sequence_length < 1
             or batch_size < sequence_length or batch_size % sequence_length):
         raise ValueError("recurrent batch_size must be a positive multiple of sequence_length")
@@ -77,7 +79,11 @@ def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_co
             nll = -distribution.log_prob(actions)
             squared_error = (values.flatten() - returns) ** 2
             entropy = distribution.entropy()
-            loss = (nll[valid] + value_coef * squared_error[valid]).mean()
+            changed = torch.as_tensor([row[3] == 1 for row in rows], device=model.device)
+            if action_change_weight == 1:
+                loss = (nll[valid] + value_coef * squared_error[valid]).mean()
+            else:
+                loss = weighted_action_loss(nll, changed, valid, action_change_weight) + value_coef * squared_error[valid].mean()
             if not torch.isfinite(loss):
                 raise RuntimeError("non-finite recurrent cloning loss")
             if training:
@@ -97,7 +103,7 @@ def sequence_epoch(model, episodes, order, batch_size, sequence_length, value_co
             totals["accuracy"] += float(correct[valid].sum())
             totals["value_mse"] += float(squared_error[valid].detach().sum())
             totals["entropy"] += float(entropy[valid].detach().sum())
-            changed = torch.as_tensor([row[3] == 1 for row in rows], device=model.device) & valid
+            changed = changed & valid
             changed_count += int(changed.sum())
             changed_correct += float(correct[changed].sum())
             changed_nll += float(nll[changed].detach().sum())
