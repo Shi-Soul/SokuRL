@@ -209,3 +209,23 @@ worker `3dc6fb30af754e9d81bcc67216d715be` 正常清理；证据
 `logs/diagnostics/block-feedback-audit-20261003/start.json`。源码文件哈希、原生
 快照身份、模型接口和课程 sidecar 均已核对。观察器继续等待预定四个检查点，
 目前仅证明真实训练流程成立，尚无训练后纯 God 强度提升证据。
+
+## 全部冻结对照图与可复核数据
+
+已汇总纯 God、三档逐帧独立噪声和三档块噪声，共 **112 个完成局**。
+[PNG 比较图](../logs/diagnostics/block-noise-comparison-20261003/comparison.png) 与
+[PDF](../logs/diagnostics/block-noise-comparison-20261003/comparison.pdf) 分别展示
+全部胜负/超时、双座位胜局、双方平均掉血及连续 32 决策只选择 God 的窗口占比。
+图中没有连接未测量的中间比例，不将固定开发网格当作独立测试。
+
+同目录 `conditions.csv` 保存七组汇总（含双方符卡动作进入均值和实际随机
+帧数），`games.csv` 保存 112 个逐局结果，`summary.json` 保存源文件、回放
+及产物哈希。所有局的模型、角色、私有种子、原 God 配置、旧模块和清理状态
+再次核对；窗口计数与实际 uniform 指令从私有 RNG 及动作回放重算。
+`audit.json` 将 CSV/汇总与既有完整审计交叉核对，未发现差异。
+
+生成与核对脚本为 `.dev/plot-block-noise-comparison-20261003.py` 和
+`.dev/audit-block-noise-comparison-20261003.py`，对应日志均保留。汇总 SHA256
+`9a3d2223e7293b6cee1f8a9abd1526c96956e98cf96547d1719c5b87f897ca5e`。
+PNG 和 PDF 栅格化预览均已目视检查，无观察到的裁切或标签重叠；检查范围
+见 `visual-qa.json`。这些比较支持重新校准课程起点，不证明训练后的策略更强。
