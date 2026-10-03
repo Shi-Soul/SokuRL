@@ -66,3 +66,11 @@ worker `5e4dd2e4c68a432cb3cbedbba64f2c11`、私有服务正常退出，prefix/ga
 `.dev/input-metrics-applied-actions-retry-20261003.json`。
 观察脚本及核对脚本为 `.dev/profile-input-metrics-retry-20261003.py` 和
 `.dev/audit-input-metrics-retry-20261003.py`，对应同名日志均保留。
+
+后续均衡座位最终检查点的完整纯 God 评估也通过独立回放核对：16 局、41818
+个双方联合帧（83636 个角色帧），不是短时限诊断。每局双方命令直方图、局内
+变化次数及总体/对手/座位汇总的全部字段均由原 NPZ 动作流重新计算，相同。
+证据 `logs/diagnostics/balanced-final-input-metrics-audit-20261003/summary.json`。
+该评估为逐帧、零输入延迟，因此回放命令与执行帧一一对应；不能直接将这个
+核对方法用于有跳帧或输入延迟的决策级 NPZ。此处进一步验证日志完整性，
+实际策略为 0 胜 16 负，记录功能通过不代表训练强度通过。
