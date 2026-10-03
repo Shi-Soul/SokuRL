@@ -126,8 +126,16 @@ class PrivilegedReader:
         _, table, chunks, counter, count = self.value(address, "5I")
         if count != 20 or chunks == 0:
             raise RuntimeError("the selected effective deck must contain twenty cards")
-        return tuple(self.value(self.value(table + (((counter + i) >> 3) % chunks) * 4, "I")
-                                + ((counter + i) & 7) * 2, "H") for i in range(20))
+        pointers, cards = {}, []
+        for i in range(20):
+            position = counter + i
+            chunk = (position >> 3) % chunks
+            # One paused frame: reuse only this call's repeated table entries.
+            # Card values and pointers are read again on the next observation.
+            if chunk not in pointers:
+                pointers[chunk] = self.value(table + chunk * 4, "I")
+            cards.append(self.value(pointers[chunk] + (position & 7) * 2, "H"))
+        return tuple(cards)
 
     def fighter(self, address, seat, weather):
         previous = self.previous[seat]

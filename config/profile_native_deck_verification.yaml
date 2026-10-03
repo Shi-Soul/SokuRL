@@ -1,0 +1,12 @@
+defaults:
+  - profile_native_snapshot_verification
+  - _self_
+
+runtime:
+  command:
+    - env
+    - SOKURL_OFFLINE_SNAPSHOT=1
+    - SOKURL_SNAPSHOT_AUDIT=${output}/snapshot-verification
+    - ${runtime.cwd}/scripts/wine-worker.sh
+    - tools/validation/deck_worker.py
+output: logs/diagnostics/br-native-deck-verification-${now:%Y%m%d-%H%M%S}
