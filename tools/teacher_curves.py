@@ -84,7 +84,7 @@ def plot_teacher(labels, output, palette):
         axis.yaxis.set_major_formatter(PercentFormatter(xmax=1))
     axes[2, 1].yaxis.set_major_formatter(PercentFormatter(xmax=1))
     figure.suptitle('Online rule-teacher diagnostics — completed updates only\n'
-        'Changing online states; label fit is not a policy-strength evaluation\n'
+        'Teacher-label fit on sampled states is not a policy-strength evaluation\n'
         'Window frames include repeated samples; overhead includes collection and auxiliary update\n'
         'First overhead point omitted: no prior cumulative baseline in the snapshot', fontsize=11)
     figure.savefig(output / 'teacher.png', dpi=150, bbox_inches='tight')

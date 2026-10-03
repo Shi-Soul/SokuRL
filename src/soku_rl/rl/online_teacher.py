@@ -13,11 +13,12 @@ from sb3_contrib import RecurrentPPO
 from soku_rl.policy.loader import load_policy
 from soku_rl.rl.actor_windows import actor_window_logits
 from soku_rl.rl.storage import PackedObservation
+from soku_rl.rl.teacher_replay import load_teacher_replay, validate_teacher_replay
 
 
 def validate_teacher(config):
     keys = {'teacher', 'updates_per_rollout', 'sequences', 'sequence_length', 'learning_rate', 'seed'}
-    if not isinstance(config, dict) or set(config) != keys:
+    if not isinstance(config, dict) or set(config) not in (keys, keys | {'demonstration_replay'}):
         raise ValueError('online_teacher requires explicit teacher, update/window budgets, learning_rate and seed')
     spec = config['teacher']
     if (not isinstance(spec, dict) or set(spec) != {'kind', 'name', 'rules'}
@@ -32,6 +33,8 @@ def validate_teacher(config):
     rate = config['learning_rate']
     if type(rate) not in (int, float) or not math.isfinite(rate) or rate <= 0:
         raise ValueError('online_teacher learning_rate must be finite and positive')
+    if 'demonstration_replay' in config:
+        validate_teacher_replay(config['demonstration_replay'], config['sequences'])
 
 
 def attach_teacher(model, interface, config, continuing):
@@ -46,6 +49,9 @@ def attach_teacher(model, interface, config, continuing):
     identity = {'schema': 1, 'config': copy.deepcopy(config), 'teacher_fingerprint': teacher.fingerprint,
         'max_episode_steps': interface.episode.max_frames, 'loss': 'sampled_rule_action_cross_entropy',
         'control': 'learner_only', 'optimizer': 'sgd_without_momentum'}
+    if 'demonstration_replay' in config:
+        replay, identities = load_teacher_replay(config['demonstration_replay'], interface, teacher.fingerprint)
+        identity['demonstration_replay_datasets'] = identities
     if continuing:
         if not hasattr(model, 'teacher_state') or model.teacher_state['identity'] != identity:
             raise ValueError('continued online_teacher requires identical settings and teacher identity')
@@ -56,7 +62,13 @@ def attach_teacher(model, interface, config, continuing):
             'collected_frames': 0, 'teacher_episodes': 0, 'behavior_matches': 0,
             'query_seconds': 0., 'collection_seconds': 0., 'current_burn_in_frames': 0, 'episodes': [],
             'label_counts': [0] * int(model.action_space.n)}
+        if 'demonstration_replay' in config:
+            model.teacher_state['demonstration_replay'] = {
+                'rng': np.random.default_rng(config['demonstration_replay']['seed']).bit_generator.state,
+                'updates': 0, 'frames': 0, 'burn_in_frames': 0}
     model._online_teacher = OnlineTeacher(model, teacher, config, interface.episode.max_frames)
+    if 'demonstration_replay' in config:
+        model._online_teacher.replay = replay
 
 
 class OnlineTeacher:
@@ -133,34 +145,50 @@ class OnlineTeacher:
         frames, burn = 0, 0
         gradient_norms = []
         totals = dict(nll_before=0., nll_after=0., accuracy_before=0., accuracy_after=0.)
+        grouped = {name: dict(totals, frames=0, burn_in_frames=0) for name in ('online', 'replay')}
+        replay_sequences = 0
+        if 'demonstration_replay' in config:
+            replay_sequences = config['demonstration_replay']['sequences']
+            replay_rng = np.random.default_rng()
+            replay_rng.bit_generator.state = state['demonstration_replay']['rng']
         for _ in range(config['updates_per_rollout']):
             windows = []
-            for index in rng.integers(len(self.recent), size=config['sequences']):
+            for index in rng.integers(len(self.recent), size=config['sequences'] - replay_sequences):
                 episode, offset = self.recent[int(index)]
                 length = min(config['sequence_length'], len(episode['observations']) - offset)
                 target = torch.tensor(episode['labels'][offset:offset + length], device=model.device)
-                windows.append((episode['observations'], offset, length, target))
+                windows.append((episode['observations'], offset, length, target, 'online'))
+            if replay_sequences:
+                windows.extend(self.replay.sample(replay_rng, replay_sequences, config['sequence_length'], model.device))
             count = sum(row[2] for row in windows)
             self.optimizer.zero_grad(set_to_none=True)
-            for episode, offset, length, target in windows:
+            for episode, offset, length, target, source in windows:
                 logits = actor_window_logits(model, episode, offset, length, True)
                 nll = F.cross_entropy(logits, target, reduction='sum')
                 if not torch.isfinite(nll):
                     raise RuntimeError('non-finite online teacher cross entropy')
                 (nll / count).backward()
-                totals['nll_before'] += float(nll.detach())
-                totals['accuracy_before'] += int((logits.argmax(-1) == target).sum())
+                nll_value, correct = float(nll.detach()), int((logits.argmax(-1) == target).sum())
+                totals['nll_before'] += nll_value
+                totals['accuracy_before'] += correct
+                grouped[source]['nll_before'] += nll_value
+                grouped[source]['accuracy_before'] += correct
+                grouped[source]['frames'] += length
             gradient_norm = torch.nn.utils.clip_grad_norm_(
                 model.policy.parameters(), model.max_grad_norm, error_if_nonfinite=True)
             gradient_norms.append(float(gradient_norm))
             self.optimizer.step()
-            for episode, offset, length, target in windows:
+            for episode, offset, length, target, source in windows:
                 logits = actor_window_logits(model, episode, offset, length, False)
                 nll = F.cross_entropy(logits, target, reduction='sum')
                 if not torch.isfinite(nll):
                     raise RuntimeError('non-finite post-update online teacher cross entropy')
-                totals['nll_after'] += float(nll)
-                totals['accuracy_after'] += int((logits.argmax(-1) == target).sum())
+                nll_value, correct = float(nll), int((logits.argmax(-1) == target).sum())
+                totals['nll_after'] += nll_value
+                totals['accuracy_after'] += correct
+                grouped[source]['nll_after'] += nll_value
+                grouped[source]['accuracy_after'] += correct
+                grouped[source]['burn_in_frames'] += 2 * offset if isinstance(model, RecurrentPPO) else 0
                 burn += 2 * offset if isinstance(model, RecurrentPPO) else 0
             frames += count
             state['updates'] += 1
@@ -179,6 +207,17 @@ class OnlineTeacher:
             'gradient_clip_fraction': sum(norm > model.max_grad_norm for norm in gradient_norms) / len(gradient_norms),
             'gradient_limit': model.max_grad_norm, 'learning_rate': config['learning_rate'],
             'seconds': time.perf_counter() - started}
+        if replay_sequences:
+            replay_state = state['demonstration_replay']
+            replay_state['rng'] = replay_rng.bit_generator.state
+            replay_state['updates'] += config['updates_per_rollout']
+            replay_state['frames'] += grouped['replay']['frames']
+            replay_state['burn_in_frames'] += grouped['replay']['burn_in_frames']
+            for source, values in grouped.items():
+                metrics.update({f'{source}_{key}': value / values['frames'] for key, value in values.items()
+                                if key in totals})
+                metrics[f'{source}_frames'] = values['frames']
+                metrics[f'{source}_burn_in_frames'] = values['burn_in_frames']
         state['last_update'] = metrics
         for key, value in metrics.items():
             model.logger.record(f'teacher/{key}', value)

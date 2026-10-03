@@ -1,0 +1,13 @@
+defaults:
+  - train_address_online_teacher_strong
+  - _self_
+
+rl:
+  online_teacher:
+    demonstration_replay:
+      datasets:
+        - logs/demonstrations/god-marisa-reimu-20261001
+        - logs/demonstrations/god-marisa-reimu-expanded-20261001
+      sequences: 4
+      seed: 849201
+output: logs/training/br-address-teacher-replay-${now:%Y%m%d-%H%M%S}

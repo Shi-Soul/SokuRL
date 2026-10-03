@@ -211,7 +211,7 @@ CPU/CUDA 针对性回归 34 passed（9.65 秒），日志
 `logs/training/br-address-online-teacher-strong-20261003`，日志
 `.dev/train-address-online-teacher-strong-20261003.log`；精确 PID 观察状态为
 `.dev/finish-address-online-teacher-strong-20261003.json`。训练随后完成，完整记录见下节；
-纯神 AI 强度结果仍待评估结束。
+纯神 AI 强度结果见后续完整评估记录。
 
 首个 2048 步检查点核对通过，证据
 `logs/diagnostics/address-online-teacher-strong-audit-20261003/start.json`。原始/有效配置、
@@ -295,8 +295,15 @@ uniform=.5。这些仍是含噪训练对手成绩。
 
 较大步长增强了对部分原 BC 状态变化帧的拟合，也进一步降低原教师轨迹的整体拟合；
 不能根据 NLL 更低或变化帧更准直接判定战力提升。观察器已在空闲 GPU 0 启动完整
-16 局纯神 AI 评估（源码 `f39fcab`），保留同一世界/角色/策略种子。评估仍在运行，
-此时不启动或延长下一项训练。
+16 局纯神 AI 评估（源码 `f39fcab`），保留同一世界/角色/策略种子。
+
+完整评估为 **0 胜、16 负**，两座位各 8 负。平均自身/对手 HP 减少
+10070.25 / 1976.0，双方符卡动作进入 .4375 / .0625，耗时 623.353 秒。模型、配对
+身份、原 God 和退出清理核对通过，证据
+`logs/diagnostics/address-online-teacher-strong-audit-20261003/games.json`，结果 SHA256
+`b8f5b3ab75fed443b481d9eb5be464da2c4c2e8b20ddb800f0020e1e55387f25`。
+训练与评估均已正常退出。相比 .01 教师组，改变辅助步长没有获得胜局，不继续加大
+步长或延长这一配置。下一候选检验[当前状态与原教师训练轨迹联合监督](teacher-replay.md)。
 
 ## 三组完整曲线
 
