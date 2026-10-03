@@ -14,6 +14,7 @@ from soku_rl.env.match import LEGACY_MATCH, MatchConfig
 from soku_rl.env.observation.privileged import encode_privileged
 from soku_rl.env.observation.memory_schema import PRIVILEGED_FEATURES
 from soku_rl.env.combat_metrics import CombatMetrics
+from soku_rl.env.input_metrics import InputMetrics
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,7 @@ class Episode:
         self.frame = 0
         self.number = 0
         self.combat_metrics = CombatMetrics()
+        self.input_metrics = InputMetrics()
         self.controls = DelayedControls(ControlConfig(config.decision_frames, config.latency_frames))
 
     def reset(self, time_step, seed):
@@ -97,6 +99,7 @@ class Episode:
         self.frame = 0
         self.controls.reset()
         self.combat_metrics.reset(time_step.observations[0])
+        self.input_metrics.reset()
         self.ready, self.ended = True, False
         self.observation_history.reset(time_step.frame, time_step.observations)
         return self.observation_history.observations(), self._infos(time_step, "ongoing")
@@ -124,6 +127,7 @@ class Episode:
             raise RuntimeError("backend must advance exactly one frame")
         self.frame = time_step.frame
         self.combat_metrics.step(time_step.observations[0])
+        self.input_metrics.step(self.controls.held)
         self.observation_history.append(time_step.frame, time_step.observations)
         terminated = time_step.terminated
         truncated = not terminated and (time_step.truncated or self.frame >= self.config.max_frames)
@@ -138,7 +142,8 @@ class Episode:
                         "outcome": outcome,
                         "decision_frames": self.config.decision_frames,
                         "latency_frames": self.config.latency_frames,
-                        "combat_metrics": self.combat_metrics.snapshot(seat)}
+                        "combat_metrics": self.combat_metrics.snapshot(seat),
+                        **({"input_metrics": self.input_metrics.snapshot(seat)} if self.ended else {})}
                 for seat, agent in enumerate(AGENTS)}
 
 

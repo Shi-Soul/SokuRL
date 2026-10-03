@@ -1,0 +1,13 @@
+defaults:
+  - profile_br_seats
+  - _self_
+
+# Fresh-policy telemetry check; four short games are not a strength benchmark.
+num_envs: 2
+rl:
+  ppo:
+    batch_size: 128
+algorithm:
+  timesteps: 1024
+  checkpoint_every: 512
+output: logs/diagnostics/br-input-metrics-${now:%Y%m%d-%H%M%S}

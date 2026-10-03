@@ -77,6 +77,9 @@ def run_plan(env, strategies, plan, config, directory, reset_batch):
                 if "combat_metrics" in info:
                     records[-1]["combat_metrics_by_seat"] = [
                         infos[slot][agent]["combat_metrics"] for agent in AGENTS]
+                if "input_metrics" in info:
+                    records[-1]["input_metrics_by_seat"] = [
+                        infos[slot][agent]["input_metrics"] for agent in AGENTS]
                 del obs[slot]
                 progress = {"games": records, "seconds": time.perf_counter() - started,
                             "summary": summarize(plan, records, config["alpha"])}

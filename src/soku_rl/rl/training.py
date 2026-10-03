@@ -50,6 +50,8 @@ class EpisodeRecords(BaseCallback):
                 self.records[-1]["end_steps"] = self.num_timesteps
                 if "combat_metrics" in info:
                     self.records[-1]["combat_metrics"] = info["combat_metrics"]
+                if "input_metrics" in info:
+                    self.records[-1]["input_metrics"] = info["input_metrics"]
                 if "curriculum_event" in info:
                     self.records[-1]["curriculum_event"] = info["curriculum_event"]
         return True
@@ -64,7 +66,7 @@ class EpisodeRecords(BaseCallback):
         # Off-policy learners may collect several rollouts between logger dumps.
         # Missing means in this rollout must not inherit a previous rollout's data.
         for key in tuple(self.logger.name_to_value):
-            if key.startswith("combat/"):
+            if key.startswith(("combat/", "inputs/")):
                 self.logger.record(key, None)
         self.logger.record("combat/episodes", rollout_metrics["episodes"])
         self.logger.record("combat/measured_episodes", rollout_metrics["combat"]["measured_episodes"])
@@ -76,10 +78,14 @@ class EpisodeRecords(BaseCallback):
                 self.logger.record(f"combat/{key}", value)
         for key, value in self.curriculum.scalar_metrics().items():
             self.logger.record(key, value)
+        self.logger.record("inputs/measured_episodes", rollout_metrics["inputs"]["measured_episodes"])
+        for key, value in rollout_metrics["inputs"].get("pooled", {}).items():
+            self.logger.record(f"inputs/{key}", value)
         (self.directory / "progress.json").write_text(json.dumps({
             "steps": self.num_timesteps, "episodes": self.records,
             "episode_summary": metrics, "rollout_episode_summary": rollout_metrics,
             "curriculum": self.curriculum.snapshot(),
+            "input_summary": metrics["overall"]["inputs"],
             "combat_summary": summarize_combat([record["combat_metrics"] for record in self.records
                 if "combat_metrics" in record])}, indent=2), encoding="utf-8")
         self._write_timings("updating")

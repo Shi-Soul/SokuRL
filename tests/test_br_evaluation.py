@@ -162,11 +162,17 @@ def test_benchmark_counts_seats_and_censoring_without_confusing_timeouts(tmp_pat
 
 
 def test_combat_summary_follows_learner_when_swapping_seats(tmp_path):
+    from soku_rl.env.input_metrics import InputMetrics
+    from soku_rl.env.encoding import decode_action
+
     class CombatGame(EvaluationGame):
         def step(self, actions):
             result = super().step(actions)
+            inputs = InputMetrics()
+            inputs.step((decode_action(480), decode_action(256)))
             for pair in result[-1].values():
                 for seat in (0, 1):
+                    pair[f"player_{seat}"]["input_metrics"] = inputs.snapshot(seat)
                     pair[f"player_{seat}"]["combat_metrics"] = {
                         "available": True, "own_hp_loss": 100 + seat * 600,
                         "opponent_hp_loss": 700 - seat * 600, "own_hp_loss_frames": 1,
@@ -179,7 +185,9 @@ def test_combat_summary_follows_learner_when_swapping_seats(tmp_path):
     report = benchmark_br(CombatGame("p1_win"), strategies, "learned", learner,
                           setups, config, "game", tmp_path)
     assert report["combat_summary"]["means"]["own_hp_loss"] == 400
+    assert report["input_summary"]["pooled"]["own_spell_key_rate"] == .5
     for row in report["by_opponent_and_seat"]:
         seat = row["learner_seat"]
         assert row["combat_summary"]["means"]["own_hp_loss"] == 100 + seat * 600
         assert row["combat_summary"]["action_means"]["own_spell_action_entries"] == seat
+        assert row["input_summary"]["pooled"]["own_spell_key_rate"] == 1 - seat

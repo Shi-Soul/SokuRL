@@ -2,6 +2,8 @@
 
 BR 的 uniform / 神 AI 混合现支持按长期胜率连续反馈调整，配置、日志与恢复约定见
 [自适应课程](adaptive-curriculum.md)。
+双方[实际逻辑输入统计](input-metrics.md)与伤害、符卡动作分开记录，用于发现
+训练中的命令集中和频繁切换；按键比例不能替代实际攻击或胜率。
 其[采样预算实验](curriculum-sampling-budget.md)通过同一检查点生命周期保留 Adam
 及长期 EMA，按预先固定的累计采样点检验更长训练；尚无通用 BR 达标结论。
 共享 PPO 还可启用[当前轨迹上的冻结策略约束](online-policy-anchor.md)，

@@ -1,5 +1,6 @@
 """Learner-relative episode summaries without mixing seats or missing measurements."""
 from soku_rl.env.combat_metrics import summarize_combat
+from soku_rl.env.input_metrics import summarize_inputs
 
 
 def summarize_episodes(records):
@@ -14,6 +15,8 @@ def summarize_episodes(records):
         counts[outcome] += 1
     result = {"episodes": len(records), "counts": counts,
         "combat": summarize_combat([record.get("combat_metrics", {"available": False})
+                                    for record in records]),
+        "inputs": summarize_inputs([record.get("input_metrics", {"available": False})
                                     for record in records])}
     if records:
         result.update(win_rate=counts["win"] / len(records),

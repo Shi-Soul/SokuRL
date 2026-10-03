@@ -6,6 +6,7 @@ import json
 
 from soku_rl.env.match import MatchConfig, PlayerSetup
 from soku_rl.env.combat_metrics import summarize_combat
+from soku_rl.env.input_metrics import summarize_inputs
 from soku_rl.evaluation.benchmark import run_plan
 from soku_rl.evaluation.tournament import Trial, make_plan
 from soku_rl.pomg import Outcome
@@ -61,12 +62,16 @@ def benchmark_br(env, strategies, candidate, learner, setups, config, game_ident
     report = run_plan(env, strategies, plan, config, directory, reset_matchup_trials)
     groups = {}
     combat_groups = {}
+    input_groups = {}
     for game in report["games"]:
         key = (game["opponent"], game["learner_seat"])
         counts = groups.setdefault(key, Counter(win=0, loss=0, double_ko=0, time_limit=0))
         combat = (game["combat_metrics_by_seat"][game["learner_seat"]]
                   if "combat_metrics_by_seat" in game else {"available": False})
         combat_groups.setdefault(key, []).append(combat)
+        inputs = (game["input_metrics_by_seat"][game["learner_seat"]]
+                  if "input_metrics_by_seat" in game else {"available": False})
+        input_groups.setdefault(key, []).append(inputs)
         outcome = game["outcome"]
         if outcome in (Outcome.DRAW.value, Outcome.TRUNCATED.value):
             counts[outcome] += 1
@@ -77,7 +82,9 @@ def benchmark_br(env, strategies, candidate, learner, setups, config, game_ident
     report["by_opponent_and_seat"] = [{"opponent": name, "learner_seat": seat,
         "opponent_character": setups[name]["character"], "counts": dict(counts),
         "games": sum(counts.values()), "win_rate": counts["win"] / sum(counts.values()),
-        "combat_summary": summarize_combat(combat_groups[name, seat])}
+        "combat_summary": summarize_combat(combat_groups[name, seat]),
+        "input_summary": summarize_inputs(input_groups[name, seat])}
         for (name, seat), counts in sorted(groups.items())]
     report["combat_summary"] = summarize_combat([record for records in combat_groups.values() for record in records])
+    report["input_summary"] = summarize_inputs([record for records in input_groups.values() for record in records])
     return report

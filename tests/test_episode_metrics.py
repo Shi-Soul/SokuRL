@@ -80,9 +80,15 @@ def test_empty_rollout_clears_stale_combat_scalars_before_delayed_dump(tmp_path)
     callback.num_timesteps = 8
     callback.rollout_started = time.perf_counter()
     callback.records = [episode(0, "p1_win", "rush", 0, 100)]
+    from soku_rl.env.input_metrics import InputMetrics
+    from soku_rl.env.encoding import decode_action
+    inputs = InputMetrics()
+    inputs.step((decode_action(480), decode_action(256)))
+    callback.records[0]["input_metrics"] = inputs.snapshot(0)
     callback._on_rollout_end()
     assert logger.name_to_value["combat/own_hp_loss"] == 100
     assert logger.name_to_value["combat/win_rate"] == 1
+    assert logger.name_to_value["inputs/own_spell_key_rate"] == 1
     logger.record("train/loss", .123)
     callback.rollout_record_start = 1
     callback.rollout_started = time.perf_counter()
@@ -91,7 +97,10 @@ def test_empty_rollout_clears_stale_combat_scalars_before_delayed_dump(tmp_path)
     assert logger.name_to_value["combat/own_hp_loss"] is None
     assert logger.name_to_value["combat/win_rate"] is None
     assert logger.name_to_value["train/loss"] == .123
+    assert logger.name_to_value["inputs/measured_episodes"] == 0
+    assert logger.name_to_value["inputs/own_spell_key_rate"] is None
     logger.dump(16)
     logger.close()
     row = list(csv.DictReader((tmp_path / "scalars/progress.csv").open()))[0]
     assert row["combat/episodes"] == "0" and row["combat/own_hp_loss"] == ""
+    assert row["inputs/own_spell_key_rate"] == ""
