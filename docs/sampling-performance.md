@@ -99,3 +99,26 @@ Python 调用，不直接测量 Wine 子进程内部或 CUDA kernel。CPU 等待
 累计/自身时间排序文本和审核；原始 pstats SHA256 为
 `5ba51f553b8c8d76920bfd75ac51ba569b16688a2adf049efd607cdc274721ae`。
 脚本/日志 `.dev/audit-sampling-profile-address8-20261002.*`。
+
+## 补充工作进程内部剖析
+
+无损循环缓冲区的[实机结果](recurrent-storage.md)已经降低存储与取批开销，但
+4096 步诊断中，512 次 worker step 仍累计 16.163 秒。这个值包含等待、通信与
+完整观测读取，仅凭主进程 profile 不能判断瓶颈位于游戏模拟还是 Python 读取。
+
+`profile_worker_sampling` 继承原 `profile_recurrent_storage` 的 4096 步配置，仅
+以 Windows Python 的标准 `cProfile` 包裹原 worker 入口，将 `worker.pstats`
+保存在本次输出目录。父进程同时剖析，游戏、完整观测、原神 AI、逐帧 576 动作及
+PPO 保持原配置。它是独立短诊断，不更改正在运行的慢反馈续训或其预算。
+
+```bash
+bash scripts/linux.sh -m cProfile -o ../.dev/br-worker-parent-profile-20261003.pstats \
+  tools/train.py --config-name profile_worker_sampling linux.cuda_devices=3 \
+  output=logs/diagnostics/br-worker-sampling-profile-20261003
+```
+
+运行后须核对原稀疏诊断的初始模型及 2048/4096 步参数、Adam 和完整配置差异。
+分别报告 worker 接收请求时的等待、实际 step、观测读取、内存页读取和回复序列化；
+父子进程并发时间不能相加，嵌套函数累计时间也不能相加。该诊断带剖析开销且共享
+节点有其他任务，不直接给出端到端加速结论。不得因为某函数看起来慢就修改神 AI
+行为、删观测字段或减少原游戏的模拟帧数。

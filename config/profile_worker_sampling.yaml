@@ -1,0 +1,13 @@
+defaults:
+  - profile_recurrent_storage
+  - _self_
+
+runtime:
+  command:
+    - ${runtime.cwd}/scripts/wine-worker.sh
+    - -m
+    - cProfile
+    - -o
+    - ${output}/worker.pstats
+    - tools/rollout_worker.py
+output: logs/diagnostics/br-worker-sampling-profile-${now:%Y%m%d-%H%M%S}
