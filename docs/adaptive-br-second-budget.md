@@ -135,3 +135,24 @@ controller_episodes_at_start 以及最终课程状态，均与记录一致。反
 证据 `logs/diagnostics/main-zero-noise-20261003/{progress,summary}.json`，进度
 快照 SHA256 `a6157d5845c3a6673bdaf86e481fd0f12ee6fd949fcc5727d5a1579dd2e34438`；
 核对脚本和日志在 `.dev/audit-main-zero-noise-20261003.{py,log}`。
+
+## 累计 1,572,864 步：第二个新增预算检查点
+
+完整检查点已核对，PPO epoch 计数 2284、Adam 更新 8901。此次续训累计
+104 个完成局为 37 胜、61 负、6 超时；1P 为 16 胜、24 负、1 超时（41 局），
+2P 为 21 胜、37 负、5 超时（63 局）。相对上个检查点新增 50 局为
+**0 胜、45 负、5 超时**；这些局包含不同开局噪声，不能全部称为纯 God 局。
+累计平均自身/对手掉血 8258.6058 / 6072.0385，双方符卡动作进入均值
+.711538 / .201923。
+
+课程累计 320 局、EMA=.334498423，新局 uniform=.031443757；逐局重算与
+sidecar 一致。反馈已从零回调，但到此检查点尚未恢复训练胜局；它不能证明
+课程失效或之后必然恢复，后续仍按原固定预算完成测评。
+
+检查点 SHA256 `4d676cc794beba94bb7419b238cc433fd5424f8902f2f96243e8d56c84727fb0`，
+参数哈希 `b84ad915333d0232f8b9cfa48ebcbc03d2b9736d37105db1d772166d450f73b4`。
+恢复的初始策略/Adam/计数、配置、原生快照、源码 `ba9b8cf` 和课程均核对。
+核对快照已到 1,593,344 步，上述完成局严格截至检查点步数；证据
+`logs/diagnostics/slow-feedback-second-budget-audit-20261003/half.json`。
+旧模块原网格的完整 16 局纯神 AI 测评已在 GPU 0、源码 `884a0e7` 启动，
+输出 `logs/benchmark/br-address-slow-feedback-second-budget-half-20261003`；结果待核对。

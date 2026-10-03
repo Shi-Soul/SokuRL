@@ -49,3 +49,23 @@ reset、循环状态、采样/评分/BC 缓存概率及梯度一致性；另用�
 不会把监督准确率提升当成赢率提升。`train_address_facing` 已准备好从对应
 best 权重接入原共享 PPO 和长期 EMA 自适应课程，尚未启动该 PPO 训练。
 该实验仍固定魔理沙对灵梦；跨角色 BR 强度尚未证明。
+
+预检及实际 CUDA 初始化随后核对通过。38 个初始参数张量逐位等于原 BC 的
+initial checkpoint，参数量同为 3,761,489，初始参数哈希
+`bc1fa4555303e85229122663019bcb719e1b5a9125da0af241cf4e02dda9a790`。
+Adam 为空、PPO 计数为零，实际完整观察为 590,890 维、576 动作；最新自身
+方向字段的两部分编码从索引 22 开始。相同参数不代表初始动作分布在朝左时
+与绝对动作头相同，该排列本身正是被检验的改动。
+
+训练在干净提交 `884a0e7`、GPU 6 启动，启动器 PID 3192401，输出
+`logs/pretraining/god-marisa-reimu-facing-20261003`；实际 initial.zip SHA256
+`e63bea22e6988fc52d816a3f8d90302783cec8b4011b743bfbb17b1f3f2c2e34`。
+源码逐文件身份核对通过，尚无拟合完成或实战强度结果。调度器
+`.dev/finish-facing-bc-20261003.{py,json,log}` 固定执行 20 epoch、完整预训练
+核对及 GPU 7 的 16 局测评，随后核对双方战斗和逐帧输入统计。
+
+证据为 `logs/diagnostics/facing-bc-preflight-20261003/{summary,actual-start}.json`。
+除线程对齐前的失败日志外，预检报告写入时的 numpy 整数序列化错误也保留
+在 `.dev/check-facing-bc-before-serialization-fix-20261003.log`；修复输出类型后
+重做预检通过，未因此启动或重启训练。追加历史定位后的当前 8 项动作头
+测试再次全部通过（10.54 秒），记录 `.dev/pytest-facing-policy-current-history-20261003.log`。
