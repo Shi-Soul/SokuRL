@@ -1,0 +1,9 @@
+defaults:
+  - train_critic_calibration_control
+  - _self_
+
+# Isolate the entropy bonus; keep stochastic action sampling and the EMA curriculum.
+rl:
+  ppo:
+    ent_coef: 0.0
+output: logs/diagnostics/br-address-entropy-zero-${now:%Y%m%d-%H%M%S}
