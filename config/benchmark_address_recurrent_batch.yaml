@@ -1,0 +1,15 @@
+defaults:
+  - benchmark_br
+  - _self_
+
+training_directory: logs/pretraining/god-marisa-reimu-address-invariant-20261002
+checkpoint: best.zip
+require_complete: true
+num_envs: 8
+rl:
+  cpu_threads: 1
+benchmark:
+  recurrent_batch: true
+  world_seeds: [918042743, 1897077702, 244381756, 3884668474, 1067982671, 3435502516, 2494848888, 749036788]
+  policy_seed: 728341
+output: logs/diagnostics/recurrent-batch-games-${now:%Y%m%d-%H%M%S}

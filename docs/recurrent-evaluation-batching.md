@@ -57,3 +57,10 @@ CPU/CUDA 测试覆盖数组/字典观察、两个模型、两层 LSTM、局部�
 严格概率比较测试关闭 TF32，该设置只作用于测试。全量回归为 **1478 passed、
 12 skipped、1 deselected、2 subtests passed**（158.47 秒），日志
 `.dev/pytest-recurrent-batch-full-20261003.log`。完整游戏验证尚待执行，默认开关保持关闭。
+
+完整游戏诊断配置为 `benchmark_address_recurrent_batch`：原 BC best、原 God、
+旧运行模块、8 个共同世界种子 × 双座位、8 个实例。串行对照仅覆盖
+`benchmark.recurrent_batch=false`。两组依次在同一 GPU 运行，显式保留 ambient
+PyTorch 数值设置并记录到 `numerics.json`，不额外开启严格精度。比较全部动作
+回放、配对局结果、双方掉血/符卡及总耗时；若轨迹长度不同，耗时比不解释为
+固定工作量的加速比。这是开发诊断，不是新的训练候选或独立强度测试。
