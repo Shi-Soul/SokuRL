@@ -4,6 +4,12 @@ from sb3_contrib.common.recurrent.policies import RecurrentActorCriticPolicy
 import torch
 
 
+def left_facing(observations, index):
+    facing = observations[:, index] * 4294967296. + observations[:, index + 1] * 65536.
+    # Zero-filled recurrent padding uses identity; its loss is masked by SB3.
+    return facing < 0
+
+
 class FacingRecurrentActorCriticPolicy(RecurrentActorCriticPolicy):
     def __init__(self, *args, facing_index, **kwargs):
         if type(facing_index) is not int or facing_index < 0:
@@ -22,10 +28,7 @@ class FacingRecurrentActorCriticPolicy(RecurrentActorCriticPolicy):
         self.register_buffer("mirrored_commands", mirror, persistent=False)
 
     def _left_facing(self, observations):
-        index = self.facing_index
-        facing = observations[:, index] * 4294967296. + observations[:, index + 1] * 65536.
-        # Zero-filled recurrent padding uses identity; its loss is masked by SB3.
-        return facing < 0
+        return left_facing(observations, self.facing_index)
 
     def _remap_actions(self, observations, actions):
         mirror = self.mirrored_commands[actions.long()]

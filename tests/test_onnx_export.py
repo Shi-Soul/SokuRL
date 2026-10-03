@@ -122,3 +122,44 @@ def test_portable_population_keeps_episode_selection_and_checks_members(tmp_path
     child.write_text(child.read_text() + " ")
     with pytest.raises(ValueError, match="member checksum"):
         load_policy("mixed", {"kind": "onnx", "path": str(directory / "policy.json")}, interface, "cpu")
+
+
+def test_facing_actor_export_keeps_absolute_commands_when_facing_changes(tmp_path):
+    from test_facing_policy import configuration
+    from soku_rl.env.observation.memory_schema import FIGHTER_NAMES, WORLD_NAMES
+    import onnxruntime as ort
+
+    torch.set_num_threads(1)
+    interface, config = configuration()
+    model, _ = create_learner(ObservationContractEnv(interface), interface, config, {"kind": "fresh"}, "cpu", 5)
+    with torch.no_grad():
+        model.policy.action_net.weight.zero_()
+        model.policy.action_net.bias.fill_(-5.)
+        model.policy.action_net.bias[448] = 5.
+    path = tmp_path / "best.zip"
+    model.save(path)
+    contract = tmp_path / "training.yaml"
+    OmegaConf.save(OmegaConf.create({"episode": asdict(interface.episode),
+        "wrappers": asdict(interface.config), "algorithm": config}), contract)
+    output = tmp_path / "portable"
+    manifest = export_actor({"candidate": {"name": "facing", "policy": {
+        "kind": "sb3_recurrent", "path": str(path), "training_config": str(contract)}},
+        "verification_steps": 512, "seed": 13, "output": str(output)})
+    assert manifest["verification"]["maximum_absolute_error"] < 2e-6
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = options.inter_op_num_threads = 1
+    session = ort.InferenceSession(str(output / "actor.onnx"), sess_options=options,
+                                  providers=["CPUExecutionProvider"])
+    states = [np.zeros(manifest["state_shape"], np.float32) for _ in range(2)]
+    rng = np.random.default_rng(7)
+    signs = set()
+    position = 2 * (len(WORLD_NAMES) + FIGHTER_NAMES.index("dir"))
+    for step in range(8):
+        observation = verification_observation(interface, rng, step)
+        facing = observation[position] * 4294967296. + observation[position + 1] * 65536.
+        signs.add(facing)
+        probabilities, *states = session.run(None, {
+            "observation": observation[None], "hidden": states[0], "cell": states[1]})
+        assert int(probabilities.argmax(-1)[0]) == (448 if facing > 0 else 64)
+        assert (probabilities > 0).all()
+    assert signs == {-1., 1.}

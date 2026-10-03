@@ -16,6 +16,7 @@ from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface
 from soku_rl.policy.loader import load_policy
 from soku_rl.policy.population import MixturePolicy, PPOPolicy, UniformPolicy
 from soku_rl.policy.verification_inputs import verification_observation
+from soku_rl.rl.facing_policy import FacingRecurrentActorCriticPolicy, left_facing
 
 EXPORT_VERSION = 1
 
@@ -41,6 +42,11 @@ class CategoricalActor(nn.Module):
         self.policy_net = policy.mlp_extractor
         self.action_net = policy.action_net
         self.recurrent = recurrent
+        self.facing_actions = isinstance(policy, FacingRecurrentActorCriticPolicy)
+        if self.facing_actions:
+            self.facing_index = policy.facing_index
+            self.register_buffer("action_indices", policy.facing_commands.clone())
+            self.register_buffer("mirrored_indices", policy.mirrored_commands.clone())
         if recurrent:
             self.memory = policy.lstm_actor
 
@@ -50,6 +56,10 @@ class CategoricalActor(nn.Module):
             features, states = self.memory(features.unsqueeze(0), states)
             features = features.squeeze(0)
         probabilities = self.action_net(self.policy_net.forward_actor(features)).softmax(-1)
+        if self.facing_actions:
+            permutation = torch.where(left_facing(observation, self.facing_index)[:, None],
+                                      self.mirrored_indices, self.action_indices)
+            probabilities = probabilities.gather(1, permutation)
         return (probabilities, *states) if self.recurrent else probabilities
 
 

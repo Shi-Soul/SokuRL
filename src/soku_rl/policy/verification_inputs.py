@@ -23,7 +23,8 @@ def verification_observation(interface, rng, step):
             start = len(WORLD_NAMES) + seat * PLAYER_WIDTH
             raw[start:start + FIGHTER_WIDTH] = rng.integers(0, 32, size=FIGHTER_WIDTH)
             for name, value in {"obj_n": count, "hp": 10000 - step % 10000, "rei": 5000,
-                    "rmax": 5000, "x": 300 + 400 * seat, "dir": 1 - 2 * seat,
+                    "rmax": 5000, "x": 300 + 400 * seat,
+                    "dir": (1 - 2 * seat) * (1 - 2 * ((step + history) % 2)),
                     "address": 0xFFFFFFFF - step}.items():
                 raw[start + FIGHTER_NAMES.index(name)] = value
             objects = raw[start + FIGHTER_WIDTH:start + FIGHTER_WIDTH + count * OBJECT_WIDTH]

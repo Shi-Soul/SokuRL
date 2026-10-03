@@ -65,3 +65,22 @@ uniform=.5；该 EMA 同样不是纯神 AI 胜率。
 恰为 65,536 步，SHA256
 `8aa77956fac3bc98ed0b5457dceed6a486ddf198fe919a157c16f3b4edbfc9cf`。
 剩余三轮按原定预算执行，最终完整测评仍未发生。
+
+## 四轮预算完成，最终测评中
+
+训练已正常完成 262,144 样本、四次 rollout。PPO epoch 计数为 5、实际 Adam
+为 361 次，各轮受 KL 提前停止影响；不能把四轮当成完整执行了 12 epoch。
+45 个完成训练局为 27 胜、14 负、4 超时；1P 为 15 胜、6 负、2 超时，2P 为
+12 胜、8 负、2 超时，各 slot 完成 5–6 局。平均自身/对手掉血
+7541.0667 / 8713.2444，双方符卡动作进入均值 .2 / .377778。
+
+最终 EMA=.593261188、uniform=.468770648；原 BC 初始化、空初始 Adam、
+完整配置、逐局课程重算、实际双座位和战斗统计均核对。总耗时 2183.9801 秒，
+其中采样 2021.6206 秒、更新 48.1122 秒。worker
+`98fb6f5edfca437c924742aac498f60e` 正常退出并清理。
+
+最终模型 SHA256 `5eade44dbedde4af57c748c4a9896c3fbc3b71472ac1c0b5b53a6ae8dfbda68b`，
+参数哈希 `635966184befd7f0f875eb32ce3eb338afbd0a425ec089815b6419d2a383d2e9`。
+证据 `logs/diagnostics/wide-credit-audit-20261003/final.json`。固定 16 局旧模块
+纯神 AI 测评已在 GPU 4 启动，输出
+`logs/benchmark/br-address-wide-credit-final-20261003`；尚无完整强度结论。
