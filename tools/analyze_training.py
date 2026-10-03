@@ -14,6 +14,7 @@ import numpy as np
 from omegaconf import OmegaConf
 
 from soku_rl.rl.episode_metrics import grouped_episode_metrics
+from teacher_curves import plot_teacher
 
 
 def align_update_metrics(rows, rollouts, learner, allow_unaligned):
@@ -308,6 +309,7 @@ def main(cfg):
     plt.close(figure)
     plot_combat(list(cfg.runs), output, cfg.combat_window, palette, styles)
     plot_curriculum(list(cfg.runs), output)
+    plot_teacher(list(cfg.runs), output, palette)
     (output / "summary.json").write_text(json.dumps(summaries, indent=2))
     print(json.dumps(summaries, indent=2))
 
