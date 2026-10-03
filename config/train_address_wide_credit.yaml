@@ -1,0 +1,12 @@
+defaults:
+  - train_address_long_credit_budget
+  - _self_
+
+# Four rollouts test the longer return window before allocating a larger budget.
+algorithm:
+  timesteps: 262144
+  checkpoint_every: 65536
+rl:
+  ppo:
+    n_steps: 8192
+output: logs/training/br-address-wide-credit-${now:%Y%m%d-%H%M%S}
