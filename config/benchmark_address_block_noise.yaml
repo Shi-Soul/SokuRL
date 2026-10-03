@@ -1,0 +1,24 @@
+defaults:
+  - benchmark_address_noise_boundary
+  - _self_
+
+# Same frozen parent, original God and marginal noise as the independent gate.
+algorithm:
+  opponents:
+    - name: god:0:character
+      probability: 1.0
+      setup: {character: 0, palette: 0, deck: 0}
+      policy:
+        kind: block_action_noise
+        random_probability: 0.125
+        block_decisions: 16
+        policy:
+          kind: rule
+          name: god
+          rules:
+            roster: [god]
+            god:
+              package: ${rules.god.package}
+              api_source: ${rules.god.api_source}
+              script: character
+output: logs/diagnostics/frozen-address-block-noise-${now:%Y%m%d-%H%M%S}

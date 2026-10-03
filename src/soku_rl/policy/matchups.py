@@ -9,7 +9,7 @@ from soku_rl.env.wrappers.learning import LearningInterface
 def opponent_interface(interface, learner, entry):
     match = MatchConfig(PlayerSetup(**learner), PlayerSetup(**entry["setup"]))
     spec = entry["policy"]
-    while spec["kind"] == "action_noise":
+    while spec["kind"] in {"action_noise", "block_action_noise"}:
         spec = spec["policy"]
     if spec["kind"] == "rule" and spec["name"] == "god":
         script = spec["rules"]["god"]["script"]

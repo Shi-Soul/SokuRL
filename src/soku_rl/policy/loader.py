@@ -31,6 +31,12 @@ def load_policy(name, spec, interface, device):
             raise ValueError("action_noise requires policy and random_probability")
         return ActionNoisePolicy(name, load_policy(name, spec["policy"], interface, device),
             int(interface.action_space.n), spec["random_probability"])
+    if kind == "block_action_noise":
+        from soku_rl.policy.block_noise import BlockActionNoisePolicy
+        if set(spec) != {"kind", "policy", "random_probability", "block_decisions"}:
+            raise ValueError("block_action_noise requires policy, random_probability and block_decisions")
+        return BlockActionNoisePolicy(name, load_policy(name, spec["policy"], interface, device),
+            int(interface.action_space.n), spec["random_probability"], spec["block_decisions"])
     if kind == "rule":
         from soku_rl.policy.rules.observed_rules import RulePolicy, LearningRulePolicy
         from soku_rl.policy.rules.strategies import rule_implementation

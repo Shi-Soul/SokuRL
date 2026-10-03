@@ -1,0 +1,8 @@
+# @package algorithm.curriculum
+defaults:
+  - adaptive_noise
+  - _self_
+
+kind: adaptive_block_action_noise
+# This holds only the source-selection gate, never an action or game frame.
+block_decisions: 16

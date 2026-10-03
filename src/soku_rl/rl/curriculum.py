@@ -204,6 +204,9 @@ class AdaptiveEpisodeMixture(AdaptiveActionNoise):
 def create_curriculum(config, opponents, probabilities, num_actions):
     if config == {"kind": "fixed"}:
         return FixedOpponentSchedule()
+    if config.get("kind") == "adaptive_block_action_noise":
+        from soku_rl.rl.block_curriculum import AdaptiveBlockActionNoise
+        return AdaptiveBlockActionNoise(config, opponents, probabilities, num_actions)
     if "kind" in config and config["kind"] == AdaptiveEpisodeMixture.kind:
         return AdaptiveEpisodeMixture(config, opponents, probabilities, num_actions)
     return AdaptiveActionNoise(config, opponents, probabilities, num_actions)

@@ -190,7 +190,7 @@ def test_active_episode_keeps_its_probability_when_another_episode_finishes(monk
 @pytest.mark.parametrize("learner,checkpoint", [
     ("ppo", "final.zip"), ("ppo", "checkpoints/updated_8_steps.zip"), ("ppo", "checkpoints/ppo_8_steps.zip"),
     ("dqn", "final.zip"), ("dqn", "checkpoints/updated_8_steps.zip")])
-@pytest.mark.parametrize("kind", ["adaptive_action_noise", "adaptive_episode_mixture"])
+@pytest.mark.parametrize("kind", ["adaptive_action_noise", "adaptive_episode_mixture", "adaptive_block_action_noise"])
 def test_actual_training_records_and_resumes_curriculum(tmp_path, learner, checkpoint, kind):
     from test_dqn import dqn_config, contract as dqn_contract
     torch.set_num_threads(1)
@@ -200,6 +200,8 @@ def test_actual_training_records_and_resumes_curriculum(tmp_path, learner, check
         "initial_policy": {"kind": "fresh"}, "curriculum": settings() | {
             "kind": kind, "warmup_episodes": 1, "update_every": 1},
         "opponents": [{"name": "random", "probability": 1., "policy": {"kind": "uniform"}}]}
+    if kind == "adaptive_block_action_noise":
+        config["curriculum"]["block_decisions"] = 16
     if learner == "dqn":
         config.update({key: dqn_config()[key] for key in ("learner", "dqn")})
     first, second, third = [tmp_path / name for name in ("first", "second", "weights")]
