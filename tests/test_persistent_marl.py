@@ -11,6 +11,8 @@ from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.wrappers.learning import LearningConfig, LearningVectorEnv
 from soku_rl.rl.persistent_policy import PersistentActorCriticPolicy
 from soku_rl.rl.recurrent_persistent_policy import PersistentRecurrentActorCriticPolicy
+from soku_rl.rl.facing_policy import FacingRecurrentActorCriticPolicy
+from soku_rl.rl.canonical_features import CanonicalCombatFeatures
 from test_env_timing import RecordingBackend, VISIBILITY
 from test_privileged_encoding import observation
 from test_shared_ppo import fixture_config
@@ -25,9 +27,10 @@ class PrivilegedBackend(RecordingBackend):
         return replace(state, observations=(own, opponent))
 
 
-@pytest.mark.parametrize("method,policy_type", [("ippo", "mlp"), ("nfsp", "mlp"),
-                                              ("psro", "mlp"), ("ippo", "lstm"), ("psro", "lstm")])
-def test_persistent_policy_survives_marl_training_and_artifact_reload(tmp_path, method, policy_type):
+@pytest.mark.parametrize("method,policy_type,head", [("ippo", "mlp", "persistent"), ("nfsp", "mlp", "persistent"),
+    ("psro", "mlp", "persistent"), ("ippo", "lstm", "persistent"), ("psro", "lstm", "persistent"),
+    ("ippo", "lstm", "canonical"), ("psro", "lstm", "canonical")])
+def test_custom_policy_survives_marl_training_and_artifact_reload(tmp_path, method, policy_type, head):
     torch.set_num_threads(1)
     env = LearningVectorEnv(TwoPlayerVectorEnv(PrivilegedBackend(), 2,
         EpisodeConfig(3, 1, 1, 0, "privileged_state", VISIBILITY, LEGACY_MATCH)),
@@ -38,6 +41,11 @@ def test_persistent_policy_survives_marl_training_and_artifact_reload(tmp_path, 
     config["ppo"]["policy_kwargs"].update(
         features_extractor_class="soku_rl.rl.persistent_policy.ActionContextFeatures",
         features_extractor_kwargs=dict(history_frames=1, object_features=2, player_features=8, features_dim=8))
+    if head == "canonical":
+        del config["ppo"]["action_persistence"], config["ppo"]["initial_action_prior"]
+        config["ppo"]["action_frame"] = "own_facing"
+        config["ppo"]["policy_kwargs"]["features_extractor_class"] = "soku_rl.rl.canonical_features.CanonicalCombatFeatures"
+        config["ppo"]["policy_kwargs"]["features_extractor_kwargs"]["arena_width"] = 1280.
     try:
         if method == "ippo":
             from soku_rl.marl.ippo import train_ippo
@@ -67,8 +75,12 @@ def test_persistent_policy_survives_marl_training_and_artifact_reload(tmp_path, 
         for seat, path in enumerate(paths):
             algorithm = PPO if policy_type == "mlp" else RecurrentPPO
             expected = PersistentActorCriticPolicy if policy_type == "mlp" else PersistentRecurrentActorCriticPolicy
+            if head == "canonical":
+                expected = FacingRecurrentActorCriticPolicy
             model = algorithm.load(path, device="cpu")
             assert isinstance(model.policy, expected)
+            if head == "canonical":
+                assert isinstance(model.policy.features_extractor, CanonicalCombatFeatures)
             tensor, _ = model.policy.obs_to_tensor(observations[0][f"player_{seat}"])
             if policy_type == "mlp":
                 distribution = model.policy.get_distribution(tensor)

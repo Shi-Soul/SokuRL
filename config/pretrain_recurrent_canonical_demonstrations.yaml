@@ -1,0 +1,8 @@
+defaults:
+  - pretrain_recurrent_address_invariant_demonstrations
+  - override track: superhuman_canonical
+  - _self_
+
+rl:
+  cpu_threads: 1
+output: logs/pretraining/god-recurrent-canonical-bc-${now:%Y%m%d-%H%M%S}

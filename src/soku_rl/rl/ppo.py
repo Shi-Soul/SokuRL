@@ -121,6 +121,10 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         architecture["repeat_probability"] = persistence["repeat_probability"]
     if "features_extractor_class" in architecture:
         architecture["features_extractor_class"] = get_class(architecture["features_extractor_class"])
+        from soku_rl.rl.canonical_features import CanonicalCombatFeatures
+        if (issubclass(architecture["features_extractor_class"], CanonicalCombatFeatures)
+                and config["ppo"].get("action_frame") != "own_facing"):
+            raise ValueError("canonical features require the own_facing action head")
     parameters["policy_kwargs"] = architecture
     if "rollout_buffer_class" in parameters:
         parameters["rollout_buffer_class"] = get_class(parameters["rollout_buffer_class"])
