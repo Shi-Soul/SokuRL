@@ -112,6 +112,16 @@ def main(cfg):
             opponent = load_policy(entry["name"], entry["policy"], matched, device)
             strategies[entry["name"]] = SeatPolicies(entry["name"], (opponent, opponent))
             setups[entry["name"]] = entry["setup"]
+        # SB3 seed initialization can change cuDNN flags while loading a model.
+        # Record effective inference settings after every policy has loaded.
+        report["inference_numerics"] = {
+            "matmul_allow_tf32": torch.backends.cuda.matmul.allow_tf32,
+            "cudnn_allow_tf32": torch.backends.cudnn.allow_tf32,
+            "cudnn_deterministic": torch.backends.cudnn.deterministic,
+            "cudnn_benchmark": torch.backends.cudnn.benchmark,
+            "float32_matmul_precision": torch.get_float32_matmul_precision(),
+            "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
+            "torch_version": torch.__version__, "cuda_version": torch.version.cuda}
         report["phase"] = "running_games"
         with closing(WorkerBackend(log_path=output / "worker.log", **config["runtime"])) as backend:
             backend.configure_observation(episode.backend_observation())

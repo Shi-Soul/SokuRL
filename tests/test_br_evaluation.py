@@ -12,10 +12,13 @@ from soku_rl.policy.matchups import select_opponents
 
 
 @pytest.mark.parametrize("recurrent_batch", [False, True])
-def test_model_load_failure_retains_config_and_result(tmp_path, monkeypatch, recurrent_batch):
+@pytest.mark.parametrize("failure_phase", ["loading_policies", "running_games"])
+def test_failure_retains_config_and_effective_loaded_numerics(tmp_path, monkeypatch, recurrent_batch, failure_phase):
     from hydra import compose, initialize_config_dir
     from omegaconf import OmegaConf
     import soku_rl.policy.loader
+    import soku_rl.env.worker_pipe
+    import torch
     root = Path(__file__).parents[1]
     source = tmp_path / "training"
     source.mkdir()
@@ -29,17 +32,32 @@ def test_model_load_failure_retains_config_and_result(tmp_path, monkeypatch, rec
     (source / "config.yaml").write_text(OmegaConf.to_yaml(training, resolve=True))
     (source / "final.zip").write_bytes(b"load failure fixture")
 
-    def fail_load(*args):
-        raise RuntimeError("model allocation failed")
+    monkeypatch.setattr(torch.backends.cudnn, "deterministic", False)
+
+    def fail_load(name, specification, interface, device):
+        if failure_phase == "loading_policies":
+            raise RuntimeError("model allocation failed")
+        monkeypatch.setattr(torch.backends.cudnn, "deterministic", True)
+        return UniformPolicy(name, 576)
+
+    def fail_worker(**kwargs):
+        raise RuntimeError("worker allocation failed")
 
     monkeypatch.setattr(soku_rl.policy.loader, "load_policy", fail_load)
+    monkeypatch.setattr(soku_rl.env.worker_pipe, "WorkerBackend", fail_worker)
     main = runpy.run_path(str(root / "tools/benchmark_br.py"))["main"]
-    with pytest.raises(RuntimeError, match="model allocation failed"):
+    error = "model allocation failed" if failure_phase == "loading_policies" else "worker allocation failed"
+    with pytest.raises(RuntimeError, match=error):
         main.__wrapped__(cfg)
     report = json.loads((output / "result.json").read_text())
     assert report["success"] is False
-    assert report["phase"] == "loading_policies"
-    assert "model allocation failed" in report["error"]
+    assert report["phase"] == failure_phase
+    assert error in report["error"]
+    if failure_phase == "running_games":
+        assert report["inference_numerics"]["cudnn_deterministic"] is True
+        assert report["inference_numerics"]["torch_version"] == torch.__version__
+    else:
+        assert "inference_numerics" not in report
     assert (output / "config.yaml").is_file()
     saved = OmegaConf.to_container(OmegaConf.load(output / "config.yaml"), resolve=True)
     assert ("grouped_recurrent_ppo" in saved["policy_inference"]) == recurrent_batch
