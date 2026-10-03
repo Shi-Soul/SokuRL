@@ -2,6 +2,8 @@
 
 BR 的 uniform / 神 AI 混合现支持按长期胜率连续反馈调整，配置、日志与恢复约定见
 [自适应课程](adaptive-curriculum.md)。
+其[采样预算实验](curriculum-sampling-budget.md)通过同一检查点生命周期保留 Adam
+及长期 EMA，按预先固定的累计采样点检验更长训练；尚无通用 BR 达标结论。
 共享 PPO 还可启用[当前轨迹上的冻结策略约束](online-policy-anchor.md)，
 其实现诊断已完成，但首个短程配置在完整神 AI 四局筛查中全负，尚无强度收益。
 另有[当前轨迹原规则教师辅助](online-rule-teacher.md)，由同一共享 PPO 工厂接入，

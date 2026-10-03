@@ -27,3 +27,16 @@ PPO 超参数保持父配置。新环境重新开局，环境随机数序列和�
 总预算固定，不根据中途胜负自动扩大；真实故障保留失败和恢复证据。父检查点完成
 并核对正常退出后，先用共享工厂核对完整参数/Adam 与课程恢复，再提交并启动 GPU
 续训。除配置外没有新增 PPO 实现，其他 MARL 继续使用同一 learner 生命周期。
+
+配置提交 `696b241` 已推送。父运行正常完成并通过最终核对后，共享工厂 CPU
+恢复预检通过：全部 policy/Adam 共 116 个张量逐位相等，保留 262,144 步、
+384 个 PPO epoch、1508 次 Adam。课程恢复 52 局、EMA=.479648249、
+uniform=.431071630，分子与权重也完全一致，没有重新预热。
+证据 `logs/diagnostics/slow-feedback-budget-preflight-20261003/summary.json`。
+
+同一提交下已在空闲 GPU 0 启动新运行，原生 PID 2698290，启动器 PID 2698255，
+当时可用内存约 242 GiB。输出 `logs/training/br-address-slow-feedback-budget-20261003`，
+日志 `.dev/train-slow-feedback-budget-20261003.log`。观察器
+`.dev/finish-slow-feedback-budget-20261003.json` 先核对第一次实际更新（累计
+264,192 步），再依次核对两个中间点和最终点，并在空闲 GPU 5 完成各自的纯神 AI
+评估。观察超时或测评失败只停止后续调度，不终止或重启正在运行的训练。
