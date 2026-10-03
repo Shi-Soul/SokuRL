@@ -50,3 +50,10 @@ learner 工厂和原配置，重新应用冻结范围；检查点续训拒绝改
 `.dev/finish-address-frozen-representation-20261003.json` 跟踪精确进程，首轮/最终
 核对冻结参数和缓冲区未变、冻结参数没有 Adam 状态、动作/价值头实际更新，再在
 空闲 GPU 5 执行最终 16 局评估。运行中的慢反馈候选仍使用其启动时已加载的实现。
+
+首轮 2048 步实机核对通过，完成 3 个 PPO epoch、12 次 Adam；固定 actor 的全部
+参数与缓冲区保持逐位不变，相应参数没有 Adam 状态，动作头和价值头均实际更新。
+源码、配置、初始化和课程状态均匹配预检。证据
+`logs/diagnostics/address-frozen-representation-audit-20261003/start.json`，检查点
+SHA256 `da5cc4f526be4c928605b3f104002aec84270eb3dca646ec8fe5d02104055c54`。
+这验证冻结确实在真实 PPO 中生效，尚不说明保留表示能改善完整对局。
