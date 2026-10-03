@@ -1,0 +1,31 @@
+defaults:
+  - collect_address_noisy_demonstrations
+  - _self_
+
+seed: 3901493
+behavior:
+  random_probability: 0.09562905458187479
+noise_calibration:
+  result: logs/diagnostics/noisy-teacher-noise-fit-20261003/result.json
+  result_sha256: 461840dc7f18fc32eab7acfe387dc4f9d9af408878c6a6eee26961c9091f66f4
+  audit: logs/diagnostics/noisy-teacher-noise-fit-audit-20261003/summary.json
+  model: noisy_bc
+  dataset: noisy_teacher
+  group: overall
+  metric: fitted_uniform_replacement_probability
+# Budget gate for this experiment, not the acceptance criterion for a strong BR.
+teacher_quality_gate:
+  min_wins: 4
+  min_wins_per_seat: 1
+excluded_datasets:
+  - logs/demonstrations/god-marisa-reimu-20261001
+  - logs/demonstrations/god-marisa-reimu-expanded-20261001
+  - logs/demonstrations/god-marisa-reimu-expansion64-20261002
+  - logs/demonstrations/learner-marisa-reimu-20261001
+  - logs/demonstrations/learner-marisa-reimu-iteration2-20261001
+  - logs/demonstrations/learner-recurrent-marisa-reimu-20261001
+  - logs/demonstrations/learner-online-anchor-marisa-reimu-20261002
+  - logs/demonstrations/learner-address-invariant-marisa-reimu-20261002
+  - logs/demonstrations/address-recovery-marisa-reimu-20261002
+  - logs/demonstrations/address-noisy-marisa-reimu-20261003
+output: logs/demonstrations/address-matched-noise-${now:%Y%m%d-%H%M%S}
