@@ -1,0 +1,5 @@
+defaults:
+  - evaluate_noisy_noise_fit
+  - _self_
+
+output: logs/diagnostics/noisy-teacher-noise-geometry-${now:%Y%m%d-%H%M%S}
