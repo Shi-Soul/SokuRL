@@ -7,7 +7,7 @@ BR 的 uniform / 神 AI 混合现支持按长期胜率连续反馈调整，配�
 另有[当前轨迹原规则教师辅助](online-rule-teacher.md)，由同一共享 PPO 工厂接入，
 评估时学习策略独立行动；已完成候选尚无纯神 AI 胜局改善。
 现在还可显式[固定 actor 的特征和循环表示](frozen-actor-representation.md)，仅让
-动作输出部分和独立 critic 微调；该选项仍待实机强度验证。
+动作输出部分和独立 critic 微调；已完成候选的纯神 AI 16 局为 0 胜，尚无胜局改善。
 另一个[地址不变前馈对照](feedforward-address-invariant.md)沿用相同数据与完整输入，
 检验不用 LSTM 的共享 PPO 初始化；尚无实战结论。
 
