@@ -1,0 +1,20 @@
+defaults:
+  - train_address_slow_feedback_budget
+  - _self_
+
+algorithm:
+  initial_policy:
+    kind: checkpoint
+    path: logs/training/br-address-slow-feedback-budget-20261003/final.zip
+    training_config: logs/training/br-address-slow-feedback-budget-20261003/config.yaml
+  # New bounded continuation: 1048576 + 1048576 = 2097152 cumulative samples.
+  timesteps: 1048576
+  checkpoint_every: 262144
+runtime:
+  game_directory: Z:${runtime.cwd}/../.dev/offline-snapshot-game
+  command:
+    - env
+    - SOKURL_OFFLINE_SNAPSHOT=1
+    - ${runtime.cwd}/scripts/wine-worker.sh
+    - tools/rollout_worker.py
+output: logs/training/br-address-slow-feedback-second-budget-${now:%Y%m%d-%H%M%S}
