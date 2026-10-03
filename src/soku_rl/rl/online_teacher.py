@@ -131,6 +131,7 @@ class OnlineTeacher:
         rng.bit_generator.state = state['window_rng']
         model.policy.set_training_mode(False)
         frames, burn = 0, 0
+        gradient_norms = []
         totals = dict(nll_before=0., nll_after=0., accuracy_before=0., accuracy_after=0.)
         for _ in range(config['updates_per_rollout']):
             windows = []
@@ -149,7 +150,9 @@ class OnlineTeacher:
                 (nll / count).backward()
                 totals['nll_before'] += float(nll.detach())
                 totals['accuracy_before'] += int((logits.argmax(-1) == target).sum())
-            torch.nn.utils.clip_grad_norm_(model.policy.parameters(), model.max_grad_norm, error_if_nonfinite=True)
+            gradient_norm = torch.nn.utils.clip_grad_norm_(
+                model.policy.parameters(), model.max_grad_norm, error_if_nonfinite=True)
+            gradient_norms.append(float(gradient_norm))
             self.optimizer.step()
             for episode, offset, length, target in windows:
                 logits = actor_window_logits(model, episode, offset, length, False)
@@ -171,6 +174,10 @@ class OnlineTeacher:
             'collection_seconds': state['collection_seconds'],
             'behavior_agreement': state['behavior_matches'] / state['collected_frames'],
             'current_burn_in_frames': burn, 'ppo_steps': model.num_timesteps,
+            'gradient_norm_mean': sum(gradient_norms) / len(gradient_norms),
+            'gradient_norm_max': max(gradient_norms),
+            'gradient_clip_fraction': sum(norm > model.max_grad_norm for norm in gradient_norms) / len(gradient_norms),
+            'gradient_limit': model.max_grad_norm, 'learning_rate': config['learning_rate'],
             'seconds': time.perf_counter() - started}
         state['last_update'] = metrics
         for key, value in metrics.items():

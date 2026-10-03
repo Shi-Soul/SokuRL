@@ -1,0 +1,8 @@
+defaults:
+  - train_address_online_teacher
+  - _self_
+
+rl:
+  online_teacher:
+    learning_rate: 0.1
+output: logs/training/br-address-online-teacher-strong-${now:%Y%m%d-%H%M%S}
