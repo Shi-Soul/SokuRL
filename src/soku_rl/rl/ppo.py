@@ -26,6 +26,9 @@ def create_ppo(env, interface, config, source, device, seed):
               "Cnn" if len(env.observation_space.shape) == 3 else "Mlp")
     policy += "LstmPolicy" if config["policy_type"] == "lstm" else "Policy"
     model, metadata = initialize_ppo(algorithm, policy, env, interface, config, source, device, seed)
+    if config["ppo"].get("freeze_actor_representation", False):
+        from soku_rl.rl.frozen_representation import freeze_actor_representation
+        freeze_actor_representation(model)
     if "rehearsal" in config:
         from soku_rl.rl.rehearsal import attach_rehearsal
         attach_rehearsal(model, interface, config["rehearsal"], source["kind"] == "checkpoint")
@@ -60,6 +63,9 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
     if sum(option in config for option in ("online_anchor", "rehearsal", "online_teacher")) > 1:
         raise ValueError("select online_anchor, rehearsal or online_teacher; combining auxiliary objectives is not supported")
     parameters = dict(config["ppo"])
+    if "freeze_actor_representation" in parameters:
+        if type(parameters.pop("freeze_actor_representation")) is not bool:
+            raise ValueError("freeze_actor_representation must be a boolean")
     if "recurrent_storage" in parameters:
         from sb3_contrib import RecurrentPPO
         storage = parameters.pop("recurrent_storage")

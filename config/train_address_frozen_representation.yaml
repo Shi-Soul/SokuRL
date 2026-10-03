@@ -1,0 +1,8 @@
+defaults:
+  - train_address_teacher_control
+  - _self_
+
+rl:
+  ppo:
+    freeze_actor_representation: true
+output: logs/training/br-address-frozen-representation-${now:%Y%m%d-%H%M%S}

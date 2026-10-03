@@ -4,8 +4,10 @@ BR 的 uniform / 神 AI 混合现支持按长期胜率连续反馈调整，配�
 [自适应课程](adaptive-curriculum.md)。
 共享 PPO 还可启用[当前轨迹上的冻结策略约束](online-policy-anchor.md)，
 其实现诊断已完成，但首个短程配置在完整神 AI 四局筛查中全负，尚无强度收益。
-另有待实机检验的[当前轨迹原规则教师辅助](online-rule-teacher.md)，由同一共享 PPO
-工厂接入，评估时学习策略独立行动。
+另有[当前轨迹原规则教师辅助](online-rule-teacher.md)，由同一共享 PPO 工厂接入，
+评估时学习策略独立行动；已完成候选尚无纯神 AI 胜局改善。
+现在还可显式[固定 actor 的特征和循环表示](frozen-actor-representation.md)，仅让
+动作输出部分和独立 critic 微调；该选项仍待实机强度验证。
 
 新训练可选 `rl=ppo` 或 `rl=dqn`；DQN 的接口、回放和实机验证见 [DQN 说明](dqn.md)。默认使用 `rl/ppo.py` 创建的 Stable-Baselines3 PPO；需要循环记忆时使用同一配置空间中的 sb3-contrib RecurrentPPO。MARL 层只决定双方何时学习、对手从哪里来、是否维护平均策略或种群，不再实现自己的 PPO 或 DQN 更新。
 
