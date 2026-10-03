@@ -37,3 +37,32 @@ passed（160.12 秒），日志 `.dev/pytest-input-metrics-full-20261003.log`。
 每局 256 帧、共 1024 样本；计划把四局日志与工作进程实际接收的命令逐帧比较，并核对
 PPO 更新、源码、CUDA 和私有 worker 清理。此时尚未完成实机验证，也不把
 短局胜负作为强度结果。
+
+首次实机尝试在 `35c2a24`、GPU 7 启动，但游戏进入 Title 前以 0 退出；Wine
+日志有 `partial write 8192`，尚未成功 reset、采样或更新 PPO。原失败目录
+`logs/diagnostics/br-input-metrics-20261003` 和日志
+`.dev/profile-input-metrics-20261003.log` 保留，不能计为实机通过。
+私有 worker `a6a6357d20a84c7093b20c2a3a1a103c` 退出 1，服务 stop/wait 均为 0，
+prefix/game 已清理。确认终止和资源空闲后，以相同配置在新目录
+`logs/diagnostics/br-input-metrics-retry-20261003` 重试一次，保留独立日志。
+没有修改游戏、共享服务、训练算法或判定条件；首次启动退出的根因尚未确定。
+
+重试已正常完成，实机核对通过：双实例各完成两局，总计 1024 个实际帧样本，
+每局 256 帧；记录双方实际送给 worker 且成功返回的命令，再用独立 Counter
+逐局重算直方图及相邻帧变化次数，全部与终局日志相同。双方所有汇总比例、
+最常用命令占比和平均连续段长度也独立重算一致；座位、世界种子和角色匹配。
+
+原 PPO 工厂完成 6 个 epoch 计数、24 次 Adam，初始优化器为空，最终参数
+确实改变，完整 590890 输入和 576 动作未变。最终参数哈希
+`8060b7343421940035c4ef32c63da0d616a72db7f471c2e3e312267cd4a5e52b`。
+学习者攻击键帧占比 .879883、符卡键 .509766、切换率 .999020；这是新初始化
+模型短诊断的输入统计，不是训练收益或策略强度。未做隔离吞吐对照，不声称
+新增计数没有性能开销。
+
+源码与提交 `35c2a24` 逐文件核对一致，实际 GPU 7、原 process_memory 运行目录；
+worker `5e4dd2e4c68a432cb3cbedbba64f2c11`、私有服务正常退出，prefix/game 已清理。
+证据 `logs/diagnostics/input-metrics-audit-20261003/summary.json`，记录模型、配置、
+结果、逐帧命令与脚本哈希；实际命令保存在
+`.dev/input-metrics-applied-actions-retry-20261003.json`。
+观察脚本及核对脚本为 `.dev/profile-input-metrics-retry-20261003.py` 和
+`.dev/audit-input-metrics-retry-20261003.py`，对应同名日志均保留。
