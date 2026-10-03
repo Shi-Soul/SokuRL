@@ -85,13 +85,17 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
             from soku_rl.rl.recurrent_factorized_policy import FactorizedRecurrentActorCriticPolicy
             policy_type = FactorizedRecurrentActorCriticPolicy
     if "action_persistence" in parameters:
+        from sb3_contrib import RecurrentPPO
         from soku_rl.rl.persistent_policy import PersistentActorCriticPolicy
         persistence = parameters.pop("action_persistence")
-        if (algorithm is not PPO or interface.commands != tuple(range(576))
+        if (algorithm not in (PPO, RecurrentPPO) or interface.commands != tuple(range(576))
                 or interface.config.action_history < 1
                 or set(persistence) != {"repeat_probability"}):
-            raise ValueError("action persistence requires feedforward PPO, full commands and action history")
+            raise ValueError("action persistence requires PPO, full commands and action history")
         policy_type = PersistentActorCriticPolicy
+        if algorithm is RecurrentPPO:
+            from soku_rl.rl.recurrent_persistent_policy import PersistentRecurrentActorCriticPolicy
+            policy_type = PersistentRecurrentActorCriticPolicy
     if "initial_action_prior" in parameters:
         prior_logits = logical_action_prior(interface, parameters.pop("initial_action_prior"))
     if "action_frame" in parameters:

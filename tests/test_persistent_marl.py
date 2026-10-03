@@ -4,11 +4,13 @@ from dataclasses import replace
 import pytest
 import torch
 from stable_baselines3 import PPO
+from sb3_contrib import RecurrentPPO
 
 from soku_rl.env import EpisodeConfig, TwoPlayerVectorEnv
 from soku_rl.env.match import LEGACY_MATCH
 from soku_rl.env.wrappers.learning import LearningConfig, LearningVectorEnv
 from soku_rl.rl.persistent_policy import PersistentActorCriticPolicy
+from soku_rl.rl.recurrent_persistent_policy import PersistentRecurrentActorCriticPolicy
 from test_env_timing import RecordingBackend, VISIBILITY
 from test_privileged_encoding import observation
 from test_shared_ppo import fixture_config
@@ -23,13 +25,14 @@ class PrivilegedBackend(RecordingBackend):
         return replace(state, observations=(own, opponent))
 
 
-@pytest.mark.parametrize("method", ["ippo", "nfsp", "psro"])
-def test_persistent_policy_survives_marl_training_and_artifact_reload(tmp_path, method):
+@pytest.mark.parametrize("method,policy_type", [("ippo", "mlp"), ("nfsp", "mlp"),
+                                              ("psro", "mlp"), ("ippo", "lstm"), ("psro", "lstm")])
+def test_persistent_policy_survives_marl_training_and_artifact_reload(tmp_path, method, policy_type):
     torch.set_num_threads(1)
     env = LearningVectorEnv(TwoPlayerVectorEnv(PrivilegedBackend(), 2,
         EpisodeConfig(3, 1, 1, 0, "privileged_state", VISIBILITY, LEGACY_MATCH)),
         LearningConfig("full", False, 1, 0.))
-    config = fixture_config("mlp") | {"name": method}
+    config = fixture_config(policy_type) | {"name": method}
     config["ppo"].update(action_persistence={"repeat_probability": .8},
         initial_action_prior={"button_probability": .05})
     config["ppo"]["policy_kwargs"].update(
@@ -62,10 +65,17 @@ def test_persistent_policy_survives_marl_training_and_artifact_reload(tmp_path, 
         assert len(paths) == 2
         observations, _ = env.reset({0: 7})
         for seat, path in enumerate(paths):
-            model = PPO.load(path, device="cpu")
-            assert isinstance(model.policy, PersistentActorCriticPolicy)
+            algorithm = PPO if policy_type == "mlp" else RecurrentPPO
+            expected = PersistentActorCriticPolicy if policy_type == "mlp" else PersistentRecurrentActorCriticPolicy
+            model = algorithm.load(path, device="cpu")
+            assert isinstance(model.policy, expected)
             tensor, _ = model.policy.obs_to_tensor(observations[0][f"player_{seat}"])
-            probabilities = model.policy.get_distribution(tensor).distribution.probs
+            if policy_type == "mlp":
+                distribution = model.policy.get_distribution(tensor)
+            else:
+                states = tuple(torch.zeros(model.policy.lstm_hidden_state_shape) for _ in range(2))
+                distribution, _ = model.policy.get_distribution(tensor, states, torch.ones(1))
+            probabilities = distribution.distribution.probs
             assert torch.isfinite(probabilities).all() and (probabilities > 0).all()
             torch.testing.assert_close(probabilities.sum(1), torch.ones(1))
     finally:

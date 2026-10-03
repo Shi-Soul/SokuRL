@@ -1,0 +1,10 @@
+defaults:
+  - pretrain_recurrent_address_invariant_demonstrations
+  - _self_
+
+rl:
+  cpu_threads: 1
+  ppo:
+    action_persistence:
+      repeat_probability: 0.8
+output: logs/pretraining/god-recurrent-persistent-bc-${now:%Y%m%d-%H%M%S}

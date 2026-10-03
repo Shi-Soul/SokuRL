@@ -17,6 +17,7 @@ from soku_rl.policy.loader import load_policy
 from soku_rl.policy.population import MixturePolicy, PPOPolicy, UniformPolicy
 from soku_rl.policy.verification_inputs import verification_observation
 from soku_rl.rl.facing_policy import FacingRecurrentActorCriticPolicy, left_facing
+from soku_rl.rl.recurrent_persistent_policy import PersistentRecurrentActorCriticPolicy, previous_commands
 
 EXPORT_VERSION = 1
 
@@ -43,6 +44,10 @@ class CategoricalActor(nn.Module):
         self.action_net = policy.action_net
         self.recurrent = recurrent
         self.facing_actions = isinstance(policy, FacingRecurrentActorCriticPolicy)
+        self.persistent_actions = isinstance(policy, PersistentRecurrentActorCriticPolicy)
+        if self.persistent_actions:
+            self.repeat_gate = policy.repeat_gate
+            self.register_buffer("button_weights", policy.button_weights.clone())
         if self.facing_actions:
             self.facing_index = policy.facing_index
             self.register_buffer("action_indices", policy.facing_commands.clone())
@@ -55,7 +60,12 @@ class CategoricalActor(nn.Module):
         if self.recurrent:
             features, states = self.memory(features.unsqueeze(0), states)
             features = features.squeeze(0)
-        probabilities = self.action_net(self.policy_net.forward_actor(features)).softmax(-1)
+        latent = self.policy_net.forward_actor(features)
+        probabilities = self.action_net(latent).softmax(-1)
+        if self.persistent_actions:
+            gate = self.repeat_gate(latent).sigmoid()
+            previous = previous_commands(observation, self.button_weights)
+            probabilities = ((1 - gate) * probabilities).scatter_add(1, previous[:, None], gate)
         if self.facing_actions:
             permutation = torch.where(left_facing(observation, self.facing_index)[:, None],
                                       self.mirrored_indices, self.action_indices)
