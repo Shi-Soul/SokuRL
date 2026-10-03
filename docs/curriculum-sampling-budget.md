@@ -137,3 +137,27 @@ KL=.010646。训练回报略有下降，不能从 critic 的解释方差或混�
 正常清理核对通过，证据为预算核对目录 `mid1_games.json`。主训练保持预定
 预算，后续两点共同报告。此前已声明的[均衡座位对照](balanced-sampling-budget.md)
 单独检查采样安排，不能把其后续结果全归因于某个模型参数。
+
+## 固定混合对手上的保留能力诊断
+
+累计 524,288 步模型对纯神 AI 已为 0/16，但正在学习的混合对手胜率不能直接
+与初始化比较：训练世界和实际开局概率不同。因此补做一次固定 p=.5 的 16 局
+只读评估，与原 BC 的同概率、同世界、双座位结果配对。原 BC 已有 12 胜、2 负、
+2 超时，详见[初始化参照](address-mixture-comparison.md#冻结初始化参照完成)。
+
+这项检查区分“只在完整神 AI 上退化”与“较易对手上的能力也下降”，不凭单个
+网格证明退化原因。使用固定的 524,288 步检查点，不挑选后续最佳模型；仍为
+原 `.dev/game`、原 God 每帧推进并按 .5 替换动作、八世界 × 双座位、完整空间，
+逻辑对手名保持 `god:0:character`，真实噪声策略指纹单独核对。
+
+```bash
+bash scripts/linux.sh tools/benchmark_br.py --config-name benchmark_address_action_mix50 \
+  linux.cuda_devices=6 \
+  training_directory=logs/training/br-address-slow-feedback-budget-20261003 \
+  checkpoint=checkpoints/updated_524288_steps.zip require_complete=false \
+  output=logs/diagnostics/slow-feedback-mid1-noise50-20261003
+```
+
+结果须核对检查点、游戏模块、对手指纹、逐局世界/角色/双方策略种子和正常清理，
+并与该模型已有的纯神 AI 16 局分别报告。它不会被计作新增纯神 AI 胜局，
+也不反馈给课程、暂停训练或改变两条既定训练预算。
