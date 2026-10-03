@@ -57,3 +57,14 @@ uniform/God 比例：两座位合并、每个目标对手单独维护统计，�
 `.dev/pytest-noisy-demonstrations-full-20261003.log`。旧 teacher、learner、
 takeover 数据和共享 BR/PPO 回归保持通过。真实采集结果待记录，不将
 单元测试当作真实对局证据。
+
+`726399f` 已推送，有限采集已启动：
+`logs/demonstrations/address-noisy-marisa-reimu-20261003`，GPU 入口设为 3，
+8 个虚拟显示游戏属于 worker `12636666f11046dd8ed2ba4ee55f0b44`。
+God 规则本身在 CPU 执行。观察器 `.dev/finish-noisy-teacher-20261003.py`
+只负责本次采集和逐帧审计，不自动追加 PPO。审计将核对每一帧教师标签、
+噪声门、实际输入历史、训练/验证世界隔离以及 worker 清理。
+
+通过采集审计后，用 `evaluate_noisy_teacher` 在 GPU 上只读评分原 BC，
+检查新验证轨迹的整体及两座位拟合难度；评分不更新模型，不参与教师
+采集。是否继续动作监督训练，依据这些数据和真实对局结果决定。

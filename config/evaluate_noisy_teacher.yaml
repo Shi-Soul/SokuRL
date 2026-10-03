@@ -1,0 +1,11 @@
+defaults:
+  - evaluate_demonstrations
+  - _self_
+
+models:
+  original_bc:
+    checkpoint: logs/pretraining/god-marisa-reimu-address-invariant-20261002/best.zip
+    training_config: logs/pretraining/god-marisa-reimu-address-invariant-20261002/config.yaml
+datasets:
+  noisy_teacher: logs/demonstrations/address-noisy-marisa-reimu-20261003
+output: logs/diagnostics/noisy-teacher-fit-${now:%Y%m%d-%H%M%S}
