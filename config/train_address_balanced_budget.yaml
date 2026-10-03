@@ -1,0 +1,16 @@
+defaults:
+  - train_address_slow_feedback
+  - _self_
+
+algorithm:
+  player: balanced
+  timesteps: 1048576
+  checkpoint_every: 262144
+runtime:
+  game_directory: Z:${runtime.cwd}/../.dev/offline-snapshot-game
+  command:
+    - env
+    - SOKURL_OFFLINE_SNAPSHOT=1
+    - ${runtime.cwd}/scripts/wine-worker.sh
+    - tools/rollout_worker.py
+output: logs/training/br-address-balanced-budget-${now:%Y%m%d-%H%M%S}
