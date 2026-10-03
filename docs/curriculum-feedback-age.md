@@ -58,3 +58,10 @@ learner 工厂确认初始化参数、空 Adam、零计数、稀疏缓冲区和�
 `.dev/finish-address-slow-feedback-20261003.json` 跟踪精确 PID，核对 2048 / 65536 步
 及最终检查点；完整训练正常退出后，等待空闲 GPU 4 执行最终 16 局评估。
 观察超时只停止观察，不重启或终止训练。实际比例反馈和实战效果尚待后续验证。
+
+首轮 2048 步核对通过，证据
+`logs/diagnostics/address-slow-feedback-audit-20261003/start.json`。运行源码、配置、
+初始化、空优化器和课程 sidecar 符合预检；实际完成 3 个 PPO epoch、12 次 Adam。
+策略参数哈希 `51f3bcba5735e4029ebc6e397406e3d38ce61669f5c49c83ba37ca8157abfc79`
+与历史每局反馈控制的同一步检查点逐位一致。尚无完整对局，EMA 没有伪造值；
+该一致性只覆盖课程分叉前的首轮，不是最终轨迹等价或实战改善证据。
