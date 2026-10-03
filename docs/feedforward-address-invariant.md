@@ -26,3 +26,16 @@ value 系数 .5、动作变化权重 1、学习率 .0003 和策略/价值 MLP [2
 证据 `logs/diagnostics/feedforward-address-preflight-20261003/summary.json`，脚本和
 日志 `.dev/check-feedforward-address-20261003.{py,log}`。本次只新增配置，未修改
 训练实现；预检不替代后续 GPU 训练或真实对局。
+
+提交 `57e17fb` 推送后在空闲 GPU 3 启动，原生 PID 2671430，输出
+`logs/pretraining/god-marisa-reimu-feedforward-address-20261003`，日志
+`.dev/pretrain-feedforward-address-20261003.log`。实机初始模型参数与 CPU 预检
+逐哈希一致，Adam 为空；实际源码、数据、配置核对通过。初始 checkpoint SHA256
+`c0ca5b0f513938361664178bfe90534d42a43814ef46d6bba0b54380075159cf`。
+证据为预检目录 `start.json`，保存了完成前 4 轮时的进度快照。
+
+观察器 `.dev/finish-feedforward-address-20261003.json` 跟踪上述精确进程，正常完成
+20 轮后检查监督更新计数、验证 NLL 最优模型选择、参数/数据身份，再等待空闲
+GPU 6 执行 16 局纯神 AI 评估。评估目录预定为
+`logs/benchmark/br-reimu-feedforward-address-zero-shot-20261003`；观察超时不终止或
+重启训练，不因早期拟合指标改善而延长预算。
