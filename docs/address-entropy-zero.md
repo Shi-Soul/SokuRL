@@ -85,3 +85,13 @@ PDF 预览、逐更新 CSV、源文件哈希和核对记录。两组都仅记录
 `5cbc92d0c6237cb16c92630b509445130bea8577acef2b9eda9ebb74be7f819e`。
 绘图、核对及 PDF 渲染均退出 0，PNG 和 PDF 预览已实际查看，无标签裁切
 或图例重叠；线型与标记提供颜色外的区分，未声称执行色觉模拟。
+
+## 固定状态诊断计划
+
+用 `evaluate_address_entropy_zero` 对最终模型执行只读评分，复用原教师
+28800 帧、扩充教师 49744 帧及 BC 自身轨迹 18551 帧的既有验证集。
+调用 `.dev/evaluate-full-precision-20261002.py`，关闭 matmul / cuDNN TF32，
+启用 deterministic cuDNN，沿用 batch=256 和 sequence_length=64。
+与历史 `.001` 控制的同数据评分比较 NLL、动作变化帧准确率及分布熵；
+复用历史结果前核对检查点、数据身份、评分实现和数值设置。此诊断不产生
+新游戏或 PPO 更新，也不以标签拟合替代正在运行的纯 God 实战结论。

@@ -1,0 +1,13 @@
+defaults:
+  - evaluate_demonstrations
+  - _self_
+
+models:
+  entropy_zero:
+    checkpoint: logs/diagnostics/br-address-entropy-zero-20261003/final.zip
+    training_config: logs/diagnostics/br-address-entropy-zero-20261003/config.yaml
+datasets:
+  teacher_original: logs/demonstrations/god-marisa-reimu-20261001
+  teacher_expanded: logs/demonstrations/god-marisa-reimu-expanded-20261001
+  address_learner: logs/demonstrations/learner-address-invariant-marisa-reimu-20261002
+output: logs/diagnostics/address-entropy-zero-fixed-fit-${now:%Y%m%d-%H%M%S}
