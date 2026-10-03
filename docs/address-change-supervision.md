@@ -27,3 +27,9 @@
 `logs/diagnostics/address-change-supervision-preflight-20261003/summary.json`；
 除权重和输出外配置一致，初始化契约、检查点 SHA256、完整动作空间及预算均已核对。
 复用已有加权训练实现，本次只增加候选配置，没有改动损失函数或运行中的实验。
+
+提交 `bdf7953` 推送后已启动普通组 GPU 3 / 加权组 GPU 5，两卡启动前均空闲；
+内存可用约 243 GiB、NAS 可用约 20 TiB。原生 PID 分别 2591562 / 2591570。
+输出 `logs/pretraining/god-marisa-reimu-address-change{1,4}-20261003`，日志
+`.dev/pretrain-address-change{1,4}-20261003.log`。首轮进度已经产生，完整训练与
+16 局实战结果尚待结束，不能把运行启动视为效果验证。
