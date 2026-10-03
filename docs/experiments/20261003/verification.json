@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "run_counts": {
+    "training": 56,
+    "pretraining": 31,
+    "benchmark": 149,
+    "demonstrations": 11,
+    "diagnostics": 485
+  },
+  "evidence_count": 9045,
+  "model_count": 731,
+  "selected_model_hashes": 218,
+  "historical_documents_verified_against_git": 96,
+  "local_links_checked": 112,
+  "scope": "Archive consistency and existing evidence only; no experiments or inference launched"
+}

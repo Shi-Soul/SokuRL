@@ -1,0 +1,62 @@
+{
+  "timestamp_utc": "2026-10-03T19:30:08.526725+00:00",
+  "source_revision": "ca8c51a395cb76a4fafdd2f5632b482fe1e769ee",
+  "purpose": "User requested stop and documentation; no games, model inference or optimizer runs",
+  "run_counts": {
+    "training": 56,
+    "pretraining": 31,
+    "benchmark": 149,
+    "demonstrations": 11,
+    "diagnostics": 485
+  },
+  "status_counts": {
+    "training": {
+      "reported_success": 44,
+      "reported_failure": 12
+    },
+    "pretraining": {
+      "reported_success": 30,
+      "reported_failure": 1
+    },
+    "benchmark": {
+      "reported_success": 148,
+      "reported_failure": 1
+    },
+    "demonstrations": {
+      "interrupted_by_user": 1,
+      "reported_success": 10
+    },
+    "diagnostics": {
+      "no_root_result": 353,
+      "reported_success": 119,
+      "result_without_success_flag": 11,
+      "reported_failure": 2
+    }
+  },
+  "evidence_files": 9045,
+  "model_files": 731,
+  "rehashed_models": 218,
+  "documents": 96,
+  "parse_errors": [],
+  "excluded_scope": [
+    "logs/hydra duplicate launcher logs",
+    "logs/validation and deployment (separate runtime acceptance)",
+    "binary episode shards/replays indexed by original manifests, not copied into Git",
+    "task scratch scripts retained in parent .dev; key current paths fingerprinted below"
+  ],
+  "status_semantics": "reported_success is only the raw execution flag, not strength or independent audit approval; no_root_result does not mean running",
+  "counts_semantics": "directories, not independent experiments; diagnostics include nested checks, repeats and shared baselines; never sum as independent games or training budget",
+  "interrupted_collection": {
+    "complete_games": 8,
+    "cleanup_verified": true
+  },
+  "scratch_evidence": {
+    "finish-matched-teacher-20261003.py": "05ed65b06800fd74dbd96a563ea73b882bc52b4b1d6017140e73379ecfee1433",
+    "audit-matched-teacher-20261003.py": "0f39e792339b5f69d3788f79be2c917b7bcdbfc01e80a44ab17e1cf96000d095",
+    "preflight-matched-teacher-20261003.py": "0a70f5cd8b068bdc16c66099b7a74e445e7b9daca7aea82ee351f3614fd0e9d7",
+    "score-noise-geometry-20261003.py": "5180525bffc3d01d46de08462b24d2042e88f559257ca57239d9e2e0d8582e8f",
+    "stop-experiments-20261003.json": "0021393edc221a24d6fc10b676b1c8b25ab4bcf56ac69ee5f3a02c0b404f3616",
+    "finish-matched-teacher-20261003.json": "a08f358988350d2e82ae92f4f606e7795e7a205c10fe585016300814d3b807ec"
+  },
+  "record_archive_script_sha256": "375300123c9983996f977d7fbfea905f2ba20e6877576ed477f7407e2b7d44a6"
+}

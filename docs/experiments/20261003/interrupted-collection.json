@@ -1,0 +1,143 @@
+{
+  "status": "interrupted_by_user",
+  "source": "logs/demonstrations/address-matched-noise-marisa-reimu-20261003",
+  "result": {
+    "success": false,
+    "method": "rule_demonstrations",
+    "error": "KeyboardInterrupt()",
+    "seconds": 478.84377563744783
+  },
+  "manifest_sha256": "4263caf0cb7cb091af3c5934fe2e2aabeeaabada3cb6292f56b656eb8d106c4d",
+  "result_sha256": "83303804dc8648f6bd6c99496592b28d093a62ca9b1ea84a555188cd3bf13ee5",
+  "identity_sha256": "9174a9b5c543fa7df176a4c6d978aa9be98033b0f758def756c225144c477783",
+  "planned_games": 16,
+  "saved_complete_games": 8,
+  "groups": {
+    "overall": {
+      "games": 8,
+      "outcomes": {
+        "loss": 8
+      },
+      "saved_frames": 35577,
+      "noise_decisions": 3443,
+      "disagreements": 3439,
+      "combat_means": {
+        "own_hp_loss": 10000.0,
+        "opponent_hp_loss": 4120.125,
+        "own_spell_action_entries": 0.125,
+        "opponent_spell_action_entries": 0.125
+      }
+    },
+    "player_0": {
+      "games": 3,
+      "outcomes": {
+        "loss": 3
+      },
+      "saved_frames": 14039,
+      "noise_decisions": 1365,
+      "disagreements": 1365,
+      "combat_means": {
+        "own_hp_loss": 10000.0,
+        "opponent_hp_loss": 4248.333333333333,
+        "own_spell_action_entries": 0.0,
+        "opponent_spell_action_entries": 0.0
+      }
+    },
+    "player_1": {
+      "games": 5,
+      "outcomes": {
+        "loss": 5
+      },
+      "saved_frames": 21538,
+      "noise_decisions": 2078,
+      "disagreements": 2074,
+      "combat_means": {
+        "own_hp_loss": 10000.0,
+        "opponent_hp_loss": 4043.2,
+        "own_spell_action_entries": 0.2,
+        "opponent_spell_action_entries": 0.2
+      }
+    }
+  },
+  "successful_env_steps_reported": 44553,
+  "incomplete_episodes": [
+    {
+      "id": 14,
+      "observed_steps": 1122,
+      "attempted_actions": 1123
+    },
+    {
+      "id": 3,
+      "observed_steps": 1122,
+      "attempted_actions": 1123
+    },
+    {
+      "id": 15,
+      "observed_steps": 1122,
+      "attempted_actions": 1123
+    },
+    {
+      "id": 4,
+      "observed_steps": 1122,
+      "attempted_actions": 1123
+    },
+    {
+      "id": 2,
+      "observed_steps": 1122,
+      "attempted_actions": 1123
+    },
+    {
+      "id": 1,
+      "observed_steps": 1122,
+      "attempted_actions": 1123
+    },
+    {
+      "id": 5,
+      "observed_steps": 1122,
+      "attempted_actions": 1123
+    },
+    {
+      "id": 8,
+      "observed_steps": 1122,
+      "attempted_actions": 1123
+    }
+  ],
+  "incomplete_observed_frames": 8976,
+  "partial_prefix_storage": "Only incomplete counters persisted; no complete shard for these episodes.",
+  "last_inflight_step": "attempted_actions exceeds observed_steps by one; not counted as completed evidence",
+  "worker": "4e1fc647ca6b4695acdef7044d0bba7d",
+  "session_sha256": "36c82edecbaee258221c7f2a4d6e9bb2d01d4d60d160fdc8a2eabaa1ae1f23f4",
+  "session": {
+    "prefix": "/NAS2020/Workspaces/DRLGroup/wjxie/rl/th123-Sudo/.dev/workers/4e1fc647ca6b4695acdef7044d0bba7d/prefix",
+    "server_root": "/NAS2020/Workspaces/DRLGroup/wjxie/rl/th123-Sudo/.dev/workers/4e1fc647ca6b4695acdef7044d0bba7d/server",
+    "game": "/NAS2020/Workspaces/DRLGroup/wjxie/rl/th123-Sudo/.dev/workers/4e1fc647ca6b4695acdef7044d0bba7d/game",
+    "command": [
+      "/home/wjxie/wjxie/rl/th123-Sudo/setup/wine-10.0-amd64-wow64/bin/wine",
+      "/home/wjxie/wjxie/rl/th123-Sudo/.rt/python/python.exe",
+      "-B",
+      "tools/rollout_worker.py"
+    ],
+    "pid": 4067844,
+    "exit_code": 0,
+    "server_stop_exit": 0,
+    "server_wait_exit": 0,
+    "cleanup_attempts": {
+      "prefix": 1,
+      "game": 1
+    }
+  },
+  "recorded_pids_absent": [
+    4067413,
+    4067446,
+    4067479,
+    4067669,
+    4067844
+  ],
+  "cleanup_verified": true,
+  "saved_shard_hashes_verified": true,
+  "teacher_labels_replayed_in_stop_archive": false,
+  "full_audit_started": false,
+  "training_started": false,
+  "budget_gate": "not evaluated on the incomplete 16-game plan; no new training authorized",
+  "noise_geometry": "config/script prepared and committed where applicable; scoring not started"
+}
