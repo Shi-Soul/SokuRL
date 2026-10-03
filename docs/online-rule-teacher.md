@@ -77,3 +77,32 @@ SGD，学习率 .01、8 个至多 64 帧窗口；这是首个待检验预算，�
 实际 GPU 对照将使用空闲 GPU 3/6；每条训练由精确 PID 观察器在首轮更新和完整结束时
 核对，再在空闲 GPU 0/2 执行各自预定的完整 16 局评估。观察器只调度，实际 GPU 作业
 仍经 scripts/linux.sh；不会因观察超时停止或重启训练。
+
+## 实际启动及首轮更新
+
+在 `4908be8` 已提交、GPU 3/6 空闲、NAS 可用约 20 TiB、内存可用约 247 GiB 时，
+启动无教师/有教师对照。输出 `logs/training/br-address-{teacher-control,online-teacher}-20261002`，
+日志 `.dev/train-address-{teacher-control,online-teacher}-20261002.log`。运行跨 UTC 日期，
+保留预先指定的实验目录名，不改名或重启正在运行的作业。
+
+两项真实首轮 2048 步检查点均完成 2 个 PPO epoch、5 次 Adam，因 KL 限制提前结束
+最大三轮预算。参数均已更新；初始化参数、空 Adam、完整空间、配置和源码逐文件身份
+均与预检一致。首轮尚无完整局，课程仍为 .5，不补造结束局指标或 EMA 胜率。
+检查点 SHA256 分别为
+`2adaab045ca6970baf0fe5c2faa8dd9c1a5ab0ea2d5a2f43c6c5dd1eba828c44`、
+`50e3e6f89d2856b7f9ca14c4a1dd37ababdd9dea7c05f874b56faa5d47f34766`。
+
+教师组从 8 个私有 actor 查询了 2048 帧，逐开局 seed 与独立 RNG 重放一致，所有槽位
+各 256 帧。首次辅助更新抽取 452 个窗口帧、重放 1996 个前缀帧，NLL 从 2.160991
+降至 2.136244，抽样标签准确率均为 68.142%；实际执行动作与教师标签一致率 55.615%。
+教师查询 1.038 秒、包含压缩存储的采集开销 1.514 秒、辅助优化 0.390 秒。这些是首轮
+实现/成本证据，不是强度提升，也不保证后续 NLL 或胜率单调改善。
+证据 `logs/diagnostics/address-{teacher-control,online-teacher}-audit-20261002/start.json`。
+
+首次教师观察器因核对脚本直接比较原始 Hydra 文件和已注入共享选项的运行时配置而
+误报失败，发生在任何后续评估之前。训练进程继续正常运行。修正核对脚本为先比较
+两份原始配置，再通过共享 ppo_settings 展开并比较实际配置，接续核对通过；没有修改
+训练配置、源码或模型，没有重启训练。原失败日志和状态保留，教师观察状态改为
+`.dev/finish-address-online-teacher-resumed-20261002.json`；无教师组保持
+`.dev/finish-address-teacher-control-20261002.json`。两者正等待原定预算结束，然后执行
+完整训练核对和各自 16 局纯神 AI 评估。
