@@ -5,7 +5,7 @@ defaults:
 training_directory: logs/pretraining/god-marisa-reimu-address-invariant-20261002
 checkpoint: best.zip
 require_complete: true
-num_envs: 8
+num_envs: 4
 rl:
   cpu_threads: 1
 runtime:
