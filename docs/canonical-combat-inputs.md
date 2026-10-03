@@ -85,3 +85,11 @@ BC 填充批次与逐帧评分对照、共享 IPPO/PSRO 和 512 决策 ONNX 验�
 输入。各步骤均使用 Linux 项目入口，启动前核对干净工作树和资源；不
 自动启动 PPO。输出为 `logs/pretraining/god-marisa-reimu-canonical-20261003`
 及 `logs/benchmark/br-address-canonical-bc-20261003`。真实强度仍待该流程验证。
+
+源码 `23694dd` 已 push 后启动上述有限流程，真实训练使用 GPU 3。
+启动审计退出 0，实际 `initial.zip` 的全部初始参数与预检一致，Adam 为空、
+PPO 步数及更新数为零；检查点 SHA256 为
+`04d8dcd59e5a20f004c173ab044d1a9c249478b992a2e9588b58c8670975419d`。
+审计记录在 `logs/diagnostics/canonical-bc-preflight-20261003/actual-start.json`，
+退出日志 `.dev/canonical-bc-start_audit-20261003.log`。观察器已进入等待完整
+20 轮训练结束的阶段；目前尚无该候选的完整训练或实战结果。
