@@ -370,3 +370,21 @@ PNG 已目视检查，PDF 未另行栅格化。初版图保留，v2 为 pending 
 `.dev/plot-adaptive-budget-comparison-20261003-v2.{py,log}` 和
 `.dev/audit-adaptive-budget-comparison-20261003.{py,log}`。这是一份时间快照，
 后续均衡最终和长片段结果继续在各自实验记录报告，不覆盖该图的数据。
+
+2026-10-03 07:55:22 UTC 新增完整快照：
+`logs/diagnostics/adaptive-budget-comparison-20261003-complete/comparison.png` / `.pdf`。
+三种候选的首个百万步预算、共 12 个固定检查点均已完成；原 v2 保留不动。
+192 个检查点对局加 32 个参考对局共 224 局，胜负与战斗均值独立重算通过，
+所有 CSV 单元格、来源/产物哈希和 EMA 重算亦通过，没有缺失点或补造数据。
+
+12 个点中仅长片段半程为 1 胜，其余均为 0 胜；所有点的平均对手掉血均低于
+原 BC 的 3777。三个最终模型的平均对手掉血分别为随机座位 2510.875、均衡
+座位 1302.6875、长片段 1935.9375。三者均未证明优于原 BC，不能把均衡采样
+或长回报窗口已落地称为目标强度达成。继续训练的第二预算和 8192 帧新候选
+另行记录，不混入本张首预算图。
+
+证据为完整快照目录中的 `summary.json`、`audit.json` 和 `rows.csv`；脚本/日志
+`.dev/plot-adaptive-budget-comparison-20261003-complete.{py,log}` 与
+`.dev/audit-adaptive-budget-comparison-20261003-complete.{py,log}`。PNG 已目视核对
+全部 12 行和参考线标注，PDF 未单独栅格化。复用开发网格与单训练种子的限制
+不变，本图不提供统计显著或独立泛化结论。
