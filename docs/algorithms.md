@@ -8,6 +8,8 @@ BR 的 uniform / 神 AI 混合现支持按长期胜率连续反馈调整，配�
 评估时学习策略独立行动；已完成候选尚无纯神 AI 胜局改善。
 现在还可显式[固定 actor 的特征和循环表示](frozen-actor-representation.md)，仅让
 动作输出部分和独立 critic 微调；该选项仍待实机强度验证。
+另一个[地址不变前馈对照](feedforward-address-invariant.md)沿用相同数据与完整输入，
+检验不用 LSTM 的共享 PPO 初始化；尚无实战结论。
 
 新训练可选 `rl=ppo` 或 `rl=dqn`；DQN 的接口、回放和实机验证见 [DQN 说明](dqn.md)。默认使用 `rl/ppo.py` 创建的 Stable-Baselines3 PPO；需要循环记忆时使用同一配置空间中的 sb3-contrib RecurrentPPO。MARL 层只决定双方何时学习、对手从哪里来、是否维护平均策略或种群，不再实现自己的 PPO 或 DQN 更新。
 

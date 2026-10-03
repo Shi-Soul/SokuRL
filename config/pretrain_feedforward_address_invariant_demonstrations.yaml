@@ -1,0 +1,12 @@
+defaults:
+  - pretrain_demonstrations
+  - override track: superhuman_address_invariant
+  - _self_
+
+rl:
+  cpu_threads: 1
+pretraining:
+  dataset: logs/demonstrations/god-marisa-reimu-20261001
+  additional_datasets:
+    - logs/demonstrations/god-marisa-reimu-expanded-20261001
+output: logs/pretraining/god-marisa-reimu-feedforward-address-${now:%Y%m%d-%H%M%S}
