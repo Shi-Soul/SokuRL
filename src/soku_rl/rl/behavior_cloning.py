@@ -17,6 +17,7 @@ from soku_rl.rl.storage import PackedObservation
 from soku_rl.rl.command_diagnostics import command_group_totals, summarize_command_groups
 from soku_rl.rl.demonstration_loss import validate_change_weight, weighted_action_loss, weighted_validation_nll
 from soku_rl.rl.demonstration_supervision import supervised_samples
+from soku_rl.rl.noisy_demonstrations import validate_noise_manifest, validate_noise_episode
 
 
 class ObservationContractEnv(Env):
@@ -40,7 +41,7 @@ def load_demonstrations(source, interface):
     manifest_bytes = path.read_bytes()
     manifest = json.loads(manifest_bytes)
     if (report["success"] is not True or report["method"] != "rule_demonstrations"
-            or manifest["complete"] is not True or manifest["schema"] not in (1, 2, 3)
+            or manifest["complete"] is not True or manifest["schema"] not in (1, 2, 3, 4)
             or manifest != report["result"] or manifest["incomplete_episodes"]):
         raise ValueError("demonstrations require a successful complete collection and matching manifest")
     if manifest["schema"] == 2 and (manifest["control"] not in {"teacher", "learner"}
@@ -61,6 +62,8 @@ def load_demonstrations(source, interface):
         if (behavior["kind"] != "teacher_takeover" or behavior["after_frames"] != after
                 or behavior["teacher"] != contract["teacher"]):
             raise ValueError("recovery demonstration behavior contract differs")
+    if manifest["schema"] == 4:
+        validate_noise_manifest(manifest, contract)
     if (manifest["observation_shape"] != list(interface.observation_space.shape)
             or manifest["observation_dtype"] != interface.observation_space.dtype.str
             or manifest["num_actions"] != interface.action_space.n):
@@ -111,6 +114,8 @@ def load_demonstrations(source, interface):
                     or type(row["supervised_steps"]) is not int or int(mask.sum()) != row["supervised_steps"]
                     or not np.array_equal(executed[mask], data["actions"][mask])):
                 raise ValueError("invalid recovery supervision mask or executed teacher suffix")
+        if data["schema"] == 4:
+            validate_noise_episode(data, row, manifest)
         expected = np.cumsum(data["rewards"][::-1], dtype=np.float64)[::-1].astype(np.float32)
         if not np.array_equal(expected, data["returns"]):
             raise ValueError("demonstration return targets do not match episode rewards")

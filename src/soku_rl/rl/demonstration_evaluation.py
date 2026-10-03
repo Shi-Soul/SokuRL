@@ -27,7 +27,7 @@ def score_validation(model, samples, manifest, batch_size, sequence_length):
     if cursor != len(samples["validation"]) or any(not rows for rows in by_seat.values()):
         raise ValueError("validation must account for all samples and both seats")
     groups = {"overall": samples["validation"], "player_0": by_seat[0], "player_1": by_seat[1]}
-    learner_controlled = manifest["schema"] >= 2 and manifest["control"] in {"learner", "teacher_takeover"}
+    learner_controlled = manifest["schema"] >= 2 and manifest["control"] in {"learner", "teacher_takeover", "teacher_noise"}
     scores = {}
     for name, rows in groups.items():
         if isinstance(model, RecurrentPPO):

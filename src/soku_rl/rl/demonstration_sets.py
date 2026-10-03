@@ -17,8 +17,8 @@ def load_demonstration_sets(sources, interface, value_coef):
     for path in paths:
         rows, manifest, contract, digest = load_demonstrations(path, interface)
         control = "teacher" if manifest["schema"] == 1 else manifest["control"]
-        if control in {"learner", "teacher_takeover"} and value_coef != 0:
-            raise ValueError("learner-controlled teacher labels require value_coef=0; returns belong to the behavior policy")
+        if control in {"learner", "teacher_takeover", "teacher_noise"} and value_coef != 0:
+            raise ValueError("teacher labels with a different behavior policy require value_coef=0; returns belong to the behavior policy")
         current = {row["world_seed"] for row in manifest["episodes"]}
         if current & worlds:
             raise ValueError("demonstration datasets overlap world seeds or held-out episodes")

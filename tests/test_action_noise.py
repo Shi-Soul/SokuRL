@@ -49,6 +49,28 @@ def test_full_noise_is_uniform_and_still_advances_original_controller():
     assert np.all(np.abs(np.bincount(draws, minlength=4) / len(draws) - .25) < .015)
 
 
+@pytest.mark.parametrize("probability", [0., .02, .7, 1.])
+def test_labelled_noise_preserves_legacy_draws_and_independent_teacher_seed(probability):
+    policy = ActionNoisePolicy("noise", CounterPolicy(), 4, probability)
+    labelled = policy.spawn_with_seeds(31, 13)
+    teacher = CounterPolicy().spawn(13)
+    legacy = policy.spawn(31)
+    same_seed = policy.spawn_with_seeds(31, 31)
+    gate, actions = np.random.SeedSequence(31).spawn(2)
+    gate_rng, action_rng = np.random.default_rng(gate), np.random.default_rng(actions)
+    accidental_agreements = 0
+    for observation in range(1000):
+        label = teacher.act(observation)
+        selected = gate_rng.random() < probability
+        executed = int(action_rng.integers(4)) if selected else label
+        assert labelled.act_with_label(observation) == (label, executed, selected)
+        assert same_seed.act_with_label(observation)[1] == legacy.act(observation)
+        accidental_agreements += selected and executed == label
+    assert labelled.actor.count == 1001
+    if probability >= .7:
+        assert accidental_agreements > 0
+
+
 def test_interleaved_actors_have_independent_reproducible_randomness():
     policy = ActionNoisePolicy("noisy", CounterPolicy(), 4, .7)
     first, replay, unrelated = policy.spawn(17), policy.spawn(17), policy.spawn(29)

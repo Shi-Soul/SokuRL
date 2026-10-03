@@ -46,13 +46,15 @@ def main(cfg):
     teacher = load_policy("teacher", config["teacher"], interface, config["device"])
     if config["behavior"] == {"kind": "teacher"}:
         behavior = teacher
-    elif config["behavior"]["kind"] in {"sb3", "sb3_recurrent", "sb3_dqn", "teacher_takeover"}:
+    elif config["behavior"]["kind"] in {"sb3", "sb3_recurrent", "sb3_dqn", "teacher_takeover", "action_noise"}:
         import torch
+        if config["behavior"]["kind"] == "action_noise" and config["behavior"]["policy"] != config["teacher"]:
+            raise ValueError("noisy collection must wrap the declared teacher")
         if str(config["device"]).startswith("cuda") and not torch.cuda.is_available():
-            raise RuntimeError("CUDA requested for learner-controlled collection but unavailable")
+            raise RuntimeError("CUDA requested for collection but unavailable")
         behavior = load_policy("behavior", config["behavior"], interface, config["device"])
     else:
-        raise ValueError("collection behavior must be teacher, learned checkpoint or explicit teacher_takeover")
+        raise ValueError("collection behavior must be teacher, learned checkpoint, teacher_takeover or action_noise")
     opponents = [load_policy(entry["name"], entry["policy"],
         opponent_interface(interface, learner, entry), config["device"]) for entry in population]
     destination = Path(config["output"]).resolve()
@@ -62,6 +64,8 @@ def main(cfg):
     identity = {"source_hashes": {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
         for folder in (root / "src/soku_rl", root / "tools") for p in sorted(folder.rglob("*.py"))},
         "sampling": ("teacher controls" if behavior is teacher else
+            "same teacher labels before independently seeded uniform input replacement" if
+            config["behavior"]["kind"] == "action_noise" else
             "learner prefix then same shadow teacher controls; supervise executed suffix" if
             config["behavior"]["kind"] == "teacher_takeover" else "learner controls; teacher only labels"),
         "behavior_fingerprint": behavior.fingerprint, "excluded_plans": prior_plans,

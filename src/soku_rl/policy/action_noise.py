@@ -36,6 +36,9 @@ class ActionNoisePolicy(Policy):
     def spawn(self, seed):
         return self._wrap(self.policy.spawn(seed), seed)
 
+    def spawn_with_seeds(self, noise_seed, policy_seed):
+        return self._wrap(self.policy.spawn(policy_seed), noise_seed)
+
     def spawn_play(self, seed):
         instance = self.policy.spawn_play(seed)
         return PlayActor(self._wrap(instance.actor, seed), instance.reset_each_round)
@@ -50,9 +53,13 @@ class ActionNoiseActor:
     random_probability: float
 
     def act(self, observation):
+        return self.act_with_label(observation)[1]
+
+    def act_with_label(self, observation):
+        """Return the underlying label, executed action and replacement decision."""
         # Advance the original controller on every observation, including replaced
         # decisions. Otherwise its timers, recurrent memory and RNG would freeze.
         action = self.actor.act(observation)
         if self.gate_rng.random() < self.random_probability:
-            return int(self.action_rng.integers(self.num_actions))
-        return action
+            return action, int(self.action_rng.integers(self.num_actions)), True
+        return action, action, False

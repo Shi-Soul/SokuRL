@@ -11,6 +11,7 @@ from soku_rl.env.encoding import AGENTS
 from soku_rl.env.match import MatchConfig, PlayerSetup
 from soku_rl.rl.storage import PackedObservation
 from soku_rl.policy.takeover import TeacherTakeoverPolicy
+from soku_rl.policy.action_noise import ActionNoisePolicy
 
 
 def demonstration_plan(config, population, seed, excluded_worlds):
@@ -43,9 +44,14 @@ def demonstration_plan(config, population, seed, excluded_worlds):
 
 def collect_demonstrations(env, plan, learner, population, teacher, opponents, behavior, directory):
     takeover = isinstance(behavior, TeacherTakeoverPolicy)
+    noisy_teacher = isinstance(behavior, ActionNoisePolicy)
     if takeover and (behavior.teacher.fingerprint != teacher.fingerprint
             or env.interface.episode.decision_frames != 1 or env.interface.episode.latency_frames != 0):
         raise ValueError("recovery collection requires the declared teacher and every-frame zero-latency control")
+    if noisy_teacher and (behavior.policy.fingerprint != teacher.fingerprint
+            or behavior.num_actions != env.single_action_space.n
+            or env.interface.episode.decision_frames != 1 or env.interface.episode.latency_frames != 0):
+        raise ValueError("noisy collection requires the declared teacher and every-frame zero-latency control")
     if env.single_observation_space.shape is None or len(env.single_observation_space.shape) != 1:
         raise ValueError("demonstrations currently require flat numeric observations")
     if (not plan or len(opponents) != len(population)
@@ -56,8 +62,10 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
         raise ValueError("invalid or overlapping demonstration plan")
     directory.mkdir(parents=True, exist_ok=False)
     (directory / "plan.json").write_text(json.dumps(plan, indent=2), encoding="utf-8")
-    metadata = {"schema": 3 if takeover else 2, "complete": False, "teacher_fingerprint": teacher.fingerprint,
-        "control": "teacher_takeover" if takeover else "teacher" if behavior is teacher else "learner",
+    metadata = {"schema": 4 if noisy_teacher else 3 if takeover else 2,
+        "complete": False, "teacher_fingerprint": teacher.fingerprint,
+        "control": "teacher_noise" if noisy_teacher else
+            "teacher_takeover" if takeover else "teacher" if behavior is teacher else "learner",
         "behavior_fingerprint": behavior.fingerprint,
         "opponent_fingerprints": {entry["name"]: p.fingerprint
             for entry, p in zip(population, opponents, strict=True)},
@@ -68,6 +76,9 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
         metadata.update(after_frames=behavior.after_frames,
             learner_fingerprint=behavior.learner.fingerprint,
             supervision="executed_teacher_suffix_with_complete_unsupervised_prefix")
+    if noisy_teacher:
+        metadata.update(random_probability=behavior.random_probability,
+                        supervision="unperturbed_teacher_labels_all_frames")
     started = time.perf_counter()
     pending = {}
     try:
@@ -80,19 +91,23 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
                 pair = (own, other) if job["learner_seat"] == 0 else (other, own)
                 matches[slot] = MatchConfig(*pair)
                 label_actor = (behavior.spawn_with_seeds(job["behavior_seed"], job["teacher_seed"])
-                    if takeover else teacher.spawn(job["teacher_seed"]))
+                    if takeover or noisy_teacher else teacher.spawn(job["teacher_seed"]))
                 actors[slot] = (label_actor,
                     opponents[job["opponent_index"]].spawn(job["opponent_seed"]),
-                    label_actor if behavior is teacher or takeover else behavior.spawn(job["behavior_seed"]))
+                    label_actor if behavior is teacher or takeover or noisy_teacher else behavior.spawn(job["behavior_seed"]))
             observations, _ = env.reset_matchups({s: j["world_seed"] for s, j in jobs.items()}, matches)
             pending = {s: {"job": j, "observations": [], "actions": [], "executed_actions": [],
-                "rewards": []} for s, j in jobs.items()}
+                "rewards": [], "noise_selected": []} for s, j in jobs.items()}
             while pending:
                 actions = {}
                 for slot, record in pending.items():
                     seat = record["job"]["learner_seat"]
                     own, other = AGENTS[seat], AGENTS[1 - seat]
-                    if takeover:
+                    if noisy_teacher:
+                        label, executed, selected = actors[slot][0].act_with_label(observations[slot][own])
+                        action, executed = int(label), int(executed)
+                        record["noise_selected"].append(selected)
+                    elif takeover:
                         label, executed = actors[slot][0].act_labelled(observations[slot][own])
                         action, executed = int(label), int(executed)
                     else:
@@ -127,6 +142,8 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
                         "rewards": reward_array, "returns": returns}
                     if takeover:
                         data["supervised"] = np.arange(len(reward_array)) >= behavior.after_frames
+                    if noisy_teacher:
+                        data["noise_selected"] = np.asarray(record["noise_selected"], dtype=bool)
                     torch.save(data, directory / name)
                     with (directory / name).open("rb") as stream:
                         digest = hashlib.file_digest(stream, "sha256").hexdigest()
@@ -139,6 +156,8 @@ def collect_demonstrations(env, plan, learner, population, teacher, opponents, b
                         row["combat_metrics"] = info["combat_metrics"]
                     if takeover:
                         row["supervised_steps"] = int(data["supervised"].sum())
+                    if noisy_teacher:
+                        row["noise_decisions"] = int(data["noise_selected"].sum())
                     metadata["episodes"].append(row)
                     del pending[slot]
                     (directory / "manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")

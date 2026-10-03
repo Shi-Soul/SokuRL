@@ -1,0 +1,29 @@
+defaults:
+  - collect_demonstrations
+  - br_opponents: god_target
+  - override rl: recurrent_ppo
+  - override track: superhuman_address_invariant
+  - _self_
+
+seed: 2901383
+num_envs: 8
+rl:
+  cpu_threads: 1
+collection:
+  episodes_per_seat: 8
+  validation_per_seat: 2
+behavior:
+  kind: action_noise
+  policy: ${teacher}
+  random_probability: 0.02
+excluded_datasets:
+  - logs/demonstrations/god-marisa-reimu-20261001
+  - logs/demonstrations/god-marisa-reimu-expanded-20261001
+  - logs/demonstrations/god-marisa-reimu-expansion64-20261002
+  - logs/demonstrations/learner-marisa-reimu-20261001
+  - logs/demonstrations/learner-marisa-reimu-iteration2-20261001
+  - logs/demonstrations/learner-recurrent-marisa-reimu-20261001
+  - logs/demonstrations/learner-online-anchor-marisa-reimu-20261002
+  - logs/demonstrations/learner-address-invariant-marisa-reimu-20261002
+  - logs/demonstrations/address-recovery-marisa-reimu-20261002
+output: logs/demonstrations/address-noisy-${now:%Y%m%d-%H%M%S}
