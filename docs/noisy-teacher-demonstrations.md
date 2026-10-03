@@ -128,3 +128,11 @@ GPU 3 预检已通过：实际构造的 3761489 参数模型与原 BC best 参�
 身份和分组与采集审计相同。按固定种子和完整序列长度独立计算，20
 epochs 预计 26865 次监督更新。预检证据在
 `logs/diagnostics/noisy-bc-preflight-20261003/summary.json`。
+
+训练已从推送后的 `04460c3` 启动，输出
+`logs/pretraining/address-noisy-marisa-reimu-20261003`。有限观察器
+`.dev/finish-noisy-bc-20261003.py` 依次检查实际初始权重、完整训练结果，
+随后用 GPU 4 跑纯 God 开发网格及输入/战斗统计审计；没有自动 PPO
+追加。另用 GPU 5 对最终 best 评分原始/扩展示范、新扰动示范和旧 BC
+学习者轨迹，检查恢复时间窗是否改善及改善是否延伸到不同状态分布。
+这些固定状态诊断不能替代真实对局结果。

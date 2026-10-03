@@ -1,0 +1,9 @@
+defaults:
+  - evaluate_noisy_bc_windows
+  - _self_
+
+datasets:
+  teacher_original: logs/demonstrations/god-marisa-reimu-20261001
+  teacher_expanded: logs/demonstrations/god-marisa-reimu-expanded-20261001
+  address_learner: logs/demonstrations/learner-address-invariant-marisa-reimu-20261002
+output: logs/diagnostics/noisy-bc-fit-${now:%Y%m%d-%H%M%S}
