@@ -229,3 +229,16 @@ uniform 比例尚未转化为纯神 AI 强度提升，不能据此宣布课程�
 45.3829%。这与前三点几乎只按右方向的分布不同，但最终仍零胜，不能把
 方向分布变均衡直接当作强度改善。证据
 `logs/diagnostics/low-noise-feedback-final-input-metrics-audit-20261003/summary.json`。
+
+完整[训练与评测曲线 PNG](../logs/diagnostics/low-noise-complete-curves-20261003-v3/comparison.png)
+及 [PDF](../logs/diagnostics/low-noise-complete-curves-20261003-v3/comparison.pdf)
+覆盖全部 216 个训练事件、四个纯 God 检查点及复用的父模型基线（合计
+80 个评测局）。横轴为本次新增 PPO 样本，父模型已有百万步及 BC 另计。
+`events.csv` / `evaluations.csv` 保存图表数据，`summary.json` 保存来源与产物哈希。
+
+生成脚本 `.dev/plot-low-noise-complete-20261003-v3.py` 核对全部评测胜负和
+战斗均值；`.dev/audit-low-noise-complete-20261003-v3.py` 另用显式加权和
+重算全部 216 个 EMA 值、反馈调整量和实际新局比例，并验证 CSV。
+汇总 SHA256 `7d7dd3e2fd9b9e9dbbb1d76a6461eaaff1d9357418f3b1d952272d693a9ed43f`。
+最终 v3 的 PNG 和 PDF 预览均已目视检查，图例不再遮挡柱形或注释；
+数值与显示核对记录分别为同目录的 `audit.json` 和 `visual-qa.json`。
