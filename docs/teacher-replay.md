@@ -56,3 +56,15 @@ BR、PPO、IPPO、NFSP、PSRO 均从共享 learner 工厂获得同一配置。
 进入采样器。全量回归为 1315 passed、12 skipped、1 deselected、27 warnings、
 2 subtests passed（125.71 秒），日志 `.dev/pytest-teacher-replay-full-20261003.log`。
 提交并推送后，在空闲 GPU 3 启动同预算实机对照；结束后的纯神 AI 评估使用空闲 GPU 0。
+
+## 实际启动
+
+已在干净提交 `aa8c922` 上启动，GPU 3 空闲、内存可用约 247 GiB、NAS 可用约 20 TiB。
+输出 `logs/training/br-address-teacher-replay-20261003`，日志
+`.dev/train-address-teacher-replay-20261003.log`，原生训练 PID 2559653。
+观察状态 `.dev/finish-address-teacher-replay-20261003.json` 跟踪该精确 PID；首轮和完整
+结束后核对配置、源码、模型、查询计数与 EMA，再执行完整 16 局纯神 AI 评估。
+
+核对脚本 `.dev/audit-teacher-replay-20261003.py` 还会独立重放离线窗口 RNG，从原始
+训练局长度重算每轮离线监督帧数和前缀帧数，并核对在线/离线分项加权等于总损失。
+首次实际更新仍待记录，尚无本候选的实战强度证据。
