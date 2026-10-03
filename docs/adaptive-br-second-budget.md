@@ -233,3 +233,33 @@ sidecar 一致。反馈已从零回调，但到此检查点尚未恢复训练胜
 进程，保留原状态，将最终评测迁到已释放的训练 GPU 5。模型、种子、旧运行模块
 和串行循环推理保持原配置，未重启训练或追加预算。调度记录为
 `.dev/resume-final-evaluations-20261003.py` 与原观察器状态中的 `reassignment`。
+
+## 第二预算最终纯神 AI 结果
+
+最终完整 16 局为 **0 胜 16 负**，两座位各 8 负。平均自身/对手掉血
+10065.375 / 2077.6875，双方符卡动作进入均值 .25 / 0；1P 对手掉血
+1596，2P 为 2559.375。最终伤害和胜率没有显示较百万步父模型的改善。
+四个追加预算检查点均为零胜，不延长本条续训预算。
+
+测评耗时 876.7082 秒，结果 SHA256
+`ba69cf952aff5e7948f681956be260c389da60bc85d9dbd294700d9b95072e35`。
+模型、原神 AI、旧运行模块、配对种子、双方统计与 worker
+`3b3eded2d5a04cde9198dd9df4db5112` 正常清理均通过核对；证据
+`logs/diagnostics/slow-feedback-second-budget-audit-20261003/final_games.json`。
+
+全部 65,436 帧输入回放重算通过。learner 右方向占 81.8983%、攻击键
+43.0375%、符卡键 75.8711%，同指令平均持续 1.7166 帧、切换率 58.2452%。
+方向集中和频繁按键仍然存在；这些边际统计不单独证明失败原因。证据
+`logs/diagnostics/slow-feedback-second-budget-final-input-metrics-audit-20261003/summary.json`。
+
+完整追加预算的课程与目标对手曲线位于
+`logs/diagnostics/second-budget-complete-curves-20261003-v2/`：
+`comparison.png`、`comparison.pdf`、`events.csv`、`evaluations.csv`、`summary.json`。
+217 个课程事件从父模型保存状态重新计算；父点加四个检查点共 80 局的胜负及
+双方掉血/符卡均重新汇总，与原审计和结果哈希一致。曲线显示 uniform 曾降至
+零，随后随长期均值下降回调至约 .294；训练 EMA 回升至约 .510，但固定纯 God
+网格仍零胜。它说明此次训练恢复未转移到目标对手，不能将原因单独归于控制器，
+也不代表已经证明其他自适应课程无效。
+
+图中柱形零点、完整 16 局分母及两个座位均保留；PNG 已检查，PDF 未另行渲染。
+生成与核对脚本/日志为 `.dev/plot-second-budget-complete-20261003-v2.{py,log}`。
