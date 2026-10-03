@@ -1,0 +1,12 @@
+defaults:
+  - train_address_low_noise_feedback
+  - _self_
+
+# Same shared PPO and frozen-parent weights initialization as the low-noise run.
+# Only the source gate is held for 16 decisions; actions remain per-frame.
+algorithm:
+  curriculum:
+    kind: adaptive_block_action_noise
+    initial_random_probability: 0.5
+    block_decisions: 16
+output: logs/training/br-address-block-feedback-${now:%Y%m%d-%H%M%S}
