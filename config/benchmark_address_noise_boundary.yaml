@@ -1,0 +1,25 @@
+defaults:
+  - benchmark_address_action_mix50
+  - _self_
+
+# Frozen first-million model; this evaluation never updates its curriculum.
+training_directory: logs/training/br-address-slow-feedback-budget-20261003
+checkpoint: final.zip
+algorithm:
+  opponents:
+    - name: god:0:character
+      probability: 1.0
+      setup: {character: 0, palette: 0, deck: 0}
+      policy:
+        kind: action_noise
+        random_probability: 0.125
+        policy:
+          kind: rule
+          name: god
+          rules:
+            roster: [god]
+            god:
+              package: ${rules.god.package}
+              api_source: ${rules.god.api_source}
+              script: character
+output: logs/diagnostics/frozen-address-noise-boundary-${now:%Y%m%d-%H%M%S}
