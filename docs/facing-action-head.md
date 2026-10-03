@@ -117,3 +117,10 @@ best，Adam/步数/课程重新从零开始，8 环境 × 256、batch=512、最�
 相关 17 项通过；修复后的全量检查为 **1466 passed、12 skipped、1 deselected、
 2 subtests passed**（160.39 秒），日志 `.dev/pytest-facing-export-full-20261003.log`。
 测试使用合成状态，不宣称已导出或验证最终游戏模型的实战表现。
+
+上述 PPO 预算的观察器已排队，路径为
+`.dev/finish-facing-ppo-20261003.{py,json,log}`。它会等待 BC 的完整测评、游戏
+worker 清理和输入日志核对全部结束，再核对 best 权重哈希与预检一致后启动；
+不依据前几局胜负筛选或改写预算。训练输出预定为
+`logs/training/br-address-facing-ppo-20261003`。实际训练审计会从原生 `.rep`
+核对每局 learner/对手角色对应的座位，不把随机 slot 当成固定座位。
