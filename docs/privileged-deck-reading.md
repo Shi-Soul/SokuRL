@@ -21,8 +21,16 @@
 逐标量算法并比较，再用既有快照 worker 对照同一暂停帧的完整状态和双视角
 编码。固定 4096 步、8 环境、全部观测动作及原 God/PPO；初始化和 2048/4096
 步参数/Adam须与旧快照诊断逐位相同。验证程序的额外重复工作不用于计时。
-之后才以原 `profile_native_snapshot` 进行不带额外核对的计时，保留父/子 pstats
-和相同检查点比较；结果未完成前不宣称吞吐改善。
+之后在同一空闲 GPU 5 顺序运行 `profile_native_deck_control` 和原
+`profile_native_snapshot`，分别使用独立诊断入口保留的旧逐标量遍历和新实现，
+两者均不带额外核对。保留父/子 pstats 和相同检查点比较；结果未完成前不宣称
+吞吐改善。这减少设备差别，仍是共享节点各一次短运行，不保证其他负载下收益。
 
 当前两个长训练的 worker 在改动前已经加载原读取器；不更换其进程、配置或
 实验预算。后续新启动进程记录新的 Python 源码身份，游戏模块身份不变。
+
+提交 `88adb16` 已推送。全量回归为 1450 passed、12 skipped、1 deselected、
+30 warnings、2 subtests passed（171.56 秒），日志
+`.dev/pytest-privileged-deck-full-20261003.log`。同一提交在 GPU 7 启动真实
+验证，输出 `logs/diagnostics/br-native-deck-verification-20261003`；初始诊断
+保留旧的逐标量比较代码，不因后续性能对照增加入口而重启。

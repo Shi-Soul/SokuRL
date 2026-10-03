@@ -1,0 +1,15 @@
+defaults:
+  - profile_native_snapshot
+  - _self_
+
+runtime:
+  command:
+    - env
+    - SOKURL_OFFLINE_SNAPSHOT=1
+    - ${runtime.cwd}/scripts/wine-worker.sh
+    - -m
+    - cProfile
+    - -o
+    - ${output}/worker.pstats
+    - tools/validation/scalar_deck_worker.py
+output: logs/diagnostics/br-native-deck-control-${now:%Y%m%d-%H%M%S}
