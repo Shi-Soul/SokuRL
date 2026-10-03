@@ -255,3 +255,23 @@ EMA=.541730314、uniform=.417174394；完整逐局重算与 sidecar 一致，概
 检查点、原对手、旧模块、配对世界/座位/策略种子及战斗统计均核对通过，
 worker `d4fe692a137a4060a9e2a156e9d30d86` 正常退出并清理；证据
 `logs/diagnostics/long-credit-budget-audit-20261003/half_games.json`。
+
+## 百万步候选的 786,432 步检查点
+
+第三个检查点已核对：48 次 rollout、100 个 PPO epoch 计数、2195 次 Adam。
+147 个完成局为 77 胜、61 负、9 超时；1P 为 41 胜、30 负、3 超时（74 局），
+2P 为 36 胜、31 负、6 超时（73 局）。各 slot 完成 17–20 局，实际座位仍
+逐回放核对。平均自身/对手掉血 8332.1565 / 8836.5850，双方符卡动作进入
+均值 .387755 / .380952。相对半程新增 55 局为 26 胜、27 负、2 超时。
+
+课程累计 147 局、EMA=.499060868、uniform=.417174394；逐局重算与 sidecar
+一致。训练胜率近期围绕目标附近，概率自首个检查点以来保持这一数值，仍为
+自适应控制的实际结果，不是固定 stage。该统计不证明纯神 AI 胜率维持或提高。
+
+检查点 SHA256 `5f138c8568e809304dd2152ccc7f2eab6a4908025fbd0aae1d7c283f305686ed`，
+参数哈希 `a565d93a9fc7d3ebc856e69ba406dee18da08df0100978e00306cfd3a07e33cd`。
+训练源码仍为 `4e70ce7`，完整配置、初始化、优化器和课程核对通过，进度快照
+恰为 786,432 步；证据
+`logs/diagnostics/long-credit-budget-audit-20261003/three_quarter.json`。
+固定原网格的 16 局纯神 AI 测评已在 GPU 7、源码 `0425b2a` 启动，输出
+`logs/benchmark/br-address-long-credit-budget-three_quarter-20261003`；完整结果待核对。
