@@ -35,3 +35,8 @@ GAE=gamma=1、batch=512、最多 3 epoch、学习率 1e-4、熵系数和 KL 限�
 证据 `logs/diagnostics/wide-credit-preflight-20261003/summary.json`，配置快照及
 脚本/日志在 `.dev/address-wide-credit-config-20261003.yaml` 和
 `.dev/check-wide-credit-20261003.{py,log}`。预检不代表实战通过。
+
+训练调度已从干净提交 `588f6d0` 启动，GPU 3、启动器 PID 3149666；实际入口
+记录使用 `cuda:0`，输出 `logs/training/br-address-wide-credit-20261003`。
+观察器 `.dev/finish-wide-credit-20261003.{py,json,log}` 会核对首轮和最终训练，
+再在 GPU 4 完成固定测评。当前尚未获得首轮 PPO 更新或实战结论。
