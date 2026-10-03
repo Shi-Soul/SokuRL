@@ -1,4 +1,5 @@
 #include "RealtimeObservation.hpp"
+#include "LocalStart.hpp"
 #include <BattleManager.hpp>
 #include <Windows.h>
 #include <cstring>
@@ -21,6 +22,19 @@ bool copyMemory(std::uint32_t address, void *target, std::uint32_t size) {
 }
 
 namespace SokuRLBridge {
+bool initializeOfflineObservation() {
+    wchar_t value[16]{};
+    const auto length = GetEnvironmentVariableW(L"SOKURL_OFFLINE_SNAPSHOT", value, _countof(value));
+    if (!length) return GetLastError() == ERROR_ENVVAR_NOT_FOUND;
+    // Observation-only opt-in. Never enable the realtime input controller or
+    // accept this transport in an unpaused/local-human/network session.
+    if (length != 1 || value[0] != L'1' || g_history ||
+        environmentValue(L"SOKURL_VS_BOOTSTRAP", 0) != 1 ||
+        environmentValue(L"SOKURL_VS_PAUSE_AT_START", 0) != 1 ||
+        GetEnvironmentVariableW(L"SOKURL_NETWORK_ROLE", value, _countof(value))) return false;
+    return initializeRealtimeObservation();
+}
+
 bool initializeRealtimeObservation() {
     wchar_t name[64]{};
     swprintf_s(name, L"Local\\SokuRLRealtimeHistory_%lu", GetCurrentProcessId());

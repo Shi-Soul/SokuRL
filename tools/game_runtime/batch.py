@@ -7,6 +7,7 @@ from bridge_shared import BridgeClient, FRAME_RING_CAPACITY, wait_for_steps
 from game_runtime.frames import FRAME_SIZE, drain_frames_into, wait_for_frame_zero
 import sokurl
 from game_runtime.observation import ObservationReader
+from game_runtime.offline_snapshot import offline_snapshot_requested
 
 
 RESET_METHODS = {"image": "process_restart", "state": "native_scene_reload",
@@ -48,6 +49,8 @@ class SokuGameBatch:
         mode = configuration["mode"]
         if self.processes or mode not in RESET_METHODS:
             raise ValueError("set a supported observation mode before launching games")
+        if offline_snapshot_requested() and mode != "privileged_state":
+            raise ValueError("offline snapshots require complete privileged observations")
         self.observation_mode = mode
         self.visibility = VisibilityConfig(**configuration["visibility"])
         self.match = MatchConfig(**configuration["match"])

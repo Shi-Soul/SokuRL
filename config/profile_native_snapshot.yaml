@@ -1,0 +1,16 @@
+defaults:
+  - profile_worker_sampling
+  - _self_
+
+runtime:
+  game_directory: Z:${runtime.cwd}/../.dev/offline-snapshot-game
+  command:
+    - env
+    - SOKURL_OFFLINE_SNAPSHOT=1
+    - ${runtime.cwd}/scripts/wine-worker.sh
+    - -m
+    - cProfile
+    - -o
+    - ${output}/worker.pstats
+    - tools/rollout_worker.py
+output: logs/diagnostics/br-native-snapshot-profile-${now:%Y%m%d-%H%M%S}

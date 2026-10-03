@@ -547,7 +547,7 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE, HMODULE)
     if (!createMapping())
         return false;
     if (!SokuRLBridge::initializeNetworkState() || !SokuRLBridge::initializeNetworkInput() ||
-        !SokuRLBridge::initializeRealtimeInput()) {
+        !SokuRLBridge::initializeRealtimeInput() || !SokuRLBridge::initializeOfflineObservation()) {
         closeMapping();
         return false;
     }

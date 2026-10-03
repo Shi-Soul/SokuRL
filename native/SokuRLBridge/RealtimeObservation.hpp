@@ -25,6 +25,7 @@ struct RealtimeHistory {
 };
 #pragma pack(pop)
 bool initializeRealtimeObservation();
+bool initializeOfflineObservation();
 void closeRealtimeObservation();
 void publishRealtimeObservation(const RawFrameState &raw);
 }

@@ -1,6 +1,7 @@
 """Use the same paused-frame observations for live environments and replays."""
 from soku_rl.env.observation.visible_state import observe_visible_states
 from soku_rl.pomg import Outcome, TimeStep
+from game_runtime.offline_snapshot import OfflineSnapshotReader, offline_snapshot_requested
 
 
 def time_step(raw, dropped_frames, observations, pid):
@@ -32,9 +33,15 @@ class ObservationReader:
             raise ValueError("unsupported observation mode")
         self.pid, self.mode, self.visibility = pid, mode, visibility
         self.resources = []
+        if offline_snapshot_requested() and mode != "privileged_state":
+            raise ValueError("offline snapshots require complete privileged observations")
         if mode == "privileged_state":
             from game_runtime.privileged import PrivilegedReader, ProcessMemory
-            self.privileged = PrivilegedReader(ProcessMemory(pid))
+            if offline_snapshot_requested():
+                from play_runtime.channels import RealtimeHistory
+                self.privileged = OfflineSnapshotReader(RealtimeHistory(pid))
+            else:
+                self.privileged = PrivilegedReader(ProcessMemory(pid))
             self.resources.append(self.privileged)
         if mode == "diagnostic_state":
             from game_runtime.diagnostic import DiagnosticReader

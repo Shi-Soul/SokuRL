@@ -1,0 +1,13 @@
+defaults:
+  - validate_matchups
+  - _self_
+
+runtime:
+  game_directory: Z:${runtime.cwd}/../.dev/offline-snapshot-game
+  command:
+    - env
+    - SOKURL_OFFLINE_SNAPSHOT=1
+    - SOKURL_SNAPSHOT_AUDIT=${output}/snapshot-verification
+    - ${runtime.cwd}/scripts/wine-worker.sh
+    - tools/validation/snapshot_worker.py
+output: logs/validation/offline-snapshot-${now:%Y%m%d-%H%M%S}

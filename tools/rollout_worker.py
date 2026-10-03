@@ -9,6 +9,7 @@ from soku_rl.env.worker_pipe import PROTOCOL, receive, send
 from game_runtime.batch import RESET_METHODS, SokuGameBatch
 from game_runtime.identity import fingerprints
 from game_runtime.startup import configure_game
+from game_runtime.offline_snapshot import offline_snapshot_requested
 
 
 def main():
@@ -28,6 +29,7 @@ def main():
     backend = SokuGameBatch(config["launch_timeout"])
     backend.enable_recording()
     send(replies, {"ok": True, "value": {"protocol": PROTOCOL, "reset_methods": RESET_METHODS,
+                                         "privileged_transport": "native_snapshot" if offline_snapshot_requested() else "process_memory",
                                          "game_directory": str(Path(game).resolve()),
                                          "game_source": config["game_directory"],
                                          "fingerprints": fingerprints()}})
