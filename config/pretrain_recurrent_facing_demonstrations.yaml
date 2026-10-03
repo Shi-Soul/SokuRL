@@ -1,0 +1,9 @@
+defaults:
+  - pretrain_recurrent_address_invariant_demonstrations
+  - _self_
+
+rl:
+  cpu_threads: 1
+  ppo:
+    action_frame: own_facing
+output: logs/pretraining/god-recurrent-facing-bc-${now:%Y%m%d-%H%M%S}

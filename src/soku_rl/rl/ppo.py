@@ -94,7 +94,23 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
         policy_type = PersistentActorCriticPolicy
     if "initial_action_prior" in parameters:
         prior_logits = logical_action_prior(interface, parameters.pop("initial_action_prior"))
+    if "action_frame" in parameters:
+        from sb3_contrib import RecurrentPPO
+        from soku_rl.rl.facing_policy import FacingRecurrentActorCriticPolicy
+        if (parameters.pop("action_frame") != "own_facing" or algorithm is not RecurrentPPO
+                or interface.commands != tuple(range(576))
+                or interface.episode.observation_mode != "privileged_state"
+                or any(key in config["ppo"] for key in (
+                    "action_factorization", "action_persistence", "initial_action_prior"))):
+            raise ValueError("facing actions require full privileged recurrent PPO without another action-head option")
+        policy_type = FacingRecurrentActorCriticPolicy
     architecture = dict(parameters["policy_kwargs"])
+    if "action_frame" in config["ppo"]:
+        from soku_rl.env.observation.memory_schema import FIGHTER_NAMES, PRIVILEGED_FEATURES, WORLD_NAMES
+        if "facing_index" in architecture:
+            raise ValueError("facing_index is derived from the shared observation contract")
+        architecture["facing_index"] = ((interface.episode.history_frames - 1) * PRIVILEGED_FEATURES
+            + 2 * (len(WORLD_NAMES) + FIGHTER_NAMES.index("dir")))
     if "action_factorization" in config["ppo"]:
         architecture["factor_button_probability"] = factorization["button_probability"]
     if "action_persistence" in config["ppo"]:
@@ -139,7 +155,7 @@ def initialize_ppo(algorithm, policy_type, env, interface, config, source, devic
                 raise ValueError(f"continued PPO must retain its {option} configuration")
     path = Path(source["path"]).resolve(strict=True)
     if source["kind"] == "weights":
-        heads = ("action_persistence", "action_factorization")
+        heads = ("action_persistence", "action_factorization", "action_frame")
         if (previous["ppo"]["policy_kwargs"] != config["ppo"]["policy_kwargs"]
                 or {key: previous["ppo"][key] for key in heads if key in previous["ppo"]}
                 != {key: config["ppo"][key] for key in heads if key in config["ppo"]}):

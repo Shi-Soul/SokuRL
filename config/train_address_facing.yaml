@@ -1,0 +1,13 @@
+defaults:
+  - train_address_slow_feedback
+  - _self_
+
+rl:
+  ppo:
+    action_frame: own_facing
+algorithm:
+  initial_policy:
+    kind: weights
+    path: logs/pretraining/god-marisa-reimu-facing-20261003/best.zip
+    training_config: logs/pretraining/god-marisa-reimu-facing-20261003/config.yaml
+output: logs/training/br-address-facing-${now:%Y%m%d-%H%M%S}
