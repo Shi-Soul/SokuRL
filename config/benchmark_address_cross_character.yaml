@@ -1,0 +1,41 @@
+defaults:
+  - benchmark_br
+  - _self_
+
+training_directory: logs/pretraining/god-marisa-reimu-address-invariant-20261002
+checkpoint: best.zip
+require_complete: true
+opponent_source: config
+num_envs: 8
+rl:
+  cpu_threads: 1
+algorithm:
+  opponents:
+    - name: god:1:character
+      probability: 0.25
+      setup: {character: 1, palette: 0, deck: 0}
+      policy: &original_god
+        kind: rule
+        name: god
+        rules:
+          roster: [god]
+          god:
+            package: ${rules.god.package}
+            api_source: ${rules.god.api_source}
+            script: character
+    - name: god:2:character
+      probability: 0.25
+      setup: {character: 2, palette: 0, deck: 0}
+      policy: *original_god
+    - name: god:5:character
+      probability: 0.25
+      setup: {character: 5, palette: 0, deck: 0}
+      policy: *original_god
+    - name: god:6:character
+      probability: 0.25
+      setup: {character: 6, palette: 0, deck: 0}
+      policy: *original_god
+benchmark:
+  world_seeds: [918042743, 1897077702]
+  policy_seed: 728341
+output: logs/diagnostics/br-address-cross-character-${now:%Y%m%d-%H%M%S}
