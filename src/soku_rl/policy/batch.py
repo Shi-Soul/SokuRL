@@ -4,6 +4,16 @@ import numpy as np
 from soku_rl.policy.dqn import DQNEpisode
 
 
+def evaluation_inference(config):
+    enabled = config.get("recurrent_batch", False)
+    if type(enabled) is not bool:
+        raise ValueError("benchmark.recurrent_batch must be a boolean")
+    if enabled:
+        from soku_rl.policy.recurrent_batch import recurrent_episode_actions
+        return recurrent_episode_actions, "grouped_recurrent_ppo_v1_grouped_greedy_dqn_v1"
+    return episode_actions, "grouped_greedy_dqn_v1_other_actors_sequential"
+
+
 def episode_actions(requests):
     actions, groups = {}, {}
     for key, (actor, observation) in requests.items():

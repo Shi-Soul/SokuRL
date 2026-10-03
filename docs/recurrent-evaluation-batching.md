@@ -1,6 +1,6 @@
 # 循环 PPO 评测的批量推理诊断
 
-当前 `evaluation.benchmark.run_plan` 通过 `policy.batch.episode_actions` 调用
+默认 `evaluation.benchmark.run_plan` 通过 `policy.batch.episode_actions` 调用
 各个 `RecurrentEpisode.act`；其中只对 DQN 做批量预测。循环 PPO 每个 actor
 分别传输观察、执行网络并取回概率，保留独立 LSTM 状态和 numpy 采样随机流。
 训练中的 SB3 向量化采样已批量调用策略，此诊断针对额外的冻结模型评测开销。
@@ -25,9 +25,8 @@
 两种数值设置之间没有单独比较轨迹；也未把严格设置的批量输出与原设置的
 逐 actor 输出当成等价。默认设置下的概率差已足以否定逐位一致性假设。
 
-局部耗时约为原来的 1/2.6，支持继续检验批量评测，但现阶段**不更改正式
-评测路径或正在运行的任务**。后续若接入，须明确其数值设置，验证独立状态、
-异步结束/重置、不同模型及双方座位，并比较完整游戏结果和端到端耗时；不得
+局部耗时约为原来的 1/2.6，支持继续检验批量评测。接入后仍须明确其数值设置，
+验证独立状态、异步结束/重置、不同模型及双方座位，并比较完整游戏结果和端到端耗时；不得
 将本次零动作差异当作任意检查点、完整历史或闭环游戏的保证。
 
 模型 SHA256 `5a3ba7e04f95bff4b68be91e936d331f51ba8b58845fb48b07380aed1f630876`。
@@ -40,3 +39,21 @@
 脚本/日志分别为 `.dev/probe-recurrent-batching-20261003.{py,log}` 和
 `.dev/probe-recurrent-batching-full-precision-20261003.{py,log}`。两次均通过
 标准 Linux GPU 入口运行，未创建游戏或执行参数更新。
+
+## 显式批量评测入口
+
+`tools/benchmark_br.py` 可追加 `+benchmark.recurrent_batch=true`，只合并持有
+同一个冻结模型的 `RecurrentEpisode`。每局仍有独立采样随机流、LSTM 状态和
+开始标志；输出状态复制到各自存储，已结束 actor 不会影响新局。自定义子类和
+包装 actor 保留自己的 `act()`。重复传入同一循环 actor 会在执行任何动作前报错。
+
+省略或设为 false 时保留原路径。开关不改变训练采样、模型参数或全 576 动作，
+也不修改全局 TF32/cuDNN 设置。启用时配置、进度和结果记录
+`grouped_recurrent_ppo_v1_grouped_greedy_dqn_v1`；批量浮点运算可能使闭环轨迹
+分叉，不能混作原推理路径的逐位重现。
+
+CPU/CUDA 测试覆盖数组/字典观察、两个模型、两层 LSTM、局部结束后新增 actor、
+独立随机流及状态存储、参数不变；面向转换策略另验证全 576 动作中的绝对指令。
+严格概率比较测试关闭 TF32，该设置只作用于测试。全量回归为 **1478 passed、
+12 skipped、1 deselected、2 subtests passed**（158.47 秒），日志
+`.dev/pytest-recurrent-batch-full-20261003.log`。完整游戏验证尚待执行，默认开关保持关闭。

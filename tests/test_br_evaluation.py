@@ -11,7 +11,8 @@ from test_matchup_response import SeatGame
 from soku_rl.policy.matchups import select_opponents
 
 
-def test_model_load_failure_retains_config_and_result(tmp_path, monkeypatch):
+@pytest.mark.parametrize("recurrent_batch", [False, True])
+def test_model_load_failure_retains_config_and_result(tmp_path, monkeypatch, recurrent_batch):
     from hydra import compose, initialize_config_dir
     from omegaconf import OmegaConf
     import soku_rl.policy.loader
@@ -23,7 +24,8 @@ def test_model_load_failure_retains_config_and_result(tmp_path, monkeypatch):
         training = compose(config_name="train", overrides=["algorithm=br", "track=superhuman",
                            "wrappers=superhuman_learning", "rules=god"])
         cfg = compose(config_name="benchmark_br", overrides=[f"training_directory={source}",
-                      f"output={output}", "device=cpu", "require_complete=false"])
+                      f"output={output}", "device=cpu", "require_complete=false",
+                      f"+benchmark.recurrent_batch={str(recurrent_batch).lower()}"])
     (source / "config.yaml").write_text(OmegaConf.to_yaml(training, resolve=True))
     (source / "final.zip").write_bytes(b"load failure fixture")
 
@@ -39,6 +41,8 @@ def test_model_load_failure_retains_config_and_result(tmp_path, monkeypatch):
     assert report["phase"] == "loading_policies"
     assert "model allocation failed" in report["error"]
     assert (output / "config.yaml").is_file()
+    saved = OmegaConf.to_container(OmegaConf.load(output / "config.yaml"), resolve=True)
+    assert ("grouped_recurrent_ppo" in saved["policy_inference"]) == recurrent_batch
     assert not (output / "plan.json").exists()
 
 
@@ -137,8 +141,10 @@ def test_completed_game_survives_failure_of_another_slot(tmp_path):
 
 
 @pytest.mark.parametrize("outcome", ["p1_win", "p2_win", "double_ko", "time_limit"])
-def test_benchmark_counts_seats_and_censoring_without_confusing_timeouts(tmp_path, outcome):
+@pytest.mark.parametrize("recurrent_batch", [False, True])
+def test_benchmark_counts_seats_and_censoring_without_confusing_timeouts(tmp_path, outcome, recurrent_batch):
     strategies, learner, setups, config = benchmark_inputs()
+    config["recurrent_batch"] = recurrent_batch
     game = EvaluationGame(outcome)
     report = benchmark_br(game, strategies, "learned", learner, setups, config, "game", tmp_path)
     assert report["summary"]["missing_games"] == 0
@@ -146,6 +152,7 @@ def test_benchmark_counts_seats_and_censoring_without_confusing_timeouts(tmp_pat
     assert len(report["by_opponent_and_seat"]) == 4
     assert report["combat_summary"]["episodes"] == 8
     assert report["combat_summary"]["measured_episodes"] == 0
+    assert ("policy_inference" in report) == recurrent_batch
     for row in report["by_opponent_and_seat"]:
         assert row["games"] == 2
         if outcome in ("double_ko", "time_limit"):

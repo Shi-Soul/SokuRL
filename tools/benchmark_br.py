@@ -55,11 +55,13 @@ def main(cfg):
     from soku_rl.env.wrappers.learning import LearningConfig, LearningInterface, LearningVectorEnv
     from soku_rl.evaluation.br import benchmark_br
     from soku_rl.policy.loader import load_policy
+    from soku_rl.policy.batch import evaluation_inference
     from soku_rl.policy.matchups import opponent_interface, select_opponents
     from soku_rl.policy.population import SeatPolicies
     from soku_rl.rl import configure_runtime
 
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    _, inference_name = evaluation_inference(config["benchmark"])
     configure_runtime(config["rl"])
     source = Path(config["training_directory"]).resolve(strict=True)
     training_path = source / "config.yaml"
@@ -92,7 +94,7 @@ def main(cfg):
     output.mkdir(parents=True, exist_ok=False)
     # Persist the actual source contract and opponent setups, not train defaults.
     config.update(source_training=training, evaluation_opponents=population,
-        policy_inference="grouped_greedy_dqn_v1_other_actors_sequential",
+        policy_inference=inference_name,
         evaluation_candidate={"name": candidate, "policy": specification}, **candidate_metadata,
         training_config_sha256=hashlib.sha256(training_path.read_bytes()).hexdigest())
     (output / "config.yaml").write_text(OmegaConf.to_yaml(OmegaConf.create(config)), encoding="utf-8")

@@ -7,7 +7,7 @@ import numpy as np
 
 from soku_rl.env.encoding import AGENTS
 from soku_rl.evaluation.tournament import make_plan, summarize
-from soku_rl.policy.batch import episode_actions
+from soku_rl.policy.batch import evaluation_inference
 
 
 def benchmark(env, strategies, candidate, config, game_identity, directory):
@@ -34,6 +34,7 @@ def run_plan(env, strategies, plan, config, directory, reset_batch):
     """Execute explicit paired trials; the reset callback owns matchup selection."""
     if not plan:
         raise ValueError("evaluation requires a nonempty trial plan")
+    episode_actions, inference_name = evaluation_inference(config)
     (directory / "plan.json").write_text(json.dumps([asdict(t) for t in plan], indent=2), encoding="utf-8")
     records = []
     started = time.perf_counter()
@@ -83,5 +84,7 @@ def run_plan(env, strategies, plan, config, directory, reset_batch):
                 del obs[slot]
                 progress = {"games": records, "seconds": time.perf_counter() - started,
                             "summary": summarize(plan, records, config["alpha"])}
+                if config.get("recurrent_batch", False):
+                    progress["policy_inference"] = inference_name
                 (directory / "progress.json").write_text(json.dumps(progress, indent=2), encoding="utf-8")
     return progress
