@@ -69,3 +69,12 @@
 输出 `logs/training/br-address-balanced-budget-20261003`，日志
 `.dev/train-balanced-budget-20261003.log`。开始等待首轮实际更新核对，尚无
 完整预算、吞吐或实战强度结论。
+
+首轮 2048 步实际更新核对通过：2 个 PPO epoch、5 次 Adam，与旧均衡短控制
+对应检查点的全部 policy 和 Adam 张量逐位相同。初始化原 BC 权重/空优化器、
+运行源码 `6a1a6e9`、新模块/快照传输、完整配置和课程 sidecar 也核对一致。
+检查点 SHA256 `c9a644d8fd3317a493e8ccb45d4c880b4a02670957472f97f909badd15c5ee23`，
+参数哈希 `d44b432ed4b8f06423bc47f98a76c21cf156cc5a3a30fe9c4c4c62a95afcd83f`。
+此时无完整局，EMA 没有虚构胜率，uniform=.5；核对时进度快照已到 6144 步，
+检查点结论仍限定为 2048 步。证据
+`logs/diagnostics/balanced-budget-audit-20261003/start.json`。
