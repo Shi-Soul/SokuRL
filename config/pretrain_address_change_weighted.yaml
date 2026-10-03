@@ -1,0 +1,7 @@
+defaults:
+  - pretrain_address_change_control
+  - _self_
+
+pretraining:
+  action_change_weight: 4.0
+output: logs/pretraining/god-marisa-reimu-address-change4-${now:%Y%m%d-%H%M%S}

@@ -1,0 +1,17 @@
+defaults:
+  - pretrain_recurrent_address_invariant_demonstrations
+  - _self_
+
+rl:
+  cpu_threads: 1
+pretraining:
+  dataset: logs/demonstrations/god-marisa-reimu-20261001
+  additional_datasets:
+    - logs/demonstrations/god-marisa-reimu-expanded-20261001
+  initial_policy:
+    kind: weights
+    path: logs/pretraining/god-marisa-reimu-address-invariant-20261002/best.zip
+    training_config: logs/pretraining/god-marisa-reimu-address-invariant-20261002/config.yaml
+  epochs: 5
+  action_change_weight: 1.0
+output: logs/pretraining/god-marisa-reimu-address-change1-${now:%Y%m%d-%H%M%S}
