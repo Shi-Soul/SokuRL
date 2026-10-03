@@ -68,8 +68,8 @@ SGD，学习率 .01、8 个至多 64 帧窗口；这是首个待检验预算，�
 完整输入/动作、稀疏缓冲区、原 God 身份、教师按自身角色选脚本以及课程初态均一致。
 最终逐字段比较只差 online_teacher 与输出目录，证据
 `logs/diagnostics/online-teacher-final-preflight-20261002/summary.json`，日志
-`.dev/check-online-teacher-final-20261002.log`。这不含游戏或强度验证；最后全量回归及
-提交后的 GPU 对照仍待完成。
+`.dev/check-online-teacher-final-20261002.log`。这项预检本身不含游戏或强度验证；
+随后完成的全量回归及 GPU 对照记录如下。
 
 提交 `2566ccd` 的最终全量回归为 1293 passed、12 skipped、1 deselected、27 warnings、
 2 subtests passed（122.63 秒），日志 `.dev/pytest-online-teacher-final-full-20261002.log`。
@@ -104,7 +104,7 @@ SGD，学习率 .01、8 个至多 64 帧窗口；这是首个待检验预算，�
 两份原始配置，再通过共享 ppo_settings 展开并比较实际配置，接续核对通过；没有修改
 训练配置、源码或模型，没有重启训练。原失败日志和状态保留，教师观察状态改为
 `.dev/finish-address-online-teacher-resumed-20261002.json`；无教师组保持
-`.dev/finish-address-teacher-control-20261002.json`。两者正等待原定预算结束，然后执行
+`.dev/finish-address-teacher-control-20261002.json`。两者随后等待原定预算结束，然后执行
 完整训练核对和各自 16 局纯神 AI 评估。
 
 ## 过程图的读法
@@ -206,3 +206,19 @@ CPU/CUDA 针对性回归 34 passed（9.65 秒），日志
 具体假设；不预先认定更大学习率能改善战力。实现与配置提交 `9442ce7`，GPU 3 已检查
 空闲，计划从原 BC 和空优化器重新开始，结束后在空闲 GPU 0 做原定 16 局配对验证。
 首轮与完整结束继续核对源文件、模型、教师查询、逐局 EMA、回放、梯度日志和清理。
+
+候选已在干净提交 `f657828` 上实际启动，原生训练 PID 2508443，输出
+`logs/training/br-address-online-teacher-strong-20261003`，日志
+`.dev/train-address-online-teacher-strong-20261003.log`；精确 PID 观察状态为
+`.dev/finish-address-online-teacher-strong-20261003.json`。这项训练仍在运行，没有强度结果。
+
+首个 2048 步检查点核对通过，证据
+`logs/diagnostics/address-online-teacher-strong-audit-20261003/start.json`。原始/有效配置、
+初始化参数、源码身份、空优化器起点及更新计数、完整空间和教师状态均符合预检。
+教师标签计数、私有 RNG、抽样/前缀帧数及更新前拟合指标与原 .01 教师组首轮一致。
+这项比较没有声称逐帧观测或后续轨迹一致。
+
+教师裁剪前梯度范数 4.866933，超过 .5 上限；NLL 为 2.160991 → 1.914657，
+窗口准确率 68.1416% → 68.5841%。原 .01 教师组同一首轮的 NLL 为
+2.160991 → 2.136244。这支持较大步长确实加强了当次标签修正，但不能据此断定后续
+训练稳定或纯神 AI 胜率改善。首轮尚未结束完整局，uniform 概率仍为 .5。
