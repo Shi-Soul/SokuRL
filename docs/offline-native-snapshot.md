@@ -39,3 +39,23 @@ Python 端复用原 `PrivilegedReader` 解码，保留前帧持久字段和 segm
 性能对照使用同一新 DLL 下未启用该选项的运行，避免把模块升级与快照切换混淆。
 父/子进程剖析、启动/采样/更新成本分别保留；没有完成测量前不宣称整体加速。
 以上真实验证尚待执行，可选路径尚未用于正式训练。
+
+## 构建与启动记录
+
+提交 `f3f48b5` 已推送。Python 全量回归 **1365 passed、12 skipped、1 deselected、
+2 subtests passed**，保留 30 条既有警告，153.10 秒；日志
+`.dev/pytest-offline-snapshot-full-20261003.log`。MSVC x86 构建通过，10 项 CTest
+全部通过（2.51 秒），日志 `.dev/{build,ctest}-offline-snapshot-20261003.log`。
+
+新桥 SHA256 `67f541326289db8322e70490029b9ca8dab2dea2766bd10512d165d78061e790`。
+复制原运行数据后，仅在独立 `.dev/offline-snapshot-game` 部署构建产物，部署记录/
+备份置于 `.dev/offline-snapshot-state`。六个部署模块中只有桥的内容改变；原
+`.dev/game` 的桥仍为
+`efeb85077d79d9adeee97bdc6b5d91d8c0b4dc0ac4279b62e782f902c93f9878`。
+首次非特权部署因读取另一私有 worker 的 `/proc/<pid>/cwd` 被拒而停止，没有替换
+文件；随后使用具备进程检查权限的原部署入口完成隔离目录部署。失败及成功日志
+`.dev/deploy-offline-snapshot{,-root}-20261003.log` 都保留，没有忽略占用检查。
+
+多角色同帧核对已启动，输出 `logs/validation/offline-snapshot-20261003`；同一新 DLL
+但保持直接内存读取的 GPU 3 对照也已启动，输出
+`logs/diagnostics/br-offline-snapshot-control-profile-20261003`。完成前不记作通过。
