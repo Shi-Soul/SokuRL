@@ -153,7 +153,8 @@ bash scripts/linux.sh -m cProfile -o ../.dev/br-worker-parent-profile-20261003.p
 不限速组合；不能直接打开实时输入来加速训练。若复用快照，须独立启用离线观察
 通道，保持原输入控制，并先逐帧核对完整原观测、持久字段、重置、神 AI 动作及
 模型更新等价，再通过新的实机计时决定是否采用。
-[可选离线快照路径](offline-native-snapshot.md)已开始实现，实机等价与性能仍待验证。
+[可选离线快照路径](offline-native-snapshot.md)已完成短采样的逐帧状态与 PPO/Adam
+等价核对及计时，完整对局验证仍在进行；详见该页，尚未替换原正式训练运行目录。
 
 原始父/子 pstats SHA256 分别为
 `2689e39789ad1f3dd830c55510deb68b4cfb04d566c41f02278865c4b5198705` /
