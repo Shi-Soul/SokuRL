@@ -51,3 +51,10 @@ learner 工厂确认初始化参数、空 Adam、零计数、稀疏缓冲区和�
 原神 AI 身份一致。另用交替座位的合成败局核对 64 个 EMA 事件及允许反馈的时点，
 这只是控制器验证，不是实战成绩。证据
 `logs/diagnostics/address-slow-feedback-preflight-20261003/summary.json`。
+
+提交 `2f64e78` 推送后在空闲 GPU 0 启动，原生 PID 2616659，输出
+`logs/training/br-address-slow-feedback-20261003`，日志
+`.dev/train-address-slow-feedback-20261003.log`。观察器
+`.dev/finish-address-slow-feedback-20261003.json` 跟踪精确 PID，核对 2048 / 65536 步
+及最终检查点；完整训练正常退出后，等待空闲 GPU 4 执行最终 16 局评估。
+观察超时只停止观察，不重启或终止训练。实际比例反馈和实战效果尚待后续验证。
