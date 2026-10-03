@@ -43,3 +43,11 @@
 
 通用入口为 `+curriculum=adaptive_block_noise`，新噪声类型仍使用共享策略
 加载器和 BR／其他调用者的同一个课程工厂。没有新增 PPO 更新实现。
+
+预检与全量测试完成、提交 `72b589a` 推送后，冻结 16 局已在 GPU 3 启动。
+输出 `logs/diagnostics/slow-feedback-final-block16-noise125-20261003`，观察器
+`.dev/finish-block-noise-20261003.py`。诊断包装器仅记录原 God 每次实际调用
+提出的指令，保存 `god_proposals.npz` 和 `controller_calls.json`；不额外调用
+God，也不改写返回动作。结束后逐帧核对两条路径：块选择 uniform 时匹配
+私有动作 RNG，选择 God 时匹配该帧实际提案，并核对调用次数等于每局帧数。
+这些是实际噪声轨迹上的提案，不是另一个反事实对局，也不是连招识别。
