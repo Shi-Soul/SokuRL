@@ -182,3 +182,14 @@ uniform 已回调到 .805310700，逐局重算与 sidecar 相同。控制器降�
 证据 `logs/diagnostics/balanced-budget-audit-20261003/three_quarter.json`。
 固定旧模块/原神 AI 的 16 局测评已在 GPU 4 启动，输出
 `logs/benchmark/br-address-balanced-budget-three_quarter-20261003`，完整结果待核对。
+
+随后完整 16 局及核对结束：**0 胜 16 负，双座位各 8 负**。平均自身/对手
+掉血 10000 / 1854.4375，双方符卡动作进入均值 .125 / 0；1P 对手掉血
+1494.625，2P 为 2214.25。相对半程的对手掉血有所回升，但三个固定检查点
+均未取得纯神 AI 胜局，仍没有恢复到原 BC 的 3777 平均对手掉血。
+
+测评耗时 613.3886 秒，源码 `bc0da18`；结果 SHA256
+`d0a229aefcbe2531fb0e7960fbd7fea076ddb2fb2a33a68ace61212ccc75737d`。
+检查点、原对手、旧模块、配对角色/策略种子及战斗统计核对通过，worker
+`7d332bea62914fdf94a27690ad3a5e52` 正常退出并清理。证据为同核对目录的
+`three_quarter_games.json`，核对源码 `dc1dc55`。训练保持原定百万步终点。

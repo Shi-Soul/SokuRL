@@ -37,3 +37,17 @@ uniform，没有额外 stage、纯神 AI 胜率反馈或固定难度切换。
 快照等价门槛及清理记录再次核对，原始门槛哈希为 `5019fc75…`。
 证据 `logs/diagnostics/slow-feedback-second-budget-preflight-20261003/summary.json`，
 脚本/日志 `.dev/check-slow-feedback-second-budget-20261003.{py,log}`。
+
+## 首次恢复更新通过
+
+训练已在干净提交 `ba9b8cf`、GPU 5 启动，启动器 PID 3030494。累计
+1,050,624 步检查点核对通过：全部初始策略和 Adam 张量逐位等于父模型，
+随后动作网络参数确已变化；PPO epoch 计数从 1525 增至 1528，Adam 从
+5932 增至 5944。完整配置、源码、原生快照运行身份和课程 sidecar 均一致。
+
+首轮没有新完整局，课程准确保留 216 局、EMA=.727258839、uniform=.267132571，
+没有把恢复后的新游戏当作已完成局，也没有重置长期统计。检查点 SHA256
+`ebffa77b2d8a9695a2cdd07c3cc82bd0573ff3dd454c3708438b0d5abb2c5b6e`，
+参数哈希 `a70d757de34abe4963c8624326fc43346e69426ee74a0f8a28d29488ae42da21`。
+证据 `logs/diagnostics/slow-feedback-second-budget-audit-20261003/start.json`，
+进度快照恰为该步数。这验证续训执行正确，尚未提供新增预算的强度结果。
