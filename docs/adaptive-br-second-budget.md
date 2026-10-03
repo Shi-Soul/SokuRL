@@ -156,3 +156,23 @@ sidecar 一致。反馈已从零回调，但到此检查点尚未恢复训练胜
 `logs/diagnostics/slow-feedback-second-budget-audit-20261003/half.json`。
 旧模块原网格的完整 16 局纯神 AI 测评已在 GPU 0、源码 `884a0e7` 启动，
 输出 `logs/benchmark/br-address-slow-feedback-second-budget-half-20261003`；结果待核对。
+
+## 1,572,864 步纯神 AI 测评：仍未获得胜局
+
+完整 16 局为 **0 胜、15 负、1 超时**，1P 为 7 负 1 超时，2P 为 8 负。
+平均自身/对手掉血 10002.375 / 2087.6875，双方符卡动作进入均值
+.5625 / .0625；1P 对手掉血 2446.75，2P 为 1728.625。上个检查点的
+对手掉血为 3529.0625，本次回落；此前改善未保持，不能宣称课程已突破纯 God。
+
+测评耗时 1076.2694 秒，结果 SHA256
+`f30f240b27d0a211c20a039b86bae6e887abe986fcccf25a41a381291e86deb8`。
+检查点、原神 AI、旧模块、配对种子、双方战斗统计和 worker
+`89803c2c65c24fc7875b7f057ee6e659` 正常清理已核对；证据
+`logs/diagnostics/slow-feedback-second-budget-audit-20261003/half_games.json`。
+
+全部 82,126 帧联合输入回放独立核对通过。learner 右方向占 89.1362%、
+攻击键 51.7035%、符卡键 53.9050%，平均同指令持续 1.6415 帧、切换率
+60.9134%。攻击和符卡键可同时按下，比例不能相加解释为互斥类别；频繁
+输入也不代表有效攻击或符卡次数。证据
+`logs/diagnostics/slow-feedback-second-half-input-metrics-audit-20261003/summary.json`。
+剩余两个预定检查点继续执行，EMA 和优化器完整延续，没有根据此结果修改课程。
