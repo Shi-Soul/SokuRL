@@ -3,6 +3,9 @@ defaults:
   - _self_
 
 models:
+  control:
+    checkpoint: logs/diagnostics/br-critic-control-20261002/final.zip
+    training_config: logs/diagnostics/br-critic-control-20261002/config.yaml
   entropy_zero:
     checkpoint: logs/diagnostics/br-address-entropy-zero-20261003/final.zip
     training_config: logs/diagnostics/br-address-entropy-zero-20261003/config.yaml
