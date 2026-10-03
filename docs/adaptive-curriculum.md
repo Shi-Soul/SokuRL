@@ -5,6 +5,8 @@
 另有[每局反馈的间隔对照](curriculum-feedback-frequency.md)，保留长期 EMA，
 检验默认反馈间隔与短训练预算之间的关系。
 最新的地址不变循环策略对照见[当前 PPO 实验](address-invariant-ppo.md)。
+[块噪声课程与完整训练记录](block-noise-curriculum.md)复用同一长期 EMA，
+将选择 God 或 uniform 的门控保持 16 帧，仍逐帧生成和执行动作。
 [冻结模型校准](frozen-noise-calibration.md)尚未证明 uniform 比例与实际难度严格单调；
 反馈方向是课程控制假设，课程内胜率提升仍须通过原神 AI 的独立评测检验。
 
