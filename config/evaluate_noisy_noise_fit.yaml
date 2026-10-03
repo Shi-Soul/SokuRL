@@ -1,0 +1,9 @@
+defaults:
+  - evaluate_noisy_teacher
+  - _self_
+
+models:
+  noisy_bc:
+    checkpoint: logs/pretraining/address-noisy-marisa-reimu-20261003/best.zip
+    training_config: logs/pretraining/address-noisy-marisa-reimu-20261003/config.yaml
+output: logs/diagnostics/noisy-teacher-noise-fit-${now:%Y%m%d-%H%M%S}
