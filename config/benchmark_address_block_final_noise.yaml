@@ -1,0 +1,26 @@
+defaults:
+  - benchmark_address_block_noise
+  - _self_
+
+# Frozen completed block-curriculum policy at a harder, paired development setting.
+training_directory: logs/training/br-address-block-feedback-20261003
+checkpoint: final.zip
+algorithm:
+  opponents:
+    - name: god:0:character
+      probability: 1.0
+      setup: {character: 0, palette: 0, deck: 0}
+      policy:
+        kind: block_action_noise
+        random_probability: 0.25
+        block_decisions: 16
+        policy:
+          kind: rule
+          name: god
+          rules:
+            roster: [god]
+            god:
+              package: ${rules.god.package}
+              api_source: ${rules.god.api_source}
+              script: character
+output: logs/diagnostics/frozen-block-final-noise-${now:%Y%m%d-%H%M%S}
