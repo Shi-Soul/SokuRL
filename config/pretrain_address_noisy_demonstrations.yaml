@@ -1,0 +1,11 @@
+defaults:
+  - pretrain_address_invariant_aggregate
+  - _self_
+
+pretraining:
+  additional_datasets:
+    - logs/demonstrations/god-marisa-reimu-expanded-20261001
+    - logs/demonstrations/address-noisy-marisa-reimu-20261003
+  # Labels precede perturbations; mixed-behavior returns are not teacher values.
+  value_coef: 0.0
+output: logs/pretraining/address-noisy-${now:%Y%m%d-%H%M%S}
