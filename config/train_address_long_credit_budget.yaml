@@ -1,0 +1,9 @@
+defaults:
+  - train_address_balanced_budget
+  - _self_
+
+rl:
+  ppo:
+    n_steps: 2048
+    gae_lambda: 1.0
+output: logs/training/br-address-long-credit-budget-${now:%Y%m%d-%H%M%S}
