@@ -90,3 +90,22 @@ learner 右方向占 97.3180%、攻击键 18.7714%、符卡键 78.1876%，
 
 本次只完成冻结难度诊断，尚未启动块噪声 PPO。后续应先定位可学习的
 块噪声起点，再决定是否值得投入训练；进行中的低噪声训练保持原定配置。
+
+## 扩展冻结难度诊断
+
+下一步预定完整测评 p=.25 和 .5，每点 16 局，仍为块长 16、同一冻结父模型、
+原配对网格、旧模块、串行推理；在空闲 GPU 3 上依次执行。两点都完整报告，
+不依据首批对局筛选；此任务不训练模型，也不自动启动新 PPO 预算。
+这些固定评测点用于确定难度，训练课程继续按长期 EMA 调整，没有新增 stage。
+
+两点共享工厂预检已通过：完整观察/动作契约、模型未更新、原 God 身份及
+角色/座位/私有种子与对照一致。预检证据分别在
+`logs/diagnostics/block-noise-250-preflight-20261003/summary.json` 和
+`logs/diagnostics/block-noise-500-preflight-20261003/summary.json`。
+
+参数化核对脚本 `.dev/audit-block-noise-grid-20261003.py` 已对旧 .125 全部
+16 局执行回归核对，与原审计的结果哈希、逐局来源计数、战斗汇总及清理状态
+完全一致；证据 `logs/diagnostics/block-noise-grid-auditor-regression-20261003/games.json`。
+原诊断脚本及证据未修改。观察器 `.dev/finish-block-noise-grid-20261003.py`
+为每点保存源码提交、配置/脚本哈希、退出码，并依次完成真实 God 提案与
+uniform 私有 RNG 核对、全部输入统计重算和独立 worker 清理验证。
