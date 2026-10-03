@@ -55,8 +55,8 @@ uniform/God 比例：两座位合并、每个目标对手单独维护统计，�
 1 deselected、2 subtests passed、48 warnings（190.88 秒）。日志分别为
 `.dev/pytest-noisy-demonstrations-targeted-final-20261003.log` 和
 `.dev/pytest-noisy-demonstrations-full-20261003.log`。旧 teacher、learner、
-takeover 数据和共享 BR/PPO 回归保持通过。真实采集结果待记录，不将
-单元测试当作真实对局证据。
+takeover 数据和共享 BR/PPO 回归保持通过。真实采集结果见后文，单元
+测试不作为真实对局证据。
 
 `726399f` 已推送，有限采集已启动：
 `logs/demonstrations/address-noisy-marisa-reimu-20261003`，GPU 入口设为 3，
@@ -121,7 +121,7 @@ God 规则本身在 CPU 执行。观察器 `.dev/finish-noisy-teacher-20261003.p
 全新优化器，LR 1e-4，20 epochs，batch 256、序列长度 64，只训练动作
 损失（`value_coef=0`），原 48 局加新 16 局。网络、完整观测和 576
 动作不变；按完整验证集 NLL 选择 best。训练后运行完整 16 局纯 God
-开发网格，再决定是否追加自适应课程 PPO；当前尚无新策略强度结论。
+开发网格，再决定是否追加自适应课程 PPO；完成后的强度结论见末节。
 
 GPU 3 预检已通过：实际构造的 3761489 参数模型与原 BC best 参数
 逐项哈希一致，优化器为空、PPO 步数为零、LR 确为 1e-4；合并数据
@@ -178,5 +178,27 @@ PNG、PDF、21 行 epoch CSV、24 行分组拟合 CSV 和源文件哈希齐全�
 渲染均已查看，文字/图例/注释可读，没有发现裁剪或重叠。图中明确保留
 单种子、描述性时间窗和离线指标的限制。
 
-纯 God 16 局配对开发评测正在 GPU 4 运行，输出
-`logs/benchmark/br-address-noisy-bc-20261003`；目前不报告新策略胜率。
+## 纯 God 完整评测：候选关闭
+
+`logs/benchmark/br-address-noisy-bc-20261003` 已完成：**0 胜 16 负**，
+两座位各 8 负，845.669 秒。best 检查点、配对世界/策略种子、双方
+角色、原 God、旧游戏身份及专属 worker 清理全部核对通过。
+worker `2e5adae7ee6544b68f21d6413b755683` 正常退出，有限观察器退出 0。
+结果 SHA256：`966fd39829e69a7b204492d7a976e11f1822fbd2b765b4f558401b9bf9a0485a`。
+
+| 座位 | 胜/负 | 平均自身/对手掉血 | 自身/对手符卡状态进入 |
+| --- | --- | --- | --- |
+| 全体 | 0/16 | 10042.125 / 3633.625 | .1875 / .0625 |
+| 1P | 0/8 | 10000 / 3074.25 | 0 / 0 |
+| 2P | 0/8 | 10084.25 / 4193 | .375 / .125 |
+
+原 BC 在该开发网格为 1 胜 15 负、平均对手掉血 3777；原来唯一的
+2P 胜局在本候选中变为负局。保留历史 Python 实现差异，这不是独立
+测试或严格同源码的因果对比。短期恢复标签拟合改善没有转化为胜局，
+因此本候选不追加 PPO 预算，不能将它标为更强 BR 初始化。
+
+逐帧输入审计覆盖 71769 个联合帧：攻击键 5.6431%，符卡键 .0376%，
+左右输入 32.6896%/32.5531%，平均相同指令持续 9.9596 帧，指令变化率
+10.0205%。这些是实际输入统计，不是命中或伤害归因。完整证据在
+`logs/diagnostics/noisy-bc-audit-20261003/games.json` 和
+`logs/diagnostics/noisy-bc-input-metrics-audit-20261003/summary.json`。
