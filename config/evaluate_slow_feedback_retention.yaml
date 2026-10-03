@@ -1,0 +1,16 @@
+defaults:
+  - evaluate_demonstrations
+  - _self_
+
+models:
+  initial_bc:
+    checkpoint: logs/pretraining/god-marisa-reimu-address-invariant-20261002/best.zip
+    training_config: logs/pretraining/god-marisa-reimu-address-invariant-20261002/config.yaml
+  candidate:
+    checkpoint: logs/training/br-address-slow-feedback-20261003/final.zip
+    training_config: logs/training/br-address-slow-feedback-20261003/config.yaml
+datasets:
+  teacher_original: logs/demonstrations/god-marisa-reimu-20261001
+  teacher_expanded: logs/demonstrations/god-marisa-reimu-expanded-20261001
+  address_learner: logs/demonstrations/learner-address-invariant-marisa-reimu-20261002
+output: logs/diagnostics/slow-feedback-retention-${now:%Y%m%d-%H%M%S}
