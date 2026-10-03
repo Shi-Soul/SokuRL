@@ -75,6 +75,19 @@ def test_history_cursor_wraps_without_losing_order(history):
     assert cursor == 0 and frames[0].match.frame == 200
 
 
+def test_snapshot_transport_preserves_offline_segment_zero(history):
+    publish(history, 1, 0, 2)
+    address = history.view + channels.HISTORY_HEADER.size
+    C.c_uint32.from_address(address + 4).value = 0
+    raw = bridge_shared.RawFrameState.from_address(address + channels.FRAME_HEADER.size)
+    raw.segmentId = 0
+    cursor, frames = channels.SnapshotHistory.read_after(history, 0)
+    assert cursor == 1 and frames[0].raw.segmentId == frames[0].raw.frameId == 0
+    assert frames[0].scores == (0, 1) and frames[0].memory.read(100, 4) == b'abcd'
+    with pytest.raises(ValueError, match='positive match'):
+        history.read_after(0)
+
+
 def test_live_history_recovers_overrun_at_latest_complete_frame(history):
     publish(history, 21, 20, 4)
     cursor, frames, dropped = history.read_latest(0)

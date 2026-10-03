@@ -37,7 +37,7 @@ def test_native_frames_keep_full_observations_and_reset_persistent_fields(captur
     direct = PrivilegedReader(memory)
     history = History()
     reader = OfflineSnapshotReader(history)
-    for segment, frame in ((7, 0), (7, 1), (7, 2), (8, 0), (8, 1)):
+    for segment, frame in ((0, 0), (0, 1), (0, 2), (1, 0), (1, 1)):
         raw = Raw(frame, segment)
         copied = snapshot(capture, memory)
         assert copied.error == 0

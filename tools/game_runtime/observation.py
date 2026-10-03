@@ -38,8 +38,8 @@ class ObservationReader:
         if mode == "privileged_state":
             from game_runtime.privileged import PrivilegedReader, ProcessMemory
             if offline_snapshot_requested():
-                from play_runtime.channels import RealtimeHistory
-                self.privileged = OfflineSnapshotReader(RealtimeHistory(pid))
+                from play_runtime.channels import SnapshotHistory
+                self.privileged = OfflineSnapshotReader(SnapshotHistory(pid))
             else:
                 self.privileged = PrivilegedReader(ProcessMemory(pid))
             self.resources.append(self.privileged)

@@ -57,7 +57,16 @@ class CapturedFrame:
     capture_seconds: float
 
 
-class RealtimeHistory(_Mapping):
+@dataclass(frozen=True)
+class SnapshotFrame:
+    raw: object
+    render: RenderSnapshot
+    memory: SnapshotMemory
+    capture_seconds: float
+    scores: tuple
+
+
+class SnapshotHistory(_Mapping):
     def __init__(self, pid):
         super().__init__(pid, "RealtimeHistory", HISTORY_SIZE, False)
         header = HISTORY_HEADER.unpack(C.string_at(self.view, HISTORY_HEADER.size))
@@ -65,22 +74,6 @@ class RealtimeHistory(_Mapping):
             self.close()
             raise ValueError("unsupported realtime history ABI")
         self.frequency = header[4]
-
-    def read_latest(self, cursor):
-        """Prefer current play over replaying a backlog; keep strict reads separate."""
-        if not self.view or type(cursor) is not int or not 0 <= cursor < 2**32:
-            raise ValueError("read requires an open history and uint32 cursor")
-        written = C.c_uint32.from_address(self.view + 24).value
-        count = (written - cursor) & 0xFFFFFFFF
-        start = (written - 1) & 0xFFFFFFFF if count else cursor
-        try:
-            end, frames = self.read_after(start)
-        except BufferError:
-            # The writer lapped this copy. Retry the newest slot on the next poll.
-            return cursor, (), 0
-        if not frames:
-            return cursor, (), 0
-        return end, frames[-1:], ((end - cursor) & 0xFFFFFFFF) - 1
 
     def read_after(self, cursor):
         if not self.view or type(cursor) is not int or not 0 <= cursor < 2**32:
@@ -118,9 +111,36 @@ class RealtimeHistory(_Mapping):
                 raise RuntimeError("inconsistent native frame identity")
             render = RenderSnapshot.decode(prefix[FRAME_HEADER.size + RAW_SIZE:MEMORY_OFFSET])
             memory = SnapshotMemory(struct.iter_unpack("<3I", descriptors), data)
-            state = MatchState(match, raw.roundId, frame, (left, right), (raw.p1.hp, raw.p2.hp), "battle")
-            frames.append(CapturedFrame(state, raw, render, memory, ticks / self.frequency))
+            frames.append(SnapshotFrame(raw, render, memory, ticks / self.frequency, (left, right)))
         return (cursor + len(frames)) & 0xFFFFFFFF, tuple(frames)
+
+
+class RealtimeHistory(SnapshotHistory):
+    def read_after(self, cursor):
+        end, snapshots = super().read_after(cursor)
+        frames = []
+        for snapshot in snapshots:
+            raw = snapshot.raw
+            state = MatchState(raw.segmentId, raw.roundId, raw.frameId, snapshot.scores,
+                               (raw.p1.hp, raw.p2.hp), "battle")
+            frames.append(CapturedFrame(state, raw, snapshot.render, snapshot.memory, snapshot.capture_seconds))
+        return end, tuple(frames)
+
+    def read_latest(self, cursor):
+        """Prefer current play over replaying a backlog; keep strict reads separate."""
+        if not self.view or type(cursor) is not int or not 0 <= cursor < 2**32:
+            raise ValueError("read requires an open history and uint32 cursor")
+        written = C.c_uint32.from_address(self.view + 24).value
+        count = (written - cursor) & 0xFFFFFFFF
+        start = (written - 1) & 0xFFFFFFFF if count else cursor
+        try:
+            end, frames = self.read_after(start)
+        except BufferError:
+            # The writer lapped this copy. Retry the newest slot on the next poll.
+            return cursor, (), 0
+        if not frames:
+            return cursor, (), 0
+        return end, frames[-1:], ((end - cursor) & 0xFFFFFFFF) - 1
 
 
 class RealtimeInput(_Mapping):

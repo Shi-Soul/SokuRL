@@ -59,3 +59,17 @@ Python 端复用原 `PrivilegedReader` 解码，保留前帧持久字段和 segm
 多角色同帧核对已启动，输出 `logs/validation/offline-snapshot-20261003`；同一新 DLL
 但保持直接内存读取的 GPU 3 对照也已启动，输出
 `logs/diagnostics/br-offline-snapshot-control-profile-20261003`。完成前不记作通过。
+
+首个多角色真实诊断在首帧失败：离线原始 segment=0，原实时通道构造 `MatchState`
+时要求正编号。失败发生在观测返回前，未产生有效核对帧；原失败结果、worker 日志
+和清理记录保留。修复将完整共享内存解析拆为 `SnapshotHistory`，直接保留原始帧；
+实时 `RealtimeHistory` 仍把它转换为既有 `MatchState`，正编号约束没有放宽。
+无需更改原生 DLL 或重编号离线局，后续验证使用新输出目录。
+
+修复后的相关 Linux 检查为 132 passed（4.09 秒），日志
+`.dev/pytest-offline-snapshot-v2-20261003.log`。Wine Python 未安装 pytest，首次
+调用在导入前失败，未记为测试通过；没有另行下载依赖。随后通过标准库 unittest
+直接检查实际 Windows 共享内存解析器，8 项通过，覆盖 segment=0、实时正编号/
+最新帧行为、不可变字节、缺帧、捕获错误、帧身份及序号回绕。脚本/日志
+`.dev/check-offline-snapshot-channel-20261003.{py,log}`，摘要
+`logs/diagnostics/offline-snapshot-channel-20261003/summary.json`。
