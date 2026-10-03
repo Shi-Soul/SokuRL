@@ -43,3 +43,10 @@ learner 工厂和原配置，重新应用冻结范围；检查点续训拒绝改
 全量回归为 1352 passed、12 skipped、1 deselected、30 warnings、2 subtests passed
 （134.14 秒），日志 `.dev/pytest-frozen-representation-full-20261003.log`。
 这些检查验证实现和兼容性，尚不是实战收益证据。
+
+提交 `b16673f` 推送后在空闲 GPU 3 启动，内存可用约 242 GiB。输出
+`logs/training/br-address-frozen-representation-20261003`，原生 PID 2644764，日志
+`.dev/train-address-frozen-representation-20261003.log`。观察器
+`.dev/finish-address-frozen-representation-20261003.json` 跟踪精确进程，首轮/最终
+核对冻结参数和缓冲区未变、冻结参数没有 Adam 状态、动作/价值头实际更新，再在
+空闲 GPU 5 执行最终 16 局评估。运行中的慢反馈候选仍使用其启动时已加载的实现。
