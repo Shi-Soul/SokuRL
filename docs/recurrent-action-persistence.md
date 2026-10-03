@@ -68,6 +68,16 @@ TorchRL 导入与 ONNX tracing/export 提示，跳过项仍不能视为已验证
 有限观察器 `.dev/finish-recurrent-persistent-bc-20261003.py` 将先在 GPU 3
 执行 20 epoch BC，审计真实初值、数据身份、更新次数和 best 选择，再在
 GPU 4 执行 16 局纯 God 及输入/清理审计。每项均调用项目 Linux 入口，
-启动前检查干净工作树和空闲 GPU；不自动启动 PPO。当前尚未启动训练。
+启动前检查干净工作树和空闲 GPU；不自动启动 PPO。训练已按此流程启动。
 训练输出 `logs/pretraining/god-marisa-reimu-recurrent-persistent-20261003`，
 评测输出 `logs/benchmark/br-address-recurrent-persistent-bc-20261003`。
+
+## 实际启动
+
+运行源码 `1cbcde2`，GPU 3 训练已启动。真实 `initial.zip` 的 SHA256 为
+`b75152b8dabb16d987fa84ae68e8b245a6004d29cd2b8fb66f13f6202de0aa13`，
+参数哈希与预检一致，PPO 计数为零且 Adam 为空；身份清单中的全部源码
+哈希已与该提交核对。证据
+`logs/diagnostics/recurrent-persistent-bc-preflight-20261003/actual-start.json`。
+当前观察器跟踪精确训练进程，等待原定 20 epoch 完成，再执行训练审计和
+配对实战。监督训练进度不作为策略强度或 PPO 提升证据。
