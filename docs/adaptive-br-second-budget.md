@@ -196,3 +196,21 @@ sidecar 一致。反馈已从零回调，但到此检查点尚未恢复训练胜
 `logs/diagnostics/slow-feedback-second-budget-audit-20261003/three_quarter.json`。
 另用冻结的父模型补测[中间噪声区间](frozen-noise-boundary.md)，分开观察
 固定策略面对不同混合比例的表现，不改动当前续训课程。
+
+## 1,835,008 步纯神 AI 结果
+
+第三个固定测评点为 **0 胜、15 负、1 超时**，1P 为 8 负，2P 为 7 负 1 超时。
+平均自身/对手掉血 9933.875 / 2958.75，双方符卡动作进入均值 .25 / .0625；
+1P 对手掉血 3146.625，2P 为 2770.875。相比上个点的 2087.6875 对手掉血
+有所回升，但仍无胜局；混合训练重新出现胜局尚未转化为纯 God 胜利。
+
+完整测评耗时 1181.0745 秒，结果 SHA256
+`1578987ec6f8407bf43e387b26323879afd127596c2452a6dcbb6c8ca78c4759`。
+模型/原神 AI/旧模块、配对种子、战斗汇总与 worker
+`3025944de81549d5aa9ca0915ad2dddc` 正常清理均核对通过；证据
+`logs/diagnostics/slow-feedback-second-budget-audit-20261003/three_quarter_games.json`。
+
+全部 90,323 帧联合输入回放重算通过；learner 右方向占 88.4824%、攻击键
+48.7384%、符卡键 59.3548%，同指令平均持续 1.8961 帧、切换率 52.7323%。
+证据 `logs/diagnostics/slow-feedback-second-three-quarter-input-metrics-audit-20261003/summary.json`。
+最终 2,097,152 步及测评按原预算继续，当前续训未改变课程或初始化。

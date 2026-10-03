@@ -1,0 +1,12 @@
+defaults:
+  - train_address_slow_feedback_second_budget
+  - _self_
+
+algorithm:
+  # Explicit weights initialization: reset Adam, sample counters and EMA.
+  initial_policy:
+    kind: weights
+  curriculum:
+    initial_random_probability: 0.125
+    gain: 0.05
+output: logs/training/br-address-low-noise-feedback-${now:%Y%m%d-%H%M%S}
