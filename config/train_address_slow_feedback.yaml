@@ -1,0 +1,8 @@
+defaults:
+  - train_address_action_mix50
+  - _self_
+
+algorithm:
+  curriculum:
+    update_every: 8
+output: logs/training/br-address-slow-feedback-${now:%Y%m%d-%H%M%S}
