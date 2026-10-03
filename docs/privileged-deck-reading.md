@@ -34,3 +34,19 @@
 `.dev/pytest-privileged-deck-full-20261003.log`。同一提交在 GPU 7 启动真实
 验证，输出 `logs/diagnostics/br-native-deck-verification-20261003`；初始诊断
 保留旧的逐标量比较代码，不因后续性能对照增加入口而重启。
+
+真实验证已正常结束，205.0783 秒。4,104 个完整暂停状态及双视角编码一致，
+每个状态两种读取器、每种读取器两份牌组，共 **16,416 次**新旧牌组比较全部
+通过。初始化及 2048/4096 步全部 policy、Adam 与原快照诊断逐位相同；最终
+参数哈希 `6695c9c9c5a29ccfc3c6e5f64bd4f10c6126eff58943813fe424203316502345`，
+ZIP SHA256 `43c1ee29ef030b0f7ca0d576e0361c65c9542e4a9e865ce624851b00873a0fcc`。
+源码、配置、原神 AI、运行模块和私有 worker 正常清理核对通过，证据
+`logs/diagnostics/native-deck-audit-20261003/verify/summary.json`。
+没有完整局，不把此诊断记为战力结果；额外双读与旧算法重算耗时不用于估计加速。
+
+计时对照提交 `8941e3f` 已推送，GPU 5 上开始旧逐标量入口，再顺序运行新实现。
+控制入口的函数语法树与 `621d689` 中的原 `deck` 相同，仅重命名函数及 self
+参数；最终计时核对会重新检查并记录该证据。观察状态
+`.dev/finish-native-deck-profile-20261003.json`，两次独立输出
+`logs/diagnostics/br-native-deck-{control,profile}-20261003`。每次都先核对完整
+模型/Adam，随后才比较实际调用数与计时；未完成时不填性能改善比例。
