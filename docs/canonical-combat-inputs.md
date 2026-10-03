@@ -121,3 +121,12 @@ batch=256 的样本平均每名玩家 1.666 个在场对象、最多 29 个；ba
 退出 0 的脚本/日志为 `.dev/profile-canonical-compaction-20261003.{py,log}`；
 `logs/diagnostics/canonical-compaction-profile-20261003/summary.json` 保留各次
 计时、样本索引、数据哈希和检查点身份。当前 BC/后续实战仍使用原实现。
+
+随后独立执行 `.dev/check-canonical-compaction-20261003.py`，退出 0。
+16 组 CPU/CUDA × 1/2 历史帧 × 0/1/29/1024 对象的合成检查覆盖双朝向、
+历史朝向不同及零填充历史。规范化输入、特征输出、参数梯度、两次 Adam
+更新后的参数与优化器状态均逐位一致，原始输入未被修改。另外 CPU/CUDA
+各运行共享工厂的 16 步循环 PPO 对照，所有策略参数及 Adam 状态逐位一致，
+且参数确实发生更新。该 PPO 使用确定性的接口测试环境，不能代替完整
+游戏轨迹、部署导出或真实训练吞吐验证。详细证据为性能目录中的
+`equivalence.json`；正式模块仍未采用原型。
