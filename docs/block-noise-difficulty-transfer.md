@@ -48,3 +48,21 @@ GPU 3、冻结模型及所有预检输入哈希匹配，再调用项目 Linux �
 `logs/diagnostics/block-final-noise-audit-20261003/games.json`，输入核对
 `logs/diagnostics/block-final-noise-input-audit-20261003/summary.json`。
 所有结果待真实对局和审计完成后填写，不以预检代替游戏证据。
+
+## 当前最终检查点的恢复预检
+
+在等待固定难度对局期间，通过共享 `create_learner` 以 `kind: checkpoint`
+加载实际最终模型，并与直接加载的原模型逐项比较。38 个策略状态张量及
+26 组 Adam 状态完全一致；保留 1,048,576 采样步、1,510 个 PPO epoch
+与 Adam step=5,885。缓冲区仍为稀疏循环实现，8 环境、n_steps=256、
+batch=512、3 epoch、学习率 1e-4、gamma=1、GAE=.95 均不变。
+
+课程恢复后完整状态与 sidecar 一致，保留 208 局、EMA=.674665585、
+uniform=.298857405。实际创建的块噪声 actor 使用上述比例和块长 16，
+并记录 controller_episodes_at_start=208；模型不携带旧游戏现场进入新环境。
+本预检新增采样和优化步数均为 **0**，不代表已经续训，也不替代强度门槛。
+
+证据 `logs/diagnostics/block-final-restore-preflight-20261003/summary.json`，
+SHA256 `0b71de4e9ef1260ba993752f6469968df1c2a9bffd3459d6acdc96b4fc0711cd`；
+脚本及日志 `.dev/check-block-final-restore-20261003.{py,log}`，退出 0。
+该检查只证明当前配置和产物可恢复；若后续改配置，仍须检查新配置的完整契约。
